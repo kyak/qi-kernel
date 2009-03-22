@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  *
  */
+#define DEBUG
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -34,7 +35,9 @@
 #define I2C_READ	1
 #define I2C_WRITE	0
 
-#define TIMEOUT         1000
+#define TIMEOUT         10000000
+#define I2C_TIMEOUT	(HZ / 100)
+
 unsigned short sub_addr = 0;
 int addr_val = 0;
 struct jz_i2c {
@@ -47,47 +50,6 @@ struct jz_i2c {
 	struct clk		*clk;
 };
 
-/*
- * I2C bus protocol basic routines
- */
-static int i2c_put_data(unsigned char data)
-{
-	unsigned int timeout = TIMEOUT*10;
-
-	__i2c_write(data);
-	__i2c_set_drf();
-	while (__i2c_check_drf() != 0);
-	while (!__i2c_transmit_ended());
-	while (!__i2c_received_ack() && timeout)
-		timeout--;
-
-	if (timeout)
-		return 0;
-	else
-		return -ETIMEDOUT;
-}
-
-static int i2c_get_data(unsigned char *data, int ack)
-{
-	int timeout = TIMEOUT*10;
-
-	if (!ack)
-		__i2c_send_nack();
-	else
-		__i2c_send_ack();
-
-	while (__i2c_check_drf() == 0 && timeout)
-		timeout--;
-
-	if (timeout) {
-		if (!ack)
-			__i2c_send_stop();
-		*data = __i2c_read();
-		__i2c_clear_drf();
-		return 0;
-	} else
-		return -ETIMEDOUT;
-}
 
 /*
  * I2C interface
@@ -97,116 +59,140 @@ void i2c_jz_setclk(unsigned int i2cclk)
 	__i2c_set_clk(jz_clocks.extalclk, i2cclk);
 }
 
-static int xfer_read(unsigned char device, struct i2c_adapter *adap, unsigned char *buf, int length)
+
+void dump_regs(int step)
 {
-	int cnt = length;
-	int timeout = 5;
-
-	device = (0xa << 3) | ((sub_addr & 0x0700) >> 8);
-	sub_addr = sub_addr & 0xff;
-
-L_try_again:
-
-	if (timeout < 0)
-		goto L_timeout;
-
-	__i2c_send_nack();	/* Master does not send ACK, slave sends it */
-
-	if (addr_val) {
-		__i2c_send_start();
-		if (i2c_put_data( (device << 1) | I2C_WRITE ) < 0)
-			goto device_werr;
-		if (i2c_put_data(sub_addr) < 0)
-			goto address_err;
-	}
-	__i2c_send_start();
-
-	if (i2c_put_data((device << 1) | I2C_READ ) < 0)
-		goto device_rerr;
-
-	__i2c_send_ack();	/* Master sends ACK for continue reading */
-	__i2c_send_start();
-
-	while (cnt) {
-		if (cnt == 1) {
-			if (i2c_get_data(buf, 0) < 0)
-				break;
-		} else {
-			if (i2c_get_data(buf, 1) < 0)
-				break;
-		}
-		cnt--;
-		buf++;
-	}
-	addr_val = 0;
-	return length - cnt;
- device_rerr:
- device_werr:
- address_err:
-	timeout --;
-	__i2c_send_stop();
-	goto L_try_again;
-
-L_timeout:
-	__i2c_send_stop();
-	printk("Read I2C device 0x%2x failed.\n", device);
-	return -ENODEV;
+	printk("%d: I2C regs:\n", step);
+	printk("SR: %08x\tCR: %08x\n", REG_I2C_SR, REG_I2C_CR);
 }
 
-static int xfer_write(unsigned char device, struct i2c_adapter *adap, unsigned char *buf, int length)
+int very_useful_function(unsigned long arg)
 {
-	int cnt = length;
-	int cnt_in_pg;
-	int timeout = 5;
-	unsigned char *tmpbuf;
-	unsigned char tmpaddr;
+	if (arg)
+		return arg;
+	else
+		return 111;
+}
 
-	device = (0xa << 3) | ((sub_addr & 0x0700) >> 8);
-	sub_addr = sub_addr & 0xff; 
+static irqreturn_t i2c_jz_handle_irq(int irq, void *dev_id)
+{
+	struct jz_i2c *i2c = (struct jz_i2c *) dev_id;
 
-	__i2c_send_nack();	/* Master does not send ACK, slave sends it */
+	wake_up(&i2c->wait);
+	dev_dbg(&i2c->adap.dev, "IRQ! SR = %08x\n", REG_I2C_SR);
 
- W_try_again:
-	if (timeout < 0)
-		goto W_timeout;
+	return IRQ_HANDLED;
+}
 
-	cnt = length;
-	tmpbuf = (unsigned char *)buf;
-	tmpaddr = device;
- start_write_page:
-	cnt_in_pg = 0;
+static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, int length)
+{
+	unsigned char *b = buf;
+	struct jz_i2c *i2c = i2c_get_adapdata(adap); 
+	int ret = 0;
+	unsigned long timeout;
+
+	dev_dbg(&adap->dev, "%s\n", __func__);
+	printk("LPC INT = %d\n", __gpio_get_pin(GPIO_LPC_INT));
+
+	__i2c_enable();
+	__i2c_clear_drf();
+
+	if (length)
+		__i2c_send_ack();
+	else
+		__i2c_send_nack();
+
 	__i2c_send_start();
-	if (i2c_put_data( (device << 1) | I2C_WRITE ) < 0)
-		goto device_err;
-	if (addr_val) {
-		if (i2c_put_data(sub_addr) < 0)
-			goto address_err;
-	}
-	while (cnt) {
-		if (++cnt_in_pg > 8) {
-			__i2c_send_stop();
-			mdelay(1);
-			sub_addr += 8;
-			goto start_write_page;
-		}
-		if (i2c_put_data(*tmpbuf) < 0) 
-			break;
-		cnt--;
-		tmpbuf++;
-	}
-	__i2c_send_stop();
-	addr_val = 0;
-	return length - cnt;
- device_err:
- address_err:
-	timeout--;
-	__i2c_send_stop();
-	goto W_try_again;
+	__i2c_write((addr << 1) | I2C_READ);
+	__i2c_set_drf();
 
-W_timeout:
-	printk(KERN_DEBUG "Write I2C device 0x%2x failed.\n", device);
+	while (!__i2c_transmit_ended());
+
+	dev_dbg(&adap->dev, "%s: Received %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
+
+	while (length--) {
+
+//		ret = wait_event_interruptible_timeout(i2c->wait, __i2c_check_drf(), I2C_TIMEOUT);
+//		if (ret < 0)
+//			return ret;
+//		
+//		if (ret) {
+//			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
+//			return -ETIMEDOUT;
+//		}
+
+		timeout = jiffies + I2C_TIMEOUT;
+		while (!__i2c_check_drf() && time_before(jiffies, timeout))
+				schedule();
+
+		if (!time_before(jiffies, timeout)) {
+			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
+			dev_dbg(&adap->dev, "%s: ACKF: %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
+			__i2c_disable();
+			return -ETIMEDOUT;
+		}
+
+		if (length == 1)
+			__i2c_send_nack();
+
+		*b++ = __i2c_read();
+		__i2c_clear_drf();
+	}
 	__i2c_send_stop();
-	return -ENODEV;
+	__i2c_disable();
+
+	return 0;
+}
+
+
+static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned char *buf, int length)
+{
+	int l = length + 1;
+	int timeout;
+	int i;
+
+	for (i = 0; i < length; i++)
+		printk("%02x ", buf[i]);
+	printk("\n");
+	
+	dev_dbg(&adap->dev, "%s\n", __func__);
+
+	__i2c_enable();
+	__i2c_clear_drf();
+	__i2c_send_start();
+
+	while (l--) {
+
+		if (l == length)
+			__i2c_write(addr << 1);
+		else
+			__i2c_write(*buf++);
+
+		__i2c_set_drf();
+
+		timeout = TIMEOUT;
+		while (__i2c_check_drf() && timeout)
+			timeout--;
+
+		if (!timeout) {
+			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
+//			__i2c_send_stop();
+			__i2c_disable();
+			return -ETIMEDOUT;
+		}
+
+		if (!__i2c_received_ack()) {
+			dev_dbg(&adap->dev, "NAK has been received during write\n");
+			__i2c_disable();
+			return -EINVAL;
+		}
+	}
+
+	__i2c_send_stop();
+	while (!__i2c_transmit_ended());
+
+	__i2c_disable();
+	return 0;
 }
 
 static int i2c_jz_xfer(struct i2c_adapter *adap, struct i2c_msg *pmsg, int num)
@@ -219,16 +205,15 @@ static int i2c_jz_xfer(struct i2c_adapter *adap, struct i2c_msg *pmsg, int num)
 			pmsg->flags & I2C_M_RD ? "read" : "writ",
 			pmsg->len, pmsg->len > 1 ? "s" : "",
 			pmsg->flags & I2C_M_RD ? "from" : "to",	pmsg->addr);
-		if (pmsg->len && pmsg->buf) {	/* sanity check */
-			if (pmsg->flags & I2C_M_RD)
-				ret = xfer_read(pmsg->addr, adap, pmsg->buf, pmsg->len);
-			else
-				ret = xfer_write(pmsg->addr, adap, pmsg->buf, pmsg->len);
 
-			if (ret)
-				return ret;
-			/* Wait until transfer is finished */
-		}
+		if (pmsg->flags & I2C_M_RD)
+			ret = xfer_read(pmsg->addr, adap, pmsg->buf, pmsg->len);
+		else
+			ret = xfer_write(pmsg->addr, adap, pmsg->buf, pmsg->len);
+
+		if (ret)
+			return ret;
+		/* Wait until transfer is finished */
 		dev_dbg(&adap->dev, "transfer complete\n");
 		pmsg++;		/* next message */
 	}
@@ -269,10 +254,17 @@ static int i2c_jz_probe(struct platform_device *dev)
 	sprintf(i2c->adap.name, "jz_i2c-i2c.%u", dev->id);
 	i2c->adap.algo_data = i2c;
 	i2c->adap.dev.parent = &dev->dev;
+	i2c_set_adapdata(&i2c->adap, i2c);
 
 	if (plat) {
 		i2c->adap.class = plat->class;
 	}
+
+//	ret = request_irq(IRQ_I2C, i2c_jz_handle_irq, 0, dev->name, i2c);
+//	if (ret) {
+//		dev_err(&dev->dev, "Unable to claim I2C IRQ\n");
+//		goto err_irq;
+//	}
 
 	/*
 	 * If "dev->id" is negative we consider it as zero.
@@ -287,21 +279,28 @@ static int i2c_jz_probe(struct platform_device *dev)
 		goto eadapt;
 	}
 
+	REG_I2C_CR |= I2C_CR_IEN;
+
 	platform_set_drvdata(dev, i2c);
 	dev_info(&dev->dev, "JZ47xx i2c bus driver.\n");
 	return 0;
 eadapt:
+//	free_irq(IRQ_I2C, i2c);
+//err_irq:
 	__i2c_disable();
+	kfree(i2c);
 emalloc:
 	return ret;
 }
 
 static int i2c_jz_remove(struct platform_device *dev)
 {
-	struct i2c_adapter *adapter = platform_get_drvdata(dev);
+	struct jz_i2c *i2c = platform_get_drvdata(dev);
 	int rc;
 
-	rc = i2c_del_adapter(adapter);
+	REG_I2C_CR &= ~I2C_CR_IEN;
+//	free_irq(IRQ_I2C, i2c);
+	rc = i2c_del_adapter(&i2c->adap);
 	platform_set_drvdata(dev, NULL);
 	return rc;
 }
