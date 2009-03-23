@@ -10,7 +10,6 @@
  * published by the Free Software Foundation.
  *
  */
-#define DEBUG
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -92,7 +91,6 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 	unsigned long timeout;
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
-	printk("LPC INT = %d\n", __gpio_get_pin(GPIO_LPC_INT));
 
 	__i2c_enable();
 	__i2c_clear_drf();
@@ -151,10 +149,6 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 	int timeout;
 	int i;
 
-	for (i = 0; i < length; i++)
-		printk("%02x ", buf[i]);
-	printk("\n");
-	
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
 	__i2c_enable();
