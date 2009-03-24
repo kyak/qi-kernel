@@ -86,9 +86,8 @@ static irqreturn_t i2c_jz_handle_irq(int irq, void *dev_id)
 static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, int length)
 {
 	unsigned char *b = buf;
-	struct jz_i2c *i2c = i2c_get_adapdata(adap); 
-	int ret = 0;
 	unsigned long timeout;
+	int ret = 0;
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
@@ -102,9 +101,15 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 
 	__i2c_send_start();
 	__i2c_write((addr << 1) | I2C_READ);
+
+	timeout = jiffies + I2C_TIMEOUT;
 	__i2c_set_drf();
 
-	while (!__i2c_transmit_ended());
+	while (__i2c_transmit_ended() && time_before(jiffies, timeout))
+		schedule();
+	timeout = jiffies + I2C_TIMEOUT;
+	while (!__i2c_transmit_ended())
+		schedule();
 
 	dev_dbg(&adap->dev, "%s: Received %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
 
@@ -113,7 +118,7 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 //		ret = wait_event_interruptible_timeout(i2c->wait, __i2c_check_drf(), I2C_TIMEOUT);
 //		if (ret < 0)
 //			return ret;
-//		
+//
 //		if (ret) {
 //			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
 //			return -ETIMEDOUT;
@@ -126,20 +131,22 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 		if (!time_before(jiffies, timeout)) {
 			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
 			dev_dbg(&adap->dev, "%s: ACKF: %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
-			__i2c_disable();
-			return -ETIMEDOUT;
+			ret = -ETIMEDOUT;
+			goto end;
 		}
 
 		if (length == 1)
 			__i2c_send_nack();
 
 		*b++ = __i2c_read();
+
 		__i2c_clear_drf();
 	}
 	__i2c_send_stop();
+end:
 	__i2c_disable();
 
-	return 0;
+	return ret;
 }
 
 
@@ -147,7 +154,6 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 {
 	int l = length + 1;
 	int timeout;
-	int i;
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
@@ -273,8 +279,6 @@ static int i2c_jz_probe(struct platform_device *dev)
 		goto eadapt;
 	}
 
-	REG_I2C_CR |= I2C_CR_IEN;
-
 	platform_set_drvdata(dev, i2c);
 	dev_info(&dev->dev, "JZ47xx i2c bus driver.\n");
 	return 0;
@@ -292,7 +296,6 @@ static int i2c_jz_remove(struct platform_device *dev)
 	struct jz_i2c *i2c = platform_get_drvdata(dev);
 	int rc;
 
-	REG_I2C_CR &= ~I2C_CR_IEN;
 //	free_irq(IRQ_I2C, i2c);
 	rc = i2c_del_adapter(&i2c->adap);
 	platform_set_drvdata(dev, NULL);
