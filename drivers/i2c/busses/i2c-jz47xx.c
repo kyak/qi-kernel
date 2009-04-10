@@ -35,7 +35,7 @@
 #define I2C_WRITE	0
 
 #define TIMEOUT         10000000
-#define I2C_TIMEOUT	(HZ / 100)
+#define I2C_TIMEOUT	(HZ / 10)
 
 unsigned short sub_addr = 0;
 int addr_val = 0;
@@ -112,6 +112,10 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 		schedule();
 
 	dev_dbg(&adap->dev, "%s: Received %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
+	if (!__i2c_received_ack()) {
+		ret = -EINVAL;
+		goto end;
+	}
 
 	while (length--) {
 
@@ -135,14 +139,15 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 			goto end;
 		}
 
-		if (length == 1)
+		if (length == 1) {
 			__i2c_send_nack();
+			__i2c_send_stop();
+		}
 
 		*b++ = __i2c_read();
 
 		__i2c_clear_drf();
 	}
-	__i2c_send_stop();
 end:
 	__i2c_disable();
 
