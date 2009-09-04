@@ -35,7 +35,7 @@
 #define I2C_WRITE	0
 
 #define TIMEOUT         10000000
-#define I2C_TIMEOUT	(HZ / 10)
+#define I2C_TIMEOUT	(HZ / 5)
 
 unsigned short sub_addr = 0;
 int addr_val = 0;
@@ -107,6 +107,12 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 
 	while (__i2c_transmit_ended() && time_before(jiffies, timeout))
 		schedule();
+	if (!time_before(jiffies, timeout)) {
+		dev_dbg(&adap->dev, "%s: %d: timeout\n", __func__, __LINE__);
+		ret = -ETIMEDOUT;
+		goto end;
+	}
+
 	timeout = jiffies + I2C_TIMEOUT;
 	while (!__i2c_transmit_ended())
 		schedule();
