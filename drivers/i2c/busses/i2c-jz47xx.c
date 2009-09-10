@@ -30,6 +30,9 @@
 #include <asm/jzsoc.h>
 #include "i2c-jz47xx.h"
 
+
+#define DEFAULT_I2C_CLOCK 100000
+
 /* I2C protocol */
 #define I2C_READ	1
 #define I2C_WRITE	0
@@ -92,6 +95,7 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
 	__cpm_start_i2c();
+	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
 	__i2c_enable();
 	__i2c_clear_drf();
 
@@ -171,6 +175,7 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
 	__cpm_start_i2c();
+	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
 	__i2c_enable();
 	__i2c_clear_drf();
 	__i2c_send_start();
@@ -252,7 +257,7 @@ static int i2c_jz_probe(struct platform_device *dev)
 	int ret;
 
 	__cpm_start_i2c();
-	__i2c_set_clk(jz_clocks.extalclk, 10000); /* default 10 KHz */
+	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
 	__i2c_enable();
 
 	i2c = kzalloc(sizeof(struct jz_i2c), GFP_KERNEL);
