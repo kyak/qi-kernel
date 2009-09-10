@@ -91,6 +91,7 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
+	__cpm_start_i2c();
 	__i2c_enable();
 	__i2c_clear_drf();
 
@@ -156,6 +157,7 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 	}
 end:
 	__i2c_disable();
+	__cpm_stop_i2c();
 
 	return ret;
 }
@@ -168,6 +170,7 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
+	__cpm_start_i2c();
 	__i2c_enable();
 	__i2c_clear_drf();
 	__i2c_send_start();
@@ -203,6 +206,7 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 	while (!__i2c_transmit_ended());
 
 	__i2c_disable();
+	__cpm_stop_i2c();
 	return 0;
 }
 
@@ -247,6 +251,7 @@ static int i2c_jz_probe(struct platform_device *dev)
 	struct i2c_jz_platform_data *plat = dev->dev.platform_data;
 	int ret;
 
+	__cpm_start_i2c();
 	__i2c_set_clk(jz_clocks.extalclk, 10000); /* default 10 KHz */
 	__i2c_enable();
 
@@ -292,11 +297,16 @@ static int i2c_jz_probe(struct platform_device *dev)
 
 	platform_set_drvdata(dev, i2c);
 	dev_info(&dev->dev, "JZ47xx i2c bus driver.\n");
+
+	__i2c_disable();
+	__cpm_stop_i2c();
+
 	return 0;
 eadapt:
 //	free_irq(IRQ_I2C, i2c);
 //err_irq:
 	__i2c_disable();
+	__cpm_stop_i2c();
 	kfree(i2c);
 emalloc:
 	return ret;
