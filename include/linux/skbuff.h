@@ -389,7 +389,7 @@ struct sk_buff {
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
 	__u8			ndisc_nodetype:2;
 #endif
-#if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
+#if 1
 	__u8			do_not_encrypt:1;
 #endif
 	kmemcheck_bitfield_end(flags2);
