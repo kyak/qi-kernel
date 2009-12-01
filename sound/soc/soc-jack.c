@@ -220,6 +220,9 @@ int snd_soc_jack_add_gpios(struct snd_soc_jack *jack, int count,
 		if (ret)
 			goto err;
 
+		INIT_WORK(&gpios[i].work, gpio_work);
+		gpios[i].jack = jack;
+
 		ret = request_irq(gpio_to_irq(gpios[i].gpio),
 				gpio_handler,
 				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
@@ -227,9 +230,6 @@ int snd_soc_jack_add_gpios(struct snd_soc_jack *jack, int count,
 				&gpios[i]);
 		if (ret)
 			goto err;
-
-		INIT_WORK(&gpios[i].work, gpio_work);
-		gpios[i].jack = jack;
 	}
 
 	return 0;
