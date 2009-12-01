@@ -546,8 +546,28 @@ static void __init resource_init(void)
 	}
 }
 
+#ifdef CONFIG_IMAGE_CMDLINE_HACK
+static void __init process__image_cmdline(void)
+{
+	extern char __image_cmdline[];
+
+	if (__image_cmdline[0] == '\0')
+		return;
+
+	if (__image_cmdline[0] == '-') {
+		strlcpy(arcs_cmdline, __image_cmdline, sizeof(arcs_cmdline));
+	} else {
+		strlcat(arcs_cmdline, " ", sizeof(arcs_cmdline));
+		strlcat(arcs_cmdline, __image_cmdline, sizeof(arcs_cmdline));
+	}
+}
+#else
+static void inline process__image_cmdline(void) {}
+#endif
+
 void __init setup_arch(char **cmdline_p)
 {
+	process__image_cmdline();
 	cpu_probe();
 	prom_init();
 
