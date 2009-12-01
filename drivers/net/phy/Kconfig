@@ -82,6 +82,11 @@ config LSI_ET1011C_PHY
 	---help---
 	  Supports the LSI ET1011C PHY.
 
+config ADM6996_PHY
+	tristate "Driver for ADM6996 switches"
+	---help---
+	  Currently supports the ADM6996F switch
+
 config FIXED_PHY
 	bool "Driver for MDIO Bus/PHY emulation with fixed speed/link PHYs"
 	depends on PHYLIB=y
