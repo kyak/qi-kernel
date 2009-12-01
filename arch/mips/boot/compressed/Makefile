@@ -27,7 +27,7 @@ $(obj)/head.o: $(obj)/head.S $(obj)/vmlinux.bin.gz vmlinux
 	$(CC) $(KBUILD_AFLAGS) \
 	-DIMAGESIZE=$(shell sh $(FILESIZE) $(obj)/vmlinux.bin.gz) \
 	-DKERNEL_ENTRY=$(shell sh $(ENTRY) $(NM) vmlinux ) \
-	-DLOADADDR=$(loadaddr) \
+	-DLOADADDR=$(loadaddr) -I$(srctree)/arch/mips/include \
 	-c -o $(obj)/head.o $<
 
 $(obj)/vmlinuz: $(OBJS) $(obj)/ld.script $(obj)/vmlinux.bin.gz $(obj)/dummy.o

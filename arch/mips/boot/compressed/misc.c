@@ -102,7 +102,7 @@ static unsigned long free_mem_end_ptr;
 #define HEAP_SIZE             0x10000
 
 #include "../../../../lib/inflate.c"
-
+#if 0
 static void *malloc(int size)
 {
 	void *p;
@@ -124,6 +124,7 @@ static void *malloc(int size)
 static void free(void *where)
 {	/* Don't care */
 }
+#endif
 
 static void gzip_mark(void **ptr)
 {
