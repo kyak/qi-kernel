@@ -38,10 +38,18 @@
 #include <linux/zlib.h>
 #include <linux/magic.h>
 
+#include <crypto/compress.h>
+
+#include <net/netlink.h>
+
 #include "squashfs_fs.h"
 #include "squashfs_fs_sb.h"
 #include "squashfs_fs_i.h"
 #include "squashfs.h"
+
+
+#define SQUASHFS_CRYPTO_ALG	"zlib"
+
 
 static struct file_system_type squashfs_fs_type;
 static struct super_operations squashfs_super_ops;
@@ -76,6 +84,16 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 	unsigned short flags;
 	unsigned int fragments;
 	u64 lookup_table_start;
+	struct {
+		struct nlattr nla;
+		int val;
+	} params = {
+		.nla = {
+			.nla_len	= nla_attr_size(sizeof(int)),
+			.nla_type	= ZLIB_DECOMP_WINDOWBITS,
+		},
+		.val			= DEF_WBITS,
+	};
 	int err;
 
 	TRACE("Entered squashfs_fill_superblock\n");
@@ -87,16 +105,25 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	msblk = sb->s_fs_info;
 
-	msblk->stream.workspace = kmalloc(zlib_inflate_workspacesize(),
-		GFP_KERNEL);
-	if (msblk->stream.workspace == NULL) {
-		ERROR("Failed to allocate zlib workspace\n");
+	msblk->tfm = crypto_alloc_pcomp(SQUASHFS_CRYPTO_ALG, 0,
+					CRYPTO_ALG_ASYNC);
+	if (IS_ERR(msblk->tfm)) {
+		ERROR("Failed to load %s crypto module\n",
+		      SQUASHFS_CRYPTO_ALG);
+		err = PTR_ERR(msblk->tfm);
+		goto failed_pcomp;
+	}
+
+	err = crypto_decompress_setup(msblk->tfm, &params, sizeof(params));
+	if (err) {
+		ERROR("Failed to set up decompression parameters\n");
 		goto failure;
 	}
 
 	sblk = kzalloc(sizeof(*sblk), GFP_KERNEL);
 	if (sblk == NULL) {
 		ERROR("Failed to allocate squashfs_super_block\n");
+		err = -ENOMEM;
 		goto failure;
 	}
 
@@ -295,17 +322,18 @@ failed_mount:
 	kfree(msblk->inode_lookup_table);
 	kfree(msblk->fragment_index);
 	kfree(msblk->id_table);
-	kfree(msblk->stream.workspace);
+	crypto_free_pcomp(msblk->tfm);
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
 	kfree(sblk);
 	return err;
 
 failure:
-	kfree(msblk->stream.workspace);
+	crypto_free_pcomp(msblk->tfm);
+failed_pcomp:
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
-	return -ENOMEM;
+	return err;
 }
 
 
@@ -349,7 +377,7 @@ static void squashfs_put_super(struct super_block *sb)
 		kfree(sbi->id_table);
 		kfree(sbi->fragment_index);
 		kfree(sbi->meta_index);
-		kfree(sbi->stream.workspace);
+		crypto_free_pcomp(sbi->tfm);
 		kfree(sb->s_fs_info);
 		sb->s_fs_info = NULL;
 	}

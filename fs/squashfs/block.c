@@ -32,7 +32,8 @@
 #include <linux/mutex.h>
 #include <linux/string.h>
 #include <linux/buffer_head.h>
-#include <linux/zlib.h>
+
+#include <crypto/compress.h>
 
 #include "squashfs_fs.h"
 #include "squashfs_fs_sb.h"
@@ -153,7 +154,8 @@ int squashfs_read_data(struct super_block *sb, void **buffer, u64 index,
 	}
 
 	if (compressed) {
-		int zlib_err = 0, zlib_init = 0;
+		int res = 0, decomp_init = 0;
+		struct comp_request req;
 
 		/*
 		 * Uncompress block.
@@ -161,12 +163,13 @@ int squashfs_read_data(struct super_block *sb, void **buffer, u64 index,
 
 		mutex_lock(&msblk->read_data_mutex);
 
-		msblk->stream.avail_out = 0;
-		msblk->stream.avail_in = 0;
+		req.avail_out = 0;
+		req.avail_in = 0;
 
 		bytes = length;
+		length = 0;
 		do {
-			if (msblk->stream.avail_in == 0 && k < b) {
+			if (req.avail_in == 0 && k < b) {
 				avail = min(bytes, msblk->devblksize - offset);
 				bytes -= avail;
 				wait_on_buffer(bh[k]);
@@ -179,45 +182,47 @@ int squashfs_read_data(struct super_block *sb, void **buffer, u64 index,
 					continue;
 				}
 
-				msblk->stream.next_in = bh[k]->b_data + offset;
-				msblk->stream.avail_in = avail;
+				req.next_in = bh[k]->b_data + offset;
+				req.avail_in = avail;
 				offset = 0;
 			}
 
-			if (msblk->stream.avail_out == 0 && page < pages) {
-				msblk->stream.next_out = buffer[page++];
-				msblk->stream.avail_out = PAGE_CACHE_SIZE;
+			if (req.avail_out == 0 && page < pages) {
+				req.next_out = buffer[page++];
+				req.avail_out = PAGE_CACHE_SIZE;
 			}
 
-			if (!zlib_init) {
-				zlib_err = zlib_inflateInit(&msblk->stream);
-				if (zlib_err != Z_OK) {
-					ERROR("zlib_inflateInit returned"
-						" unexpected result 0x%x,"
-						" srclength %d\n", zlib_err,
-						srclength);
+			if (!decomp_init) {
+				res = crypto_decompress_init(msblk->tfm);
+				if (res) {
+					ERROR("crypto_decompress_init "
+						"returned %d, srclength %d\n",
+						res, srclength);
 					goto release_mutex;
 				}
-				zlib_init = 1;
+				decomp_init = 1;
 			}
 
-			zlib_err = zlib_inflate(&msblk->stream, Z_SYNC_FLUSH);
+			res = crypto_decompress_update(msblk->tfm, &req);
+			if (res < 0) {
+				ERROR("crypto_decompress_update returned %d, "
+					"data probably corrupt\n", res);
+				goto release_mutex;
+			}
+			length += res;
 
-			if (msblk->stream.avail_in == 0 && k < b)
+			if (req.avail_in == 0 && k < b)
 				put_bh(bh[k++]);
-		} while (zlib_err == Z_OK);
+		} while (bytes || res);
 
-		if (zlib_err != Z_STREAM_END) {
-			ERROR("zlib_inflate error, data probably corrupt\n");
+		res = crypto_decompress_final(msblk->tfm, &req);
+		if (res < 0) {
+			ERROR("crypto_decompress_final returned %d, data "
+				"probably corrupt\n", res);
 			goto release_mutex;
 		}
+		length += res;
 
-		zlib_err = zlib_inflateEnd(&msblk->stream);
-		if (zlib_err != Z_OK) {
-			ERROR("zlib_inflate error, data probably corrupt\n");
-			goto release_mutex;
-		}
-		length = msblk->stream.total_out;
 		mutex_unlock(&msblk->read_data_mutex);
 	} else {
 		/*
