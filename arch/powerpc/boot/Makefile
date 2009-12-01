@@ -59,7 +59,7 @@ libfdtheader := fdt.h libfdt.h libfdt_internal.h
 $(addprefix $(obj)/,$(libfdt) libfdt-wrapper.o simpleboot.o): \
 	$(addprefix $(obj)/,$(libfdtheader))
 
-src-wlib := string.S crt0.S crtsavres.S stdio.c main.c \
+src-wlib := string.S crt0.S stdio.c main.c \
 		$(libfdt) libfdt-wrapper.c \
 		ns16550.c serial.c simple_alloc.c div64.S util.S \
 		gunzip_util.c elf_util.c $(zlib) devtree.c oflib.c ofconsole.c \
