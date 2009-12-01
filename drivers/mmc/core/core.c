@@ -706,7 +706,7 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(200);
 
 	if (host->f_min > 400000) {
 		pr_warning("%s: Minimum clock frequency too high for "
@@ -722,7 +722,7 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(200);
 }
 
 static void mmc_power_off(struct mmc_host *host)

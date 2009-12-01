@@ -111,6 +111,9 @@ static int cistpl_funce_common(struct mmc_card *card,
 	card->cis.max_dtr = speed_val[(buf[3] >> 3) & 15] *
 			    speed_unit[buf[3] & 7];
 
+	if(card->cis.max_dtr > 25000000 && card->cccr.sdio_vsn < SDIO_SDIO_REV_2_00)
+		card->cis.max_dtr = 25000000;
+
 	return 0;
 }
 
@@ -123,8 +126,10 @@ static int cistpl_funce_func(struct sdio_func *func,
 	vsn = func->card->cccr.sdio_vsn;
 	min_size = (vsn == SDIO_SDIO_REV_1_00) ? 28 : 42;
 
+#if 0
 	if (size < min_size || buf[0] != 1)
 		return -EINVAL;
+#endif
 
 	/* TPLFE_MAX_BLK_SIZE */
 	func->max_blksize = buf[12] | (buf[13] << 8);
