@@ -236,7 +236,7 @@ int mini_fo_cp_cont(dentry_t *tgt_dentry, struct vfsmount *tgt_mnt,
 	mntget(src_mnt);
 
 	/* open file write only */
-	tgt_file = dentry_open(tgt_dentry, tgt_mnt, 0x1);
+	tgt_file = dentry_open(tgt_dentry, tgt_mnt, 0x1, current_cred());
 	if(!tgt_file || IS_ERR(tgt_file)) {
 		printk(KERN_CRIT "mini_fo_cp_cont: ERROR opening target file.\n");
 		err = PTR_ERR(tgt_file);
@@ -244,7 +244,7 @@ int mini_fo_cp_cont(dentry_t *tgt_dentry, struct vfsmount *tgt_mnt,
 	}
 
 	/* open file read only */
-	src_file = dentry_open(src_dentry, src_mnt, 0x0);
+	src_file = dentry_open(src_dentry, src_mnt, 0x0, current_cred());
 	if(!src_file || IS_ERR(src_file)) {
 		printk(KERN_CRIT "mini_fo_cp_cont: ERROR opening source file.\n");
 		err = PTR_ERR(src_file);

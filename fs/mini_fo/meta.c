@@ -56,7 +56,7 @@ int meta_build_lists(dentry_t *dentry)
 
 
 		/* open META-file for reading */
-		meta_file = dentry_open(meta_dentry, meta_mnt, 0x0);
+		meta_file = dentry_open(meta_dentry, meta_mnt, 0x0, current_cred());
 		if(!meta_file || IS_ERR(meta_file)) {
 			printk(KERN_CRIT "mini_fo: meta_build_lists: \
                                           ERROR opening META file.\n");
@@ -448,7 +448,7 @@ int meta_write_d_entry(dentry_t *dentry, const char *name, int len)
 	mntget(meta_mnt);
 
         /* open META-file for writing */
-        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1);
+        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1, current_cred());
         if(!meta_file || IS_ERR(meta_file)) {
                 printk(KERN_CRIT "mini_fo: meta_write_d_entry: \
                                   ERROR opening meta file.\n");
@@ -546,7 +546,7 @@ int meta_write_r_entry(dentry_t *dentry,
 	mntget(meta_mnt);
 
         /* open META-file for writing */
-        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1);
+        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1, current_cred());
         if(!meta_file || IS_ERR(meta_file)) {
                 printk(KERN_CRIT "mini_fo: meta_write_r_entry: \
                                   ERROR opening meta file.\n");
@@ -686,7 +686,7 @@ int meta_sync_d_list(dentry_t *dentry, int app_flag)
 	mntget(meta_mnt);
 
         /* open META-file for writing */
-        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1);
+        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1, current_cred());
         if(!meta_file || IS_ERR(meta_file)) {
                 printk(KERN_CRIT "mini_fo: meta_sync_d_list: \
                                   ERROR opening meta file.\n");
@@ -828,7 +828,7 @@ int meta_sync_r_list(dentry_t *dentry, int app_flag)
 	mntget(meta_mnt);
 
         /* open META-file for writing */
-        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1);
+        meta_file = dentry_open(meta_dentry, meta_mnt, 0x1, current_cred());
         if(!meta_file || IS_ERR(meta_file)) {
                 printk(KERN_CRIT "mini_fo: meta_sync_r_list: \
                                   ERROR opening meta file.\n");
