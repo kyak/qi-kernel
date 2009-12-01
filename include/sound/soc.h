@@ -215,10 +215,10 @@ void snd_soc_jack_free_gpios(struct snd_soc_jack *jack, int count,
 #endif
 
 /* codec register bit access */
-int snd_soc_update_bits(struct snd_soc_codec *codec, unsigned short reg,
-				unsigned short mask, unsigned short value);
-int snd_soc_test_bits(struct snd_soc_codec *codec, unsigned short reg,
-				unsigned short mask, unsigned short value);
+int snd_soc_update_bits(struct snd_soc_codec *codec, unsigned int reg,
+				unsigned int mask, unsigned int value);
+int snd_soc_test_bits(struct snd_soc_codec *codec, unsigned int reg,
+				unsigned int mask, unsigned int value);
 
 int snd_soc_new_ac97_codec(struct snd_soc_codec *codec,
 	struct snd_ac97_bus_ops *ops, int num);
@@ -492,8 +492,8 @@ struct soc_mixer_control {
 
 /* enumerated kcontrol */
 struct soc_enum {
-	unsigned short reg;
-	unsigned short reg2;
+	unsigned int reg;
+	unsigned int reg2;
 	unsigned char shift_l;
 	unsigned char shift_r;
 	unsigned int max;
