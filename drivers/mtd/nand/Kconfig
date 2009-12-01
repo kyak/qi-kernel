@@ -452,4 +452,10 @@ config MTD_NAND_SOCRATES
 	help
 	  Enables support for NAND Flash chips wired onto Socrates board.
 
+config MTD_NAND_JZ4740
+	tristate "Support NAND Flash device on Jz4740 board"
+	depends on SOC_JZ4740
+	help
+	Support NAND Flash device on Jz4740 board
+
 endif # MTD_NAND
