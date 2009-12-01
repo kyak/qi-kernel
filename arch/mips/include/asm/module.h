@@ -9,6 +9,11 @@ struct mod_arch_specific {
 	struct list_head dbe_list;
 	const struct exception_table_entry *dbe_start;
 	const struct exception_table_entry *dbe_end;
+
+	void *plt_tbl;
+	unsigned int core_plt_offset;
+	unsigned int core_plt_size;
+	unsigned int init_plt_offset;
 };
 
 typedef uint8_t Elf64_Byte;		/* Type for a 8-bit quantity.  */
