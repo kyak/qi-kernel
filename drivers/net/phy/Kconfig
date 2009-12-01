@@ -93,6 +93,9 @@ config ADM6996_PHY
 	---help---
 	  Currently supports the ADM6996F switch
 
+config MVSWITCH_PHY
+	tristate "Driver for Marvell 88E6060 switches"
+
 config FIXED_PHY
 	bool "Driver for MDIO Bus/PHY emulation with fixed speed/link PHYs"
 	depends on PHYLIB=y
