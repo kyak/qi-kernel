@@ -121,6 +121,8 @@
 #endif
 	.endm
 
+	j kernel_entry
+	nop
 #ifndef CONFIG_NO_EXCEPT_FILL
 	/*
 	 * Reserved space for exception handlers.
