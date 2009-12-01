@@ -1061,6 +1061,7 @@ struct sighand_struct *lock_task_sighand(struct task_struct *tsk, unsigned long 
 
 	return sighand;
 }
+EXPORT_SYMBOL(lock_task_sighand);
 
 /*
  * send signal info to all the members of a group
