@@ -101,6 +101,7 @@ struct mtd_oob_ops {
 	uint8_t		*oobbuf;
 };
 
+struct mtd_info;
 struct mtd_info {
 	u_char type;
 	uint32_t flags;
@@ -240,6 +241,9 @@ struct mtd_info {
 	struct module *owner;
 	struct device dev;
 	int usecount;
+
+	int (*refresh_device)(struct mtd_info *mtd);
+	struct mtd_info *split;
 
 	/* If the driver is something smart, like UBI, it may need to maintain
 	 * its own reference counting. The below functions are only for driver.
