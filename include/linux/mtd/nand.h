@@ -575,6 +575,7 @@ struct platform_nand_chip {
 	int			chip_delay;
 	unsigned int		options;
 	const char		**part_probe_types;
+	int			(*chip_fixup)(struct mtd_info *mtd);
 	void			(*set_parts)(uint64_t size,
 					struct platform_nand_chip *chip);
 	void			*priv;
