@@ -97,6 +97,9 @@ check-lxdialog  := $(srctree)/$(src)/lxdialog/check-lxdialog.sh
 # we really need to do so. (Do not call gcc as part of make mrproper)
 HOST_EXTRACFLAGS = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ccflags)
 HOST_LOADLIBES   = $(shell $(CONFIG_SHELL) $(check-lxdialog) -ldflags $(HOSTCC))
+ifeq ($(shell uname -s),Darwin)
+HOST_LOADLIBES  += -lncurses
+endif
 
 HOST_EXTRACFLAGS += -DLOCALE
 

@@ -24,7 +24,9 @@
 %{
 
 #include <assert.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
 #include "genksyms.h"
 
 static int is_typedef;
