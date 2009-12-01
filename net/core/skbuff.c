@@ -72,6 +72,9 @@
 
 static struct kmem_cache *skbuff_head_cache __read_mostly;
 static struct kmem_cache *skbuff_fclone_cache __read_mostly;
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+static struct kmem_cache *skbuff_cb_store_cache __read_mostly;
+#endif
 
 static void sock_pipe_buf_release(struct pipe_inode_info *pipe,
 				  struct pipe_buffer *buf)
@@ -91,6 +94,80 @@ static int sock_pipe_buf_steal(struct pipe_inode_info *pipe,
 	return 1;
 }
 
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+/* Control buffer save/restore for IMQ devices */
+struct skb_cb_table {
+	void			*cb_next;
+	atomic_t		refcnt;
+	char      		cb[48];
+};
+
+static DEFINE_SPINLOCK(skb_cb_store_lock);
+
+int skb_save_cb(struct sk_buff *skb)
+{
+	struct skb_cb_table *next;
+
+	next = kmem_cache_alloc(skbuff_cb_store_cache, GFP_ATOMIC);
+	if (!next)
+		return -ENOMEM;
+
+	BUILD_BUG_ON(sizeof(skb->cb) != sizeof(next->cb));
+
+	memcpy(next->cb, skb->cb, sizeof(skb->cb));
+	next->cb_next = skb->cb_next;
+
+	atomic_set(&next->refcnt, 1);
+
+	skb->cb_next = next;
+	return 0;
+}
+EXPORT_SYMBOL(skb_save_cb);
+
+int skb_restore_cb(struct sk_buff *skb)
+{
+	struct skb_cb_table *next;
+
+	if (!skb->cb_next)
+		return 0;
+
+	next = skb->cb_next;
+
+	BUILD_BUG_ON(sizeof(skb->cb) != sizeof(next->cb));
+
+	memcpy(skb->cb, next->cb, sizeof(skb->cb));
+	skb->cb_next = next->cb_next;
+
+	spin_lock(&skb_cb_store_lock);
+
+	if (atomic_dec_and_test(&next->refcnt)) {
+		kmem_cache_free(skbuff_cb_store_cache, next);
+	}
+
+	spin_unlock(&skb_cb_store_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(skb_restore_cb);
+
+static void skb_copy_stored_cb(struct sk_buff *new, struct sk_buff *old)
+{
+	struct skb_cb_table *next;
+
+	if (!old->cb_next) {
+		new->cb_next = 0;
+		return;
+	}
+
+	spin_lock(&skb_cb_store_lock);
+
+	next = old->cb_next;
+	atomic_inc(&next->refcnt);
+	new->cb_next = next;
+
+	spin_unlock(&skb_cb_store_lock);
+}
+#endif
 
 /* Pipe buffer operations for a socket. */
 static struct pipe_buf_operations sock_pipe_buf_ops = {
@@ -398,6 +475,15 @@ static void skb_release_head_state(struct sk_buff *skb)
 		WARN_ON(in_irq());
 		skb->destructor(skb);
 	}
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+	/* This should not happen. When it does, avoid memleak by restoring
+	the chain of cb-backups. */
+	while(skb->cb_next != NULL) {
+		printk(KERN_WARNING "kfree_skb: skb->cb_next: %08x\n",
+			skb->cb_next);
+		skb_restore_cb(skb);
+	}
+#endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	nf_conntrack_put(skb->nfct);
 	nf_conntrack_put_reasm(skb->nfct_reasm);
@@ -535,6 +621,9 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->sp			= secpath_get(old->sp);
 #endif
 	memcpy(new->cb, old->cb, sizeof(old->cb));
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+   skb_copy_stored_cb(new, old);
+#endif
 	new->csum		= old->csum;
 	new->local_df		= old->local_df;
 	new->pkt_type		= old->pkt_type;
@@ -2778,6 +2867,13 @@ void __init skb_init(void)
 						0,
 						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 						NULL);
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+	skbuff_cb_store_cache = kmem_cache_create("skbuff_cb_store_cache",
+						  sizeof(struct skb_cb_table),
+						  0,
+						  SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+						  NULL);
+#endif
 }
 
 /**
