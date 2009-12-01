@@ -51,6 +51,12 @@ config PCI_STUB
 
 	  When in doubt, say N.
 
+config PCI_DISABLE_COMMON_QUIRKS
+	bool "PCI disable common quirks"
+	depends on PCI
+	help
+	  If you don't know what to do here, say N.
+
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
