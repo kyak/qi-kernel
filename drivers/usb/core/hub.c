@@ -1857,6 +1857,25 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 {
 	int i, status;
 
+#ifdef CONFIG_SOC_JZ4730
+	/*
+	 * On Jz4730, we assume that the first USB port was used as device.
+	 * If not, please comment next lines.
+	 */
+	if (port1 == 1) {
+		return 0;
+	}
+#endif
+
+#if defined(CONFIG_SOC_JZ4740) || defined(CONFIG_SOC_JZ4750) || defined(CONFIG_SOC_JZ4750D)
+	/*
+	 * On Jz4740 and Jz4750, the second USB port was used as device.
+	 */
+	if (port1 == 2) {
+		return 0;
+	}
+#endif
+
 	/* Block EHCI CF initialization during the port reset.
 	 * Some companion controllers don't like it when they mix.
 	 */
@@ -2818,10 +2837,34 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 			le16_to_cpu(hub->descriptor->wHubCharacteristics);
 	struct usb_device *udev;
 	int status, i;
+#ifdef CONFIG_JZSOC
+	static char jzhub = 1; /* the hub first to be initialized is jzsoc on-chip hub */
+#endif
 
 	dev_dbg (hub_dev,
 		"port %d, status %04x, change %04x, %s\n",
 		port1, portstatus, portchange, portspeed (portstatus));
+
+#ifdef CONFIG_SOC_JZ4730
+	/*
+	 * On Jz4730, we assume that the first USB port was used as device.
+	 * If not, please comment next lines.
+	 */
+	if ((port1 == 1) && (jzhub)) {
+		jzhub = 0;
+		return;
+	}
+#endif
+
+#if defined(CONFIG_SOC_JZ4740) || defined(CONFIG_SOC_JZ4750) || defined(CONFIG_SOC_JZ4750D)
+	/*
+	 * On Jz4740 and Jz4750, the second USB port was used as device.
+	 */
+	if ((port1 == 2) && (jzhub)) {
+		jzhub = 0;
+		return;
+	}
+#endif
 
 	if (hub->has_indicators) {
 		set_port_led(hub, port1, HUB_LED_AUTO);
