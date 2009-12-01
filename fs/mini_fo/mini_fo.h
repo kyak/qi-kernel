@@ -302,6 +302,10 @@ extern int mini_fo_tri_interpose(dentry_t *hidden_dentry,
 extern int mini_fo_cp_cont(dentry_t *tgt_dentry, struct vfsmount *tgt_mnt,
 			   dentry_t *src_dentry, struct vfsmount *src_mnt);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+extern struct inode *mini_fo_iget(struct super_block *sb, unsigned long ino);
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 extern int mini_fo_create(inode_t *dir, dentry_t *dentry, int mode, struct nameidata *nd);
 
@@ -500,6 +504,29 @@ static inline void double_unlock(struct dentry *d1, struct dentry *d2)
 #endif   /* if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16) */
 #endif  /* if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) */
 #endif /* __KERNEL__ */
+
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+static inline dentry_t *nd_get_dentry(struct nameidata *nd)
+{
+	return (nd->path.dentry);
+}
+
+static inline struct vfsmount *nd_get_mnt(struct nameidata *nd)
+{
+	return (nd->path.mnt);
+}
+#else
+static inline dentry_t *nd_get_dentry(struct nameidata *nd)
+{
+	return (nd->dentry);
+}
+
+static inline struct vfsmount *nd_get_mnt(struct nameidata *nd)
+{
+	return (nd->mnt);
+}
+#endif
 
 /*
  * Definitions for user and kernel code

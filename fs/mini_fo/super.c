@@ -262,10 +262,31 @@ mini_fo_umount_begin(super_block_t *sb)
 }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+struct inode *
+mini_fo_iget(struct super_block *sb, unsigned long ino)
+{
+	struct inode *inode;
+
+	inode = iget_locked(sb, ino);
+	if (!inode)
+		return ERR_PTR(-ENOMEM);
+
+	if (!(inode->i_state & I_NEW))
+		return inode;
+
+	mini_fo_read_inode(inode);
+
+	unlock_new_inode(inode);
+	return inode;
+}
+#endif /* if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25) */
 
 struct super_operations mini_fo_sops =
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 	read_inode:		mini_fo_read_inode,
+#endif
 #if defined(FIST_DEBUG) || defined(FIST_FILTER_SCA)
 	write_inode:	mini_fo_write_inode,
 #endif /* defined(FIST_DEBUG) || defined(FIST_FILTER_SCA) */

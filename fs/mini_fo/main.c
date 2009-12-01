@@ -79,6 +79,7 @@ mini_fo_tri_interpose(dentry_t *hidden_dentry,
 	 * of the new inode's fields
 	 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 	/*
 	 * original: inode = iget(sb, hidden_inode->i_ino);
 	 */
@@ -87,6 +88,13 @@ mini_fo_tri_interpose(dentry_t *hidden_dentry,
 		err = -EACCES;		/* should be impossible??? */
 		goto out;
 	}
+#else
+	inode = mini_fo_iget(sb, iunique(sb, 25));
+	if (IS_ERR(inode)) {
+		err = PTR_ERR(inode);
+		goto out;
+	}
+#endif
 
 	/*
 	 * interpose the inode if not already interposed
@@ -184,9 +192,9 @@ mini_fo_parse_options(super_block_t *sb, char *options)
 				hidden_root = ERR_PTR(err);
 				goto out;
 			}
-			hidden_root = nd.dentry;
-			stopd(sb)->base_dir_dentry = nd.dentry;
-			stopd(sb)->hidden_mnt = nd.mnt;
+			hidden_root = nd_get_dentry(&nd);
+			stopd(sb)->base_dir_dentry = nd_get_dentry(&nd);
+			stopd(sb)->hidden_mnt = nd_get_mnt(&nd);
 
 		} else if(!strncmp("sto=", options, 4)) {
 			/* parse the storage dir */
@@ -204,9 +212,9 @@ mini_fo_parse_options(super_block_t *sb, char *options)
 				hidden_root2 = ERR_PTR(err);
 				goto out;
 			}
-			hidden_root2 = nd2.dentry;
-			stopd(sb)->storage_dir_dentry = nd2.dentry;
-			stopd(sb)->hidden_mnt2 = nd2.mnt;
+			hidden_root2 = nd_get_dentry(&nd2);
+			stopd(sb)->storage_dir_dentry = nd_get_dentry(&nd2);
+			stopd(sb)->hidden_mnt2 = nd_get_mnt(&nd2);
 			stohs2(sb) = hidden_root2->d_sb;
 
 			/* validate storage dir, this is done in

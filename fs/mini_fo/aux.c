@@ -164,11 +164,11 @@ dentry_t *bpath_walk(super_block_t *sb, char *bpath)
 	err = vfs_path_lookup(mnt->mnt_root, mnt, bpath+1, 0, &nd);
 
 	/* validate */
-	if (err || !nd.dentry || !nd.dentry->d_inode) {
+	if (err || !nd_get_dentry(&nd) || !nd_get_dentry(&nd)->d_inode) {
 		printk(KERN_CRIT "mini_fo: bpath_walk: path_walk failed.\n");
 		return NULL;
 	}
-	return nd.dentry;
+	return nd_get_dentry(&nd);
 }
 
 
