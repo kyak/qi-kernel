@@ -48,13 +48,65 @@
 #include "squashfs.h"
 
 
-#define SQUASHFS_CRYPTO_ALG	"zlib"
+static int squashfs_setup_zlib(struct squashfs_sb_info *msblk)
+{
+	int err = -EOPNOTSUPP;
 
+#ifdef CONFIG_SQUASHFS_SUPPORT_ZLIB
+	struct {
+		struct nlattr nla;
+		int val;
+	} params = {
+		.nla = {
+			.nla_len	= nla_attr_size(sizeof(int)),
+			.nla_type	= ZLIB_DECOMP_WINDOWBITS,
+		},
+		.val			= DEF_WBITS,
+	};
+
+	msblk->tfm = crypto_alloc_pcomp("zlib", 0,
+					CRYPTO_ALG_ASYNC);
+	if (IS_ERR(msblk->tfm)) {
+		ERROR("Failed to load zlib crypto module\n");
+		return PTR_ERR(msblk->tfm);
+	}
+
+	err = crypto_decompress_setup(msblk->tfm, &params, sizeof(params));
+	if (err) {
+		ERROR("Failed to set up decompression parameters\n");
+		crypto_free_pcomp(msblk->tfm);
+	}
+#endif
+
+	return err;
+}
+
+static int squashfs_setup_lzma(struct squashfs_sb_info *msblk)
+{
+	int err = -EOPNOTSUPP;
+
+#ifdef CONFIG_SQUASHFS_SUPPORT_LZMA
+	msblk->tfm = crypto_alloc_pcomp("lzma", 0,
+					CRYPTO_ALG_ASYNC);
+	if (IS_ERR(msblk->tfm)) {
+		ERROR("Failed to load lzma crypto module\n");
+		return PTR_ERR(msblk->tfm);
+	}
+
+	err = crypto_decompress_setup(msblk->tfm, NULL, 0);
+	if (err) {
+		ERROR("Failed to set up decompression parameters\n");
+		crypto_free_pcomp(msblk->tfm);
+	}
+#endif
+
+	return err;
+}
 
 static struct file_system_type squashfs_fs_type;
 static struct super_operations squashfs_super_ops;
 
-static int supported_squashfs_filesystem(short major, short minor, short comp)
+static int supported_squashfs_filesystem(short major, short minor)
 {
 	if (major < SQUASHFS_MAJOR) {
 		ERROR("Major/Minor mismatch, older Squashfs %d.%d "
@@ -66,9 +118,6 @@ static int supported_squashfs_filesystem(short major, short minor, short comp)
 		ERROR("Please update your kernel\n");
 		return -EINVAL;
 	}
-
-	if (comp != ZLIB_COMPRESSION)
-		return -EINVAL;
 
 	return 0;
 }
@@ -84,16 +133,6 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 	unsigned short flags;
 	unsigned int fragments;
 	u64 lookup_table_start;
-	struct {
-		struct nlattr nla;
-		int val;
-	} params = {
-		.nla = {
-			.nla_len	= nla_attr_size(sizeof(int)),
-			.nla_type	= ZLIB_DECOMP_WINDOWBITS,
-		},
-		.val			= DEF_WBITS,
-	};
 	int err;
 
 	TRACE("Entered squashfs_fill_superblock\n");
@@ -104,21 +143,6 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 		return -ENOMEM;
 	}
 	msblk = sb->s_fs_info;
-
-	msblk->tfm = crypto_alloc_pcomp(SQUASHFS_CRYPTO_ALG, 0,
-					CRYPTO_ALG_ASYNC);
-	if (IS_ERR(msblk->tfm)) {
-		ERROR("Failed to load %s crypto module\n",
-		      SQUASHFS_CRYPTO_ALG);
-		err = PTR_ERR(msblk->tfm);
-		goto failed_pcomp;
-	}
-
-	err = crypto_decompress_setup(msblk->tfm, &params, sizeof(params));
-	if (err) {
-		ERROR("Failed to set up decompression parameters\n");
-		goto failure;
-	}
 
 	sblk = kzalloc(sizeof(*sblk), GFP_KERNEL);
 	if (sblk == NULL) {
@@ -159,8 +183,21 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* Check the MAJOR & MINOR versions and compression type */
 	err = supported_squashfs_filesystem(le16_to_cpu(sblk->s_major),
-			le16_to_cpu(sblk->s_minor),
-			le16_to_cpu(sblk->compression));
+			le16_to_cpu(sblk->s_minor));
+	if (err < 0)
+		goto failed_mount;
+
+	switch(le16_to_cpu(sblk->compression)) {
+	case ZLIB_COMPRESSION:
+		err = squashfs_setup_zlib(msblk);
+		break;
+	case LZMA_COMPRESSION:
+		err = squashfs_setup_lzma(msblk);
+		break;
+	default:
+		err = -EINVAL;
+		break;
+	}
 	if (err < 0)
 		goto failed_mount;
 
@@ -316,21 +353,16 @@ allocate_root:
 	return 0;
 
 failed_mount:
+	if (msblk->tfm)
+		crypto_free_pcomp(msblk->tfm);
 	squashfs_cache_delete(msblk->block_cache);
 	squashfs_cache_delete(msblk->fragment_cache);
 	squashfs_cache_delete(msblk->read_page);
 	kfree(msblk->inode_lookup_table);
 	kfree(msblk->fragment_index);
 	kfree(msblk->id_table);
-	crypto_free_pcomp(msblk->tfm);
-	kfree(sb->s_fs_info);
-	sb->s_fs_info = NULL;
 	kfree(sblk);
-	return err;
-
 failure:
-	crypto_free_pcomp(msblk->tfm);
-failed_pcomp:
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
 	return err;
