@@ -492,8 +492,7 @@ int nand_correct_data(struct mtd_info *mtd, unsigned char *buf,
 	if ((bitsperbyte[b0] + bitsperbyte[b1] + bitsperbyte[b2]) == 1)
 		return 1;	/* error in ecc data; no action needed */
 
-	printk(KERN_ERR "uncorrectable error : ");
-	return -1;
+	return -EBADMSG;
 }
 EXPORT_SYMBOL(nand_correct_data);
 
