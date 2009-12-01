@@ -113,17 +113,23 @@ mini_fo_lookup(inode_t *dir, dentry_t *dentry)
 		hidden_dir_dentry = hidden_dentry->d_parent;
 		kfree(bpath);
 	}
-	else if(hidden_dir_dentry && hidden_dir_dentry->d_inode)
+	else if(hidden_dir_dentry && hidden_dir_dentry->d_inode) {
+		mutex_lock(&hidden_dir_dentry->d_inode->i_mutex);
 		hidden_dentry =
 			lookup_one_len(name, hidden_dir_dentry, namelen);
-	else
+		mutex_unlock(&hidden_dir_dentry->d_inode->i_mutex);
+	} else {
 		hidden_dentry = NULL;
+	}
 
-	if(hidden_sto_dir_dentry && hidden_sto_dir_dentry->d_inode)
+	if(hidden_sto_dir_dentry && hidden_sto_dir_dentry->d_inode) {
+		mutex_lock(&hidden_sto_dir_dentry->d_inode->i_mutex);
 		hidden_sto_dentry =
 			lookup_one_len(name, hidden_sto_dir_dentry, namelen);
-	else
+		mutex_unlock(&hidden_sto_dir_dentry->d_inode->i_mutex);
+	} else {
 		hidden_sto_dentry =  NULL;
+	}
 
 	/* catch error in lookup */
 	if (IS_ERR(hidden_dentry) || IS_ERR(hidden_sto_dentry)) {
@@ -553,9 +559,11 @@ mini_fo_rmdir(inode_t *dir, dentry_t *dentry)
 #endif
 
 		/* Delete an old WOL file contained in the storage dir */
+		mutex_lock(&hidden_sto_dentry->d_inode->i_mutex);
 		meta_dentry = lookup_one_len(META_FILENAME,
 					     hidden_sto_dentry,
 					     strlen(META_FILENAME));
+		mutex_unlock(&hidden_sto_dentry->d_inode->i_mutex);
 		if(meta_dentry->d_inode) {
 			err = vfs_unlink(hidden_sto_dentry->d_inode, meta_dentry);
 			dput(meta_dentry);
@@ -643,9 +651,11 @@ mini_fo_rmdir(inode_t *dir, dentry_t *dentry)
 #endif
 
 		/* Delete an old WOL file contained in the storage dir */
+		mutex_lock(&hidden_sto_dentry->d_inode->i_mutex);
 		meta_dentry = lookup_one_len(META_FILENAME,
 					     hidden_sto_dentry,
 					     strlen(META_FILENAME));
+		mutex_unlock(&hidden_sto_dentry->d_inode->i_mutex);
 		if(meta_dentry->d_inode) {
 			/* is this necessary? dget(meta_dentry); */
 			err = vfs_unlink(hidden_sto_dentry->d_inode,
@@ -688,9 +698,11 @@ mini_fo_rmdir(inode_t *dir, dentry_t *dentry)
 #endif
 
 		/* Delete an old WOL file contained in the storage dir */
+		mutex_lock(&hidden_sto_dentry->d_inode->i_mutex);
 		meta_dentry = lookup_one_len(META_FILENAME,
 					     hidden_sto_dentry,
 					     strlen(META_FILENAME));
+		mutex_unlock(&hidden_sto_dentry->d_inode->i_mutex);
 		if(meta_dentry->d_inode) {
 			/* is this necessary? dget(meta_dentry); */
 			err = vfs_unlink(hidden_sto_dentry->d_inode,

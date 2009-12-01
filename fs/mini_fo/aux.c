@@ -86,8 +86,10 @@ int get_neg_sto_dentry(dentry_t *dentry)
 	len = dentry->d_name.len;
 	name = dentry->d_name.name;
 
+	mutex_lock(&dtohd2(dentry->d_parent)->d_inode->i_mutex);
 	dtohd2(dentry) =
 		lookup_one_len(name, dtohd2(dentry->d_parent), len);
+	mutex_unlock(&dtohd2(dentry->d_parent)->d_inode->i_mutex);
 
  out:
 	return err;
@@ -426,7 +428,9 @@ int build_sto_structure(dentry_t *dir, dentry_t *dentry)
 		const unsigned char *name;
 		len = dtohd(dentry)->d_name.len;
 		name = dtohd(dentry)->d_name.name;
+		mutex_lock(&dtohd2(dir)->d_inode->i_mutex);
 		hidden_sto_dentry = lookup_one_len(name, dtohd2(dir), len);
+		mutex_unlock(&dtohd2(dir)->d_inode->i_mutex);
 		dtohd2(dentry) = hidden_sto_dentry;
 	}
 

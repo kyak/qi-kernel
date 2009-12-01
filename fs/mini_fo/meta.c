@@ -43,9 +43,11 @@ int meta_build_lists(dentry_t *dentry)
 
   	/* might there be a META-file? */
 	if(dtohd2(dentry) && dtohd2(dentry)->d_inode) {
+		mutex_lock(&dtohd2(dentry)->d_inode->i_mutex);
 		meta_dentry = lookup_one_len(META_FILENAME,
 					     dtohd2(dentry),
 					     strlen(META_FILENAME));
+		mutex_unlock(&dtohd2(dentry)->d_inode->i_mutex);
 		if(!meta_dentry->d_inode) {
 			dput(meta_dentry);
 			goto out_ok;
@@ -426,8 +428,11 @@ int meta_write_d_entry(dentry_t *dentry, const char *name, int len)
 			goto out;
                 }
         }
+
+	mutex_lock(&dtohd2(dentry)->d_inode->i_mutex);
 	meta_dentry = lookup_one_len(META_FILENAME,
 				     dtohd2(dentry), strlen (META_FILENAME));
+	mutex_unlock(&dtohd2(dentry)->d_inode->i_mutex);
 
 	/* We need to create a META-file */
         if(!meta_dentry->d_inode) {
@@ -527,9 +532,13 @@ int meta_write_r_entry(dentry_t *dentry,
 			goto out;
                 }
         }
+
+	mutex_lock(&dtohd2(dentry)->d_inode->i_mutex);
 	meta_dentry = lookup_one_len(META_FILENAME,
 				     dtohd2(dentry),
 				     strlen (META_FILENAME));
+	mutex_unlock(&dtohd2(dentry)->d_inode->i_mutex);
+
         if(!meta_dentry->d_inode) {
                 /* We need to create a META-file */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -641,9 +650,13 @@ int meta_sync_d_list(dentry_t *dentry, int app_flag)
 			goto out;
                 }
         }
+
+	mutex_lock(&dtohd2(dentry)->d_inode->i_mutex);
 	meta_dentry = lookup_one_len(META_FILENAME,
 				     dtohd2(dentry),
 				     strlen(META_FILENAME));
+	mutex_unlock(&dtohd2(dentry)->d_inode->i_mutex);
+
         if(!meta_dentry->d_inode) {
                 /* We need to create a META-file */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -784,9 +797,13 @@ int meta_sync_r_list(dentry_t *dentry, int app_flag)
 			goto out;
                 }
         }
+
+	mutex_lock(&dtohd2(dentry)->d_inode->i_mutex);
 	meta_dentry = lookup_one_len(META_FILENAME,
 				     dtohd2(dentry),
 				     strlen(META_FILENAME));
+	mutex_unlock(&dtohd2(dentry)->d_inode->i_mutex);
+
         if(!meta_dentry->d_inode) {
                 /* We need to create a META-file */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
