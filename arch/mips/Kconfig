@@ -158,6 +158,9 @@ config MACH_JAZZ
 	 Members include the Acer PICA, MIPS Magnum 4000, MIPS Millennium and
 	 Olivetti M700-10 workstations.
 
+config MACH_JZ
+	bool "Ingenic JZ4720/JZ4740 based machines"
+
 config LASAT
 	bool "LASAT Networks platforms"
 	select CEVT_R4K
@@ -661,6 +664,7 @@ endchoice
 source "arch/mips/alchemy/Kconfig"
 source "arch/mips/basler/excite/Kconfig"
 source "arch/mips/jazz/Kconfig"
+source "arch/mips/jz4740/Kconfig"
 source "arch/mips/lasat/Kconfig"
 source "arch/mips/pmc-sierra/Kconfig"
 source "arch/mips/sgi-ip27/Kconfig"
@@ -1911,6 +1915,14 @@ config NR_CPUS
 
 source "kernel/time/Kconfig"
 
+# the value of (max order + 1)
+config FORCE_MAX_ZONEORDER
+	prompt "MAX_ZONEORDER"
+	int
+	default "12"
+	help
+	 The max memory that can be allocated = 4KB * 2^(CONFIG_FORCE_MAX_ZONEORDER - 1)
+
 #
 # Timer Interrupt Frequency Configuration
 #
@@ -2179,6 +2191,23 @@ config MIPS32_N32
 config BINFMT_ELF32
 	bool
 	default y if MIPS32_O32 || MIPS32_N32
+
+endmenu
+
+menu "CPU Frequency scaling"
+
+config CPU_FREQ_JZ
+	tristate "CPUfreq driver for JZ CPUs"
+	depends on JZSOC
+	default n
+	help
+	  This enables the CPUfreq driver for JZ CPUs.
+
+	  If in doubt, say N.
+
+if (CPU_FREQ_JZ)
+source "drivers/cpufreq/Kconfig"
+endif
 
 endmenu
 

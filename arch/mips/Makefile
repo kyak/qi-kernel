@@ -180,6 +180,14 @@ cflags-$(CONFIG_AR7)		+= -I$(srctree)/arch/mips/include/asm/mach-ar7
 load-$(CONFIG_AR7)		+= 0xffffffff94100000
 
 #
+# Commond Ingenic JZ4740 series
+#
+
+core-$(CONFIG_SOC_JZ4740)	+= arch/mips/jz4740/
+cflags-$(CONFIG_SOC_JZ4740)	+= -I$(srctree)/arch/mips/include/asm/mach-jz4740
+load-$(CONFIG_SOC_JZ4740)	+= 0xffffffff80010000
+
+#
 # Acer PICA 61, Mips Magnum 4000 and Olivetti M700.
 #
 core-$(CONFIG_MACH_JAZZ)	+= arch/mips/jazz/
@@ -714,6 +722,12 @@ makeboot =$(Q)$(MAKE) $(build)=arch/mips/boot VMLINUX=$(vmlinux-32) $(1)
 
 all:	$(all-y)
 
+uImage: $(vmlinux-32)
+	+@$(call makeboot,$@)
+
+zImage: $(vmlinux-32)
+	+@$(call makeboot,$@)
+
 vmlinux.bin: $(vmlinux-32)
 	+@$(call makeboot,$@)
 
@@ -743,6 +757,7 @@ install:
 
 archclean:
 	@$(MAKE) $(clean)=arch/mips/boot
+	@$(MAKE) $(clean)=arch/mips/boot/compressed
 	@$(MAKE) $(clean)=arch/mips/lasat
 
 define archhelp
@@ -750,6 +765,9 @@ define archhelp
 	echo '  vmlinux.ecoff        - ECOFF boot image'
 	echo '  vmlinux.bin          - Raw binary boot image'
 	echo '  vmlinux.srec         - SREC boot image'
+	echo  '  uImage	- u-boot format image (arch/$(ARCH)/boot/uImage)'
+	echo  '  zImage	- Compressed binary image (arch/$(ARCH)/boot/compressed/zImage)'
+	echo  '  vmlinux.bin	- Uncompressed binary image (arch/$(ARCH)/boot/vmlinux.bin)'
 	echo
 	echo '  These will be default as apropriate for a configured platform.'
 endef

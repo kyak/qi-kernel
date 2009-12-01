@@ -57,6 +57,12 @@
 #define	MACH_MIKROTIK_RB532	0	/* Mikrotik RouterBoard 532 	*/
 #define MACH_MIKROTIK_RB532A	1	/* Mikrotik RouterBoard 532A 	*/
 
+/*
+ * Valid machtype for group INGENIC
+ */
+#define  MACH_INGENIC_JZ4720	0	/* JZ4730 SOC		*/
+#define  MACH_INGENIC_JZ4740	1	/* JZ4740 SOC		*/
+
 #define CL_SIZE			COMMAND_LINE_SIZE
 
 extern char *system_type;
