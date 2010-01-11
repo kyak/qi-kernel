@@ -174,6 +174,9 @@ config MACH_JAZZ
 	 Members include the Acer PICA, MIPS Magnum 4000, MIPS Millennium and
 	 Olivetti M700-10 workstations.
 
+config MACH_JZ
+	bool "Ingenic JZ4720/JZ4740 based machines"
+
 config LASAT
 	bool "LASAT Networks platforms"
 	select CEVT_R4K
@@ -677,6 +680,7 @@ source "arch/mips/alchemy/Kconfig"
 source "arch/mips/basler/excite/Kconfig"
 source "arch/mips/bcm63xx/Kconfig"
 source "arch/mips/jazz/Kconfig"
+source "arch/mips/jz4740/Kconfig"
 source "arch/mips/lasat/Kconfig"
 source "arch/mips/pmc-sierra/Kconfig"
 source "arch/mips/sgi-ip27/Kconfig"

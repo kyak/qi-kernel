@@ -69,6 +69,12 @@
 #define MACH_DEXXON_GDIUM2F10  5
 #define MACH_LOONGSON_END      6
 
+/*
+ * Valid machtype for group INGENIC
+ */
+#define  MACH_INGENIC_JZ4730	0	/* JZ4730 SOC		*/
+#define  MACH_INGENIC_JZ4740	1	/* JZ4740 SOC		*/
+
 #define CL_SIZE			COMMAND_LINE_SIZE
 
 extern char *system_type;
