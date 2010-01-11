@@ -26,4 +26,21 @@ config SENSORS_TSL2550
 	  This driver can also be built as a module.  If so, the module
 	  will be called tsl2550.
 
+config N516_LPC
+	tristate "N516 keys & power controller"
+	depends on I2C
+	depends on INPUT
+	depends on POWER_SUPPLY
+	help
+	  N516 keyboard & power controller driver
+
+config N526_LPC
+	tristate "N526 LPC934 coprocessor"
+	depends on JZ4740_N526
+	help
+	  If you say yes here you get support for the N526s NXP LPC934 coprocessor.
+	  It is used as a keyboard controllor and for power management.
+
+	  If you have a N526 you probably want to say Y here.
+
 endmenu
