@@ -103,28 +103,6 @@ static unsigned long free_mem_end_ptr;
 
 #include "../../../../lib/inflate.c"
 
-static void *malloc(int size)
-{
-	void *p;
-
-	if (size <0) error("Malloc error\n");
-	if (free_mem_ptr == 0) error("Memory error\n");
-
-	free_mem_ptr = (free_mem_ptr + 3) & ~3;	/* Align */
-
-	p = (void *)free_mem_ptr;
-	free_mem_ptr += size;
-
-	if (free_mem_ptr >= free_mem_end_ptr)
-		error("\nOut of memory\n");
-
-	return p;
-}
-
-static void free(void *where)
-{	/* Don't care */
-}
-
 static void gzip_mark(void **ptr)
 {
 	*ptr = (void *) free_mem_ptr;

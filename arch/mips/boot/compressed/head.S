@@ -5,7 +5,6 @@
  */
 
 #include <asm/asm.h>
-#include <asm/cacheops.h>
 #include <asm/cachectl.h>
 #include <asm/regdef.h>
 
