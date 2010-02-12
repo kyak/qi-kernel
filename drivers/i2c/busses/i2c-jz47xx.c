@@ -21,15 +21,44 @@
 #include <linux/errno.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/interrupt.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <linux/module.h>
 #include <asm/addrspace.h>
+#include <asm/mach-jz4740/regs.h>
+#include <asm/mach-jz4740/gpio.h>
 
-#include <asm/jzsoc.h>
 #include "i2c-jz47xx.h"
 
+#define JZ_REG_I2C_DR		0x000
+#define JZ_REG_I2C_CR		0x004
+#define JZ_REG_I2C_SR		0x008
+#define JZ_REG_I2C_GR		0x00C
+
+/* I2C Control Register (I2C_CR) */
+
+#define JZ_I2C_CR_IEN		(1 << 4)
+#define JZ_I2C_CR_STA		(1 << 3)
+#define JZ_I2C_CR_STO		(1 << 2)
+#define JZ_I2C_CR_AC		(1 << 1)
+#define JZ_I2C_CR_I2CE		(1 << 0)
+
+/* I2C Status Register (I2C_SR) */
+
+#define JZ_I2C_SR_STX		(1 << 4)
+#define JZ_I2C_SR_BUSY		(1 << 3)
+#define JZ_I2C_SR_TEND		(1 << 2)
+#define JZ_I2C_SR_DRF		(1 << 1)
+#define JZ_I2C_SR_ACKF		(1 << 0)
+
+#define I2C_REG(off)	REG8(0xB0042000 + off)
+#define REG_I2C_DR	I2C_REG(0)
+#define REG_I2C_CR	I2C_REG(4)
+#define REG_I2C_SR	I2C_REG(8)
 
 #define DEFAULT_I2C_CLOCK 100000
 
@@ -40,8 +69,6 @@
 #define TIMEOUT         10000000
 #define I2C_TIMEOUT	(HZ / 5)
 
-unsigned short sub_addr = 0;
-int addr_val = 0;
 struct jz_i2c {
 	spinlock_t		lock;
 	wait_queue_head_t	wait;
@@ -50,30 +77,47 @@ struct jz_i2c {
 	unsigned int		slave_addr;
 	struct i2c_adapter	adap;
 	struct clk		*clk;
+	void __iomem		*base;
+	struct resource		*mem;
 };
 
+static struct jz_i2c *the_i2c;
+
+static inline void i2c_jz_writeb(unsigned int val, unsigned char reg)
+{
+	writeb(val, the_i2c->base + reg);
+}
+
+static inline unsigned char i2c_jz_readb(unsigned int reg)
+{
+	return readb(the_i2c->base + reg);
+}
+
+static inline void jz_i2c_set_bits(unsigned int reg, unsigned int val)
+{
+	i2c_jz_writeb(i2c_jz_readb(reg) | val, reg);
+}
+
+static inline void jz_i2c_clear_bits(unsigned int reg, unsigned int val)
+{
+	i2c_jz_writeb(i2c_jz_readb(reg) & ~val, reg);
+}
+
+#define i2c_jz_enable() jz_i2c_set_bits(JZ_REG_I2C_CR, JZ_I2C_CR_I2CE)
+#define i2c_jz_disable() jz_i2c_clear_bits(JZ_REG_I2C_CR, JZ_I2C_CR_I2CE)
+#define i2c_jz_set_drf() jz_i2c_set_bits(JZ_REG_I2C_SR, JZ_I2C_SR_DRF)
+#define i2c_jz_clear_drf() jz_i2c_clear_bits(JZ_REG_I2C_SR, JZ_I2C_SR_DRF)
+#define i2c_jz_send_nack() jz_i2c_set_bits(JZ_REG_I2C_CR, JZ_I2C_CR_AC)
+#define i2c_jz_send_ack() jz_i2c_clear_bits(JZ_REG_I2C_CR, JZ_I2C_CR_AC)
+#define i2c_jz_send_start() jz_i2c_set_bits(JZ_REG_I2C_CR, JZ_I2C_CR_STA)
+#define i2c_jz_send_stop() jz_i2c_set_bits(JZ_REG_I2C_CR, JZ_I2C_CR_STO)
 
 /*
  * I2C interface
  */
-void i2c_jz_setclk(unsigned int i2cclk)
+static void i2c_jz_setclk(unsigned int rate)
 {
-	__i2c_set_clk(jz_clocks.extalclk, i2cclk);
-}
-
-
-void dump_regs(int step)
-{
-	printk("%d: I2C regs:\n", step);
-	printk("SR: %08x\tCR: %08x\n", REG_I2C_SR, REG_I2C_CR);
-}
-
-int very_useful_function(unsigned long arg)
-{
-	if (arg)
-		return arg;
-	else
-		return 111;
+	writew(clk_get_rate(the_i2c->clk) / (16 * rate), the_i2c->base + JZ_REG_I2C_GR);
 }
 
 static irqreturn_t i2c_jz_handle_irq(int irq, void *dev_id)
@@ -81,7 +125,7 @@ static irqreturn_t i2c_jz_handle_irq(int irq, void *dev_id)
 	struct jz_i2c *i2c = (struct jz_i2c *) dev_id;
 
 	wake_up(&i2c->wait);
-	dev_dbg(&i2c->adap.dev, "IRQ! SR = %08x\n", REG_I2C_SR);
+	dev_dbg(&i2c->adap.dev, "IRQ! SR = %08x\n", JZ_REG_I2C_SR);
 
 	return IRQ_HANDLED;
 }
@@ -90,40 +134,35 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 {
 	unsigned char *b = buf;
 	unsigned long timeout;
+	unsigned char ackf;
 	int ret = 0;
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
-	__cpm_start_i2c();
-	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
-	__i2c_enable();
-	__i2c_clear_drf();
+	clk_enable(the_i2c->clk);
+	i2c_jz_setclk(DEFAULT_I2C_CLOCK);
+	i2c_jz_enable();
+	i2c_jz_clear_drf();
 
 	if (length)
-		__i2c_send_ack();
+		i2c_jz_send_ack();
 	else
-		__i2c_send_nack();
+		i2c_jz_send_nack();
 
-	__i2c_send_start();
-	__i2c_write((addr << 1) | I2C_READ);
-
-	timeout = jiffies + I2C_TIMEOUT;
-	__i2c_set_drf();
-
-	while (__i2c_transmit_ended() && time_before(jiffies, timeout))
-		schedule();
-	if (!time_before(jiffies, timeout)) {
-		dev_dbg(&adap->dev, "%s: %d: timeout\n", __func__, __LINE__);
-		ret = -ETIMEDOUT;
-		goto end;
-	}
+	i2c_jz_send_start();
+	i2c_jz_writeb((addr << 1) | I2C_READ, JZ_REG_I2C_DR);
 
 	timeout = jiffies + I2C_TIMEOUT;
-	while (!__i2c_transmit_ended())
+	i2c_jz_set_drf();
+	udelay(1000000 / DEFAULT_I2C_CLOCK);
+
+	timeout = jiffies + I2C_TIMEOUT;
+	while (!(i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_TEND))
 		schedule();
 
-	dev_dbg(&adap->dev, "%s: Received %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
-	if (!__i2c_received_ack()) {
+	ackf = i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF;
+	dev_dbg(&adap->dev, "%s: Received %s\n", __func__, ackf ? "NACK" : "ACK");
+	if (ackf) {
 		ret = -EINVAL;
 		goto end;
 	}
@@ -140,29 +179,30 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 //		}
 
 		timeout = jiffies + I2C_TIMEOUT;
-		while (!__i2c_check_drf() && time_before(jiffies, timeout))
+		while (!(i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_DRF) && time_before(jiffies, timeout))
 				schedule();
 
 		if (!time_before(jiffies, timeout)) {
 			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
-			dev_dbg(&adap->dev, "%s: ACKF: %s\n", __func__, __i2c_received_ack() ? "ACK" : "NACK");
+			dev_dbg(&adap->dev, "%s: ACKF: %s\n", __func__, (i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF) ? "NACK" : "ACK");
 			ret = -ETIMEDOUT;
 			goto end;
 		}
 
 		if (length == 1) {
-			__i2c_send_nack();
-			__i2c_send_stop();
+			i2c_jz_send_nack();
+			i2c_jz_send_stop();
 		}
 
-		*b++ = __i2c_read();
+		*b++ = i2c_jz_readb(JZ_REG_I2C_DR);
 
-		__i2c_clear_drf();
+		i2c_jz_clear_drf();
 	}
 end:
-	__i2c_disable();
-	__cpm_stop_i2c();
+	i2c_jz_disable();
+	clk_disable(the_i2c->clk);
 
+	printk("ret = %d\n", ret);
 	return ret;
 }
 
@@ -174,44 +214,43 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
-	__cpm_start_i2c();
-	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
-	__i2c_enable();
-	__i2c_clear_drf();
-	__i2c_send_start();
+	clk_enable(the_i2c->clk);
+	i2c_jz_setclk(DEFAULT_I2C_CLOCK);
+	i2c_jz_enable();
+	i2c_jz_clear_drf();
+	i2c_jz_send_start();
 
 	while (l--) {
 
 		if (l == length)
-			__i2c_write(addr << 1);
+			i2c_jz_writeb(addr << 1, JZ_REG_I2C_DR);
 		else
-			__i2c_write(*buf++);
+			i2c_jz_writeb(*buf++, JZ_REG_I2C_DR);
 
-		__i2c_set_drf();
+		i2c_jz_set_drf();
 
 		timeout = TIMEOUT;
-		while (__i2c_check_drf() && timeout)
+		while ((i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_DRF) && timeout)
 			timeout--;
 
 		if (!timeout) {
 			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
-//			__i2c_send_stop();
-			__i2c_disable();
+			i2c_jz_disable();
 			return -ETIMEDOUT;
 		}
 
-		if (!__i2c_received_ack()) {
+		if (i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF) {
 			dev_dbg(&adap->dev, "NAK has been received during write\n");
-			__i2c_disable();
+			i2c_jz_disable();
 			return -EINVAL;
 		}
 	}
 
-	__i2c_send_stop();
-	while (!__i2c_transmit_ended());
+	i2c_jz_send_stop();
+	while (!(i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_TEND));
 
-	__i2c_disable();
-	__cpm_stop_i2c();
+	i2c_jz_disable();
+	clk_disable(the_i2c->clk);
 	return 0;
 }
 
@@ -255,10 +294,19 @@ static int i2c_jz_probe(struct platform_device *dev)
 	struct jz_i2c *i2c;
 	struct i2c_jz_platform_data *plat = dev->dev.platform_data;
 	int ret;
+	struct resource *mem;
 
-	__cpm_start_i2c();
-	__i2c_set_clk(jz_clocks.extalclk, DEFAULT_I2C_CLOCK);
-	__i2c_enable();
+	mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
+	if (!mem) {
+		dev_err(&dev->dev, "Failed to get register memory resource\n");
+		return -ENOENT;
+	}
+
+	mem = request_mem_region(mem->start, resource_size(mem), dev->name);
+	if (!mem) {
+		dev_err(&dev->dev, "Failed to request register memory resource\n");
+		return -EBUSY;
+	}
 
 	i2c = kzalloc(sizeof(struct jz_i2c), GFP_KERNEL);
 	if (!i2c) {
@@ -267,8 +315,43 @@ static int i2c_jz_probe(struct platform_device *dev)
 		goto emalloc;
 	}
 
-	i2c->adap.owner   = THIS_MODULE;
-	i2c->adap.algo    = &i2c_jz_algorithm;
+	the_i2c = i2c;
+
+	ret = gpio_request(JZ_GPIO_PORTD(23), "I2C SDA");
+	if (ret) {
+		dev_err(&dev->dev, "Failed to request SDA pin\n");
+		goto err_request_sda;
+	}
+
+	jz_gpio_set_function(JZ_GPIO_PORTD(23), JZ_GPIO_FUNC2);
+	gpio_request(JZ_GPIO_PORTD(24), "I2C SCL");
+	if (ret) {
+		dev_err(&dev->dev, "Failed to request SCL pin\n");
+		goto err_request_scl;
+	}
+
+	jz_gpio_set_function(JZ_GPIO_PORTD(24), JZ_GPIO_FUNC2);
+
+	i2c->clk = clk_get(&dev->dev, "i2c");
+	if (IS_ERR(i2c->clk)) {
+		ret = PTR_ERR(i2c->clk);
+		goto err_clk_get;
+	}
+
+	i2c->base = ioremap(mem->start, resource_size(mem));
+	if (!i2c->base) {
+		dev_err(&dev->dev, "Failed to ioremap register memory region\n");
+		ret = -EBUSY;
+		goto err_ioremap;
+	}
+	dev_info(&dev->dev, "I2C base addr is 0x%p (remapped from 0x%p)\n", i2c->base, mem->start);
+
+	i2c_jz_setclk(DEFAULT_I2C_CLOCK);
+	clk_enable(i2c->clk);
+	i2c_jz_enable();
+
+	i2c->adap.owner = THIS_MODULE;
+	i2c->adap.algo = &i2c_jz_algorithm;
 	i2c->adap.retries = 5;
 	spin_lock_init(&i2c->lock);
 	init_waitqueue_head(&i2c->wait);
@@ -303,17 +386,27 @@ static int i2c_jz_probe(struct platform_device *dev)
 	platform_set_drvdata(dev, i2c);
 	dev_info(&dev->dev, "JZ47xx i2c bus driver.\n");
 
-	__i2c_disable();
-	__cpm_stop_i2c();
+	i2c_jz_disable();
+	clk_disable(i2c->clk);
 
 	return 0;
 eadapt:
 //	free_irq(IRQ_I2C, i2c);
 //err_irq:
-	__i2c_disable();
-	__cpm_stop_i2c();
+	i2c_jz_disable();
+	clk_disable(i2c->clk);
+
+	iounmap(i2c->base);
+err_ioremap:
+	clk_put(i2c->clk);
+err_clk_get:
+	gpio_free(JZ_GPIO_PORTD(23));
+err_request_scl:
+	gpio_free(JZ_GPIO_PORTD(24));
+err_request_sda:
 	kfree(i2c);
 emalloc:
+	release_mem_region(mem->start, resource_size(mem));
 	return ret;
 }
 
@@ -323,6 +416,15 @@ static int i2c_jz_remove(struct platform_device *dev)
 	int rc;
 
 //	free_irq(IRQ_I2C, i2c);
+	i2c_jz_disable();
+	clk_disable(i2c->clk);
+
+	iounmap(i2c->base);
+	clk_put(i2c->clk);
+	gpio_free(JZ_GPIO_PORTD(23));
+	gpio_free(JZ_GPIO_PORTD(24));
+	kfree(i2c);
+	release_mem_region(i2c->mem->start, resource_size(i2c->mem));
 	rc = i2c_del_adapter(&i2c->adap);
 	platform_set_drvdata(dev, NULL);
 	return rc;
