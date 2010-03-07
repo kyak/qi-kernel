@@ -11,8 +11,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -205,7 +203,6 @@ end:
 	i2c_jz_disable();
 	clk_disable(the_i2c->clk);
 
-	printk("ret = %d\n", ret);
 	return ret;
 }
 
