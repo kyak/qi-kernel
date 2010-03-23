@@ -73,6 +73,7 @@ struct jz4740_udc {
 	struct usb_gadget_driver *driver;
 	struct device *dev;
 	spinlock_t lock;
+	unsigned long lock_flags;
 
 	enum ep0state ep0state;
 	struct jz4740_ep ep[UDC_MAX_ENDPOINTS];
