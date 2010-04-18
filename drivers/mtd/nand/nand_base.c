@@ -1977,8 +1977,17 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		chip->pagebuf = -1;
 
 	/* If we're not given explicit OOB data, let it be 0xFF */
-	if (likely(!oob))
+	if (likely(!oob)) {
 		memset(chip->oob_poi, 0xff, mtd->oobsize);
+#ifdef CONFIG_MTD_NAND_JZ4740_IPL_OOB
+		/* In IPL mode bytes at offsets 2-4 must be zero or */
+		/* the IPL code won't load them... this should probably */
+		/* be somewhere in jz4740_nand.c */
+		chip->oob_poi[2] = 0x00;
+		chip->oob_poi[3] = 0x00;
+		chip->oob_poi[4] = 0x00;
+#endif
+	}
 
 	while(1) {
 		int bytes = mtd->writesize;
@@ -2668,6 +2677,15 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 		mtd->oobsize = mtd->writesize / 32;
 		busw = type->options & NAND_BUSWIDTH_16;
 	}
+
+#ifdef CONFIG_MTD_NAND_JZ4740_IPL_OOB
+	if (mtd->writesize != 2048) {
+		printk(KERN_NOTICE "NAND page size forced to 2K for IPL mode\n");
+		mtd->writesize	= 2048;
+		mtd->oobsize	= mtd->writesize / 32;
+		mtd->erasesize	= mtd->writesize * 128;
+	}
+#endif
 
 	/* Try to identify manufacturer */
 	for (maf_idx = 0; nand_manuf_ids[maf_idx].id != 0x0; maf_idx++) {
