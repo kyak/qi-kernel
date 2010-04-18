@@ -1,0 +1,155 @@
+
+               Linux for the Dingoo A320
+
+-------------
+** History **
+-------------
+
+The initial port of Linux 2.6.24.3 to the A320 was done by Ignacio Garcia Perez
+aka booboo. He added support for the Dingoo to the 2.6.24.3 kernel from Ingenic.
+	Ignacio Garcia Perez <iggarpe@gmail.com>
+	http://www.dingux.com/
+
+The OpenDingux tree is a merge between booboo's patches and the qi-kernel tree
+from Qi Hardware. This tree is kept up-to-date with the mainline kernel and
+the latest drivers from Ingenic.
+	http://projects.qi-hardware.com/index.php/p/qi-kernel/
+
+------------------
+** Contributing **
+------------------
+
+You can find the latest code on github:
+	http://github.com/mthuurne/opendingux-kernel
+
+Developers can be found on the #dingoonity channel on freenode IRC:
+	irc://irc.freenode.net/dingoonity
+
+----------------
+** Quickstart **
+----------------
+
+Use "make a320_defconfig" for a default configuration (LCD driver ILI9325).
+
+If your A320 is one of the newer models, you must change the LCD driver
+to ILI9331:
+
+    Device drivers
+    |---Graphics support
+        |---Support for framebuffer devices
+            |---SLCD panel
+
+--------------
+** Keyboard **
+--------------
+
+The keyboard driver has been completely rewritten now using the polled
+input device code. The standard keyboard map is as follows:
+
+    D-pad up            KEY_UP          KEY_VOLUMEUP            's'
+    D-pad down          KEY_DOWN        KEY_VOLUMEDOWN          'u'
+    D-pad left          KEY_LEFT        KEY_BRIGHTNESSDOWN      'e'
+    D-pad right         KEY_RIGHT       KEY_BRIGHTNESSUP        'i'
+    A button            KEY_LEFTCTRL
+    B button            KEY_LEFTATL
+    X button            KEY_SPACE
+    Y button            KEY_LEFTSHIFT
+    Left shoulder       KEY_TAB		KEY_EXIT
+    Right shoulder      KEY_BACKSPACE
+    START button        KEY_ENTER
+    SELECT button       KEY_ESC         KEY_MENU		'b'
+
+The second column is the generated keycode when the button is pressed normally.
+The third column is the generated keycode when the button is pressed while the
+power slider is pressed too.
+The fourth column is the generated system request when the button is pressed
+while both the power slider and the START button are pressed:
+
+'s'	Emergency sync of all discs.
+'u'	Remount all discs read-only.
+'e'	Send SIGTERM to all processes except init.
+'i'	Send SIGKILL to all processes except init.
+'b'	Reboot immediately.
+
+For example, to reboot the console syncing all disces and mounting read-only,
+press and hold POWER, press and hold START, and press secuentially UP, DOWN
+and SELECT. Note that SELECT is also used in dual-boot to select linux boot,
+so if you hold SELECT pressed at the end of the previous sequence, you should
+reboot back into linux.
+
+Note that the POWER + key combinations are selected to enable an user space
+daemon handle the volume, LCD bightness, and perhaps an on-screen keyboard.
+
+If you hold the power slider pressed alone this is what will happen:
+- After two seconds a KEY_POWER key press and release will be generated.
+- After five seconds, an inmediate reboot will happen.
+
+This is subject to change when hardware powerdown or idle support works.
+
+I did my best to come up with a clever and useful keyboard map, but if you
+have any suggestions, please do not hesitate to contact me.
+
+-----------
+** Sound **
+-----------
+
+Sound driver is still OSS. It's quite buggy, but stick to S16 sample
+format and everything should be ok.
+
+---------------------------------
+** IPU (Image Processing Unit) **
+---------------------------------
+
+IPU (Image Processing Unit) memory reservation at startup is disabled
+(saves 4MB). If you intend to test video playing, you might want to
+enable it:
+
+    General setup
+    |---Configure standard kernel features (for small sytems)
+        |---Reserve memory for IPU on Ingenic JZ4740 SOC
+
+---------------------------
+** CPU frequency scaling **
+---------------------------
+
+CPU frequency scaling is now default enabled. Have a look at the stuff
+in /sys/devices/system/cpu/cpu0/cpufreq/. Default governor is "userspace".
+It is untested, and anyway at the moment you can only REDUCE the CPU
+frequency below the 336MHz set by the boot hardware initialization code
+(in hwinit if you're booting vía USB boot).
+
+-------------
+** Battery **
+-------------
+
+You can read the battery status by reading from /proc/jz/battery. You will
+read a single line with a decimal value which is the battery voltage in
+millivolts.
+
+We want a platform independent way of reading the battery status, and thus
+we need something like a percentage of full battery charge. When this and
+other info reading is implemented, it will be available in the second and
+further lines read from /proc/jz/battery.
+
+-------------------
+** LCD backlight **
+-------------------
+
+You can change the LCD backlight level by using the FBIOSETBACKLIGHT ioctl
+command on the /dev/fb0 interface or by writing to /proc/jz/lcd_backlight.
+I recommend the later method since the first requires kernel headers,
+which Ingenic didn't event bother to place in the right place (the ioctl
+defintions are in drivers/video/jz4740_slcd.h).
+
+Write a value between 0 and 100.
+
+Note: the relation between the value and the luminosity is not linear.
+This is likely to be fixed some day.
+
+-------------------
+** Miscellaneous **
+-------------------
+
+Lots of JZ4740 hardware support is disabled. Not because it doesn't
+work but because it is untested. Enable it at your own risk.
+
