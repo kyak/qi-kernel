@@ -494,4 +494,23 @@ config MTD_NAND_JZ4740
 	help
 	Support NAND Flash device on Jz4740 board
 
+config MTD_NAND_JZ4740_IPL_OOB
+	bool "Tweak OOB for IPL mode"
+	default n
+	depends on MTD_NAND_JZ4740 && !MTD_NAND_MULTI_PLANE
+	help
+	  Force 2K page size and OOB format as required by the IPL
+	  (initial program loader run from ROM at startup).
+
+	  This is required to access the SPL area in IPL mode.
+
+config MTD_NAND_JZ4740_SKIP_BBTSCAN
+	bool "Skip bad block table scan"
+	default n
+	depends on MTD_NAND_JZ4740
+	help
+	  Skip bad block table scan.
+
+	  This is recommended to access the SPL area in IPL mode.
+
 endif # MTD_NAND
