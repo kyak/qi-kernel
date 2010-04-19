@@ -6,8 +6,6 @@
 obj-$(CONFIG_I2C_SCMI)		+= i2c-scmi.o
 
 # PC SMBus host controller drivers
-=======
-obj-$(CONFIG_I2C_JZ47XX)	+= i2c-jz47xx.o
 obj-$(CONFIG_I2C_ALI1535)	+= i2c-ali1535.o
 obj-$(CONFIG_I2C_ALI1563)	+= i2c-ali1563.o
 obj-$(CONFIG_I2C_ALI15X3)	+= i2c-ali15x3.o
@@ -42,6 +40,7 @@ obj-$(CONFIG_I2C_IBM_IIC)	+= i2c-ibm_iic.o
 obj-$(CONFIG_I2C_IMX)		+= i2c-imx.o
 obj-$(CONFIG_I2C_IOP3XX)	+= i2c-iop3xx.o
 obj-$(CONFIG_I2C_IXP2000)	+= i2c-ixp2000.o
+obj-$(CONFIG_I2C_JZ47XX)	+= i2c-jz47xx.o
 obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
 obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
 obj-$(CONFIG_I2C_NOMADIK)	+= i2c-nomadik.o
