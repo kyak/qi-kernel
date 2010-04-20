@@ -24,10 +24,11 @@
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
-
 #include <linux/jz4740_fb.h>
 #include <linux/mmc/jz4740_mmc.h>
 #include <linux/mtd/jz4740_nand.h>
+#include <linux/power_supply.h>
+#include <linux/power/jz4740-battery.h>
 
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
@@ -153,6 +154,18 @@ static struct jz4740_mmc_platform_data a320_mmc_pdata = {
 	//.power_active_low	= 1,
 };
 
+/* Battery */
+static struct jz_battery_platform_data a320_battery_pdata = {
+	.gpio_charge = GPIO_CHARG_STAT_N,
+	.gpio_charge_active_low = 1,
+	.info = {
+		.name = "battery",
+		.technology = POWER_SUPPLY_TECHNOLOGY_LIPO,
+		.voltage_max_design = 4200000,
+		.voltage_min_design = 3600000,
+	},
+};
+
 static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_JZ47XX
 	&jz4740_i2c_device,
@@ -173,8 +186,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_codec_device,
 	&jz4740_rtc_device,
 	&jz4740_adc_device,
-	/* TODO(MtH): Add battery support later.
-	&jz4740_battery_device, */
+	&jz4740_battery_device,
 	/* TODO(MtH): A320 equivalent?
 	&qi_lb60_gpio_keys, */
 	/* TODO(MtH): A320 equivalent?
@@ -216,8 +228,7 @@ static int __init a320_init_platform_devices(void)
 {
 	jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;
 	jz4740_nand_device.dev.platform_data = &a320_nand_pdata;
-	/* TODO(MtH): Add battery support later.
-	jz4740_battery_device.dev.platform_data = &a320_battery_pdata;*/
+	jz4740_battery_device.dev.platform_data = &a320_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &a320_mmc_pdata;
 
 	/* TODO(MtH): Dingux has no SPI support enabled.
