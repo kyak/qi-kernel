@@ -52,6 +52,7 @@ static long a320_panic_blink_callback(long time)
 	return 0;
 }
 
+#ifdef CONFIG_I2C_GPIO
 /* I2C over GPIO pins */
 static struct i2c_gpio_platform_data a320_i2c_pdata = {
 	.sda_pin = JZ_GPIO_PORTD(23),
@@ -67,6 +68,7 @@ static struct platform_device a320_i2c_device = {
 		.platform_data = &a320_i2c_pdata,
 	},
 };
+#endif
 
 /* NAND */
 static struct nand_ecclayout a320_ecclayout_4gb = {
@@ -152,10 +154,12 @@ static struct jz4740_mmc_platform_data a320_mmc_pdata = {
 };
 
 static struct platform_device *jz_platform_devices[] __initdata = {
-	/* TODO(MtH): Anything useful connected to this?
-	              The bus driver seems to be missing.
-	&jz4740_i2c_device, */
+#ifdef CONFIG_I2C_JZ47XX
+	&jz4740_i2c_device,
+#endif
+#ifdef CONFIG_I2C_GPIO
 	&a320_i2c_device,
+#endif
 	&jz4740_usb_ohci_device,
 	&jz4740_usb_gdt_device,
 	&jz4740_mmc_device,
