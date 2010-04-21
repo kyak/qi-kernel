@@ -157,7 +157,13 @@ static struct jz4740_mmc_platform_data a320_mmc_pdata = {
 
 /* Battery */
 static struct jz_battery_platform_data a320_battery_pdata = {
-	.gpio_charge = GPIO_CHARG_STAT_N,
+	// TODO(MtH): Sometimes while charging, the GPIO pin quickly flips between
+	//            0 and 1. This causes a very high CPU load because the kernel
+	//            will invoke a hotplug event handler process on every status
+	//            change. Until it is clear how to avoid or handle that, it
+	//            is better not to use the charge status.
+	//.gpio_charge = GPIO_CHARG_STAT_N,
+	.gpio_charge = -1,
 	.gpio_charge_active_low = 1,
 	.info = {
 		.name = "battery",
