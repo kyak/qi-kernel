@@ -28,6 +28,7 @@
 #include <linux/mmc/jz4740_mmc.h>
 #include <linux/mtd/jz4740_nand.h>
 #include <linux/power_supply.h>
+#include <linux/power/gpio-charger.h>
 #include <linux/power/jz4740-battery.h>
 
 #include <asm/cpu.h>
@@ -166,6 +167,26 @@ static struct jz_battery_platform_data a320_battery_pdata = {
 	},
 };
 
+static char *a320_batteries[] = {
+	"battery",
+};
+
+static struct gpio_charger_platform_data a320_charger_pdata = {
+	.name = "USB",
+	.type = POWER_SUPPLY_TYPE_USB,
+	.gpio = GPIO_USB_DETE,
+	.gpio_active_low = 1,
+	.batteries = a320_batteries,
+	.num_batteries = ARRAY_SIZE(a320_batteries),
+};
+
+static struct platform_device a320_charger_device = {
+	.name = "gpio-charger",
+	.dev = {
+		.platform_data = &a320_charger_pdata,
+	},
+};
+
 static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_JZ47XX
 	&jz4740_i2c_device,
@@ -187,6 +208,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_rtc_device,
 	&jz4740_adc_device,
 	&jz4740_battery_device,
+	&a320_charger_device,
 	/* TODO(MtH): A320 equivalent?
 	&qi_lb60_gpio_keys, */
 	/* TODO(MtH): A320 equivalent?
