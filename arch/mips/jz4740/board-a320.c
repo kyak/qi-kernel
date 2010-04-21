@@ -172,7 +172,7 @@ static char *a320_batteries[] = {
 };
 
 static struct gpio_charger_platform_data a320_charger_pdata = {
-	.name = "USB",
+	.name = "usb",
 	.type = POWER_SUPPLY_TYPE_USB,
 	.gpio = GPIO_USB_DETE,
 	.gpio_active_low = 1,
@@ -211,8 +211,6 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&a320_charger_device,
 	/* TODO(MtH): A320 equivalent?
 	&qi_lb60_gpio_keys, */
-	/* TODO(MtH): A320 equivalent?
-	&qi_lb60_charger_device, */
 };
 
 static void __init board_cpm_setup(void)
@@ -235,10 +233,6 @@ static void __init board_gpio_setup(void)
 	              The drivers from openwrt-xburst probably do, but drivers
 	              originating from Dingux might not. */
 	/*
-	gpio_as_i2c();
-
-	gpio_as_input(GPIO_USB_DETE);
-
 	gpio_as_output(GPIO_SND_MUTE_N);	TODO(IGP): production kernel should start muted
 	gpio_set_pin(GPIO_SND_MUTE_N);
 	gpio_as_output(GPIO_SND_UNKNOWN);
