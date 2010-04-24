@@ -646,6 +646,12 @@ else
 load-$(CONFIG_CPU_CAVIUM_OCTEON) 	+= 0xffffffff81100000
 endif
 
+# Ingenic JZ4740
+#
+core-$(CONFIG_SOC_JZ4740)  += arch/mips/jz4740/
+cflags-$(CONFIG_SOC_JZ4740)    += -I$(srctree)/arch/mips/include/asm/mach-jz4740
+load-$(CONFIG_SOC_JZ4740)  += 0xffffffff80010000
+
 cflags-y			+= -I$(srctree)/arch/mips/include/asm/mach-generic
 drivers-$(CONFIG_PCI)		+= arch/mips/pci/
 
