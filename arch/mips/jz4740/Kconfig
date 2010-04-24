@@ -3,6 +3,10 @@ choice
     depends on MACH_JZ
     default JZ4740_QI_LB60
 
+config JZ4740_QI_LB60
+	bool "Qi Hardware Ben NanoNote"
+	select SOC_JZ4740
+
 endchoice
 
 config HAVE_PWM
