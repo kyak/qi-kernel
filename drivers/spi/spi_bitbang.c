@@ -335,6 +335,8 @@ static void bitbang_work(struct work_struct *work)
 				 */
 				if (!m->is_dma_mapped)
 					t->rx_dma = t->tx_dma = 0;
+				if ((spi->mode & SPI_3WIRE) && bitbang->set_direction)
+					bitbang->set_direction(spi, t->tx_buf != NULL);
 				status = bitbang->txrx_bufs(spi, t);
 			}
 			if (status > 0)
