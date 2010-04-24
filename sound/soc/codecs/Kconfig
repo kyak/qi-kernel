@@ -260,6 +260,13 @@ config SND_SOC_WM9712
 config SND_SOC_WM9713
 	tristate
 
+config SND_SOC_JZCODEC
+	tristate "JZ4720/JZ4740 SoC internal codec"
+	depends on SND_SOC && SOC_JZ4740
+	help
+	  Say Y if you want to use internal codec on Ingenic JZ4720/JZ4740 based
+	  boards.
+
 # Amp
 config SND_SOC_MAX9877
 	tristate
