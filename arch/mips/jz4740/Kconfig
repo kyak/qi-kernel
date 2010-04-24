@@ -3,6 +3,10 @@ choice
     depends on MACH_JZ
     default JZ4740_QI_LB60
 
+config JZ4740_QI_LB60
+	bool "Qi Hardware Ben NanoNote"
+	select SOC_JZ4740
+
 endchoice
 
 config SOC_JZ4740
@@ -13,6 +17,7 @@ config SOC_JZ4740
 	select SYS_HAS_EARLY_PRINTK
 	select SYS_SUPPORTS_LITTLE_ENDIAN
 	select IRQ_CPU
+	select DMA_NONCOHERENT
 
 config JZSOC
 	bool
