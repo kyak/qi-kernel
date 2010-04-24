@@ -311,6 +311,17 @@ config TI_DAC7512
 	  This driver can also be built as a module. If so, the module
 	  will be calles ti_dac7512.
 
+config JZ4740_ADC
+	tristate "Ingenic JZ4720/JZ4740 SoC ADC driver"
+	depends on SOC_JZ4740
+    help
+      If you say yes here you get support for the Ingenic JZ4720/JZ4740 SoC ADC
+      core. It is required for the JZ4720/JZ4740 battery and touchscreen driver
+      and is used to synchronize access to the adc core between those two.
+
+      This driver can also be build as a module. If so, the module will be
+      called jz4740-adc.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
