@@ -52,6 +52,8 @@ struct spi_bitbang {
 	u32	(*txrx_word[4])(struct spi_device *spi,
 			unsigned nsecs,
 			u32 word, u8 bits);
+
+	void (*set_direction)(struct spi_device *, bool is_tx);
 };
 
 /* you can call these default bitbang->master methods from your custom
