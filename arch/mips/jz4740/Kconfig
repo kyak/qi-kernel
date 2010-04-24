@@ -11,6 +11,10 @@ config JZ4740_N516
 	bool "Hanvon n516 eBook reader"
 	select SOC_JZ4740
 
+config JZ4740_N526
+	bool "Hanvon n526 eBook reader"
+	select SOC_JZ4740
+
 endchoice
 
 config SOC_JZ4740
