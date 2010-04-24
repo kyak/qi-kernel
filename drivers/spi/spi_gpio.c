@@ -45,6 +45,8 @@ struct spi_gpio {
 	struct spi_bitbang		bitbang;
 	struct spi_gpio_platform_data	pdata;
 	struct platform_device		*pdev;
+
+	int miso_pin;
 };
 
 /*----------------------------------------------------------------------*/
@@ -88,19 +90,16 @@ struct spi_gpio {
 
 /*----------------------------------------------------------------------*/
 
-static inline const struct spi_gpio_platform_data * __pure
-spi_to_pdata(const struct spi_device *spi)
+static inline const struct spi_gpio * __pure
+spi_to_spi_gpio(const struct spi_device *spi)
 {
 	const struct spi_bitbang	*bang;
-	const struct spi_gpio		*spi_gpio;
 
 	bang = spi_master_get_devdata(spi->master);
-	spi_gpio = container_of(bang, struct spi_gpio, bitbang);
-	return &spi_gpio->pdata;
+	return container_of(bang, struct spi_gpio, bitbang);
 }
 
-/* this is #defined to avoid unused-variable warnings when inlining */
-#define pdata		spi_to_pdata(spi)
+#define pdata &(spi_to_spi_gpio(spi)->pdata)
 
 static inline void setsck(const struct spi_device *spi, int is_on)
 {
@@ -114,10 +113,9 @@ static inline void setmosi(const struct spi_device *spi, int is_on)
 
 static inline int getmiso(const struct spi_device *spi)
 {
-	return !!gpio_get_value(SPI_MISO_GPIO);
+	return !!gpio_get_value(spi_to_spi_gpio(spi)->miso_pin);
 }
 
-#undef pdata
 
 /*
  * NOTE:  this clocks "as fast as we can".  It "should" be a function of the
@@ -173,10 +171,16 @@ static u32 spi_gpio_txrx_word_mode3(struct spi_device *spi,
 static void spi_gpio_chipselect(struct spi_device *spi, int is_active)
 {
 	unsigned long cs = (unsigned long) spi->controller_data;
+	struct spi_gpio *spi_gpio = spi_to_spi_gpio(spi);
 
 	/* set initial clock polarity */
-	if (is_active)
+	if (is_active) {
 		setsck(spi, spi->mode & SPI_CPOL);
+		if (spi->mode & SPI_3WIRE)
+			spi_gpio->miso_pin = SPI_MOSI_GPIO;
+		else
+			spi_gpio->miso_pin = SPI_MISO_GPIO;
+	}
 
 	if (cs != SPI_GPIO_NO_CHIPSELECT) {
 		/* SPI is normally active-low */
@@ -190,6 +194,9 @@ static int spi_gpio_setup(struct spi_device *spi)
 	int		status = 0;
 
 	if (spi->bits_per_word > 32)
+		return -EINVAL;
+
+	if (!(spi->mode & SPI_3WIRE) && !gpio_is_valid(SPI_MISO_GPIO))
 		return -EINVAL;
 
 	if (!spi->controller_state) {
@@ -208,6 +215,16 @@ static int spi_gpio_setup(struct spi_device *spi)
 	}
 	return status;
 }
+
+static void spi_gpio_set_direction(struct spi_device *spi, bool is_tx)
+{
+	if (is_tx)
+		gpio_direction_output(SPI_MISO_GPIO, 0);
+	else
+		gpio_direction_input(SPI_MISO_GPIO);
+}
+
+#undef pdata
 
 static void spi_gpio_cleanup(struct spi_device *spi)
 {
@@ -243,18 +260,20 @@ spi_gpio_request(struct spi_gpio_platform_data *pdata, const char *label)
 	if (value)
 		goto done;
 
-	value = spi_gpio_alloc(SPI_MISO_GPIO, label, true);
+	value = spi_gpio_alloc(SPI_SCK_GPIO, label, false);
 	if (value)
 		goto free_mosi;
 
-	value = spi_gpio_alloc(SPI_SCK_GPIO, label, false);
-	if (value)
-		goto free_miso;
+	if (gpio_is_valid(SPI_MISO_GPIO)) {
+		value = spi_gpio_alloc(SPI_MISO_GPIO, label, true);
+		if (value)
+			goto free_sck;
+	}
 
 	goto done;
 
-free_miso:
-	gpio_free(SPI_MISO_GPIO);
+free_sck:
+	gpio_free(SPI_SCK_GPIO);
 free_mosi:
 	gpio_free(SPI_MOSI_GPIO);
 done:
@@ -302,13 +321,15 @@ static int __init spi_gpio_probe(struct platform_device *pdev)
 	spi_gpio->bitbang.txrx_word[SPI_MODE_2] = spi_gpio_txrx_word_mode2;
 	spi_gpio->bitbang.txrx_word[SPI_MODE_3] = spi_gpio_txrx_word_mode3;
 	spi_gpio->bitbang.setup_transfer = spi_bitbang_setup_transfer;
-	spi_gpio->bitbang.flags = SPI_CS_HIGH;
+	spi_gpio->bitbang.set_direction = spi_gpio_set_direction;
+	spi_gpio->bitbang.flags = SPI_CS_HIGH | SPI_3WIRE;
 
 	status = spi_bitbang_start(&spi_gpio->bitbang);
 	if (status < 0) {
 		spi_master_put(spi_gpio->bitbang.master);
 gpio_free:
-		gpio_free(SPI_MISO_GPIO);
+		if (gpio_is_valid(SPI_MOSI_GPIO))
+			gpio_free(SPI_MISO_GPIO);
 		gpio_free(SPI_MOSI_GPIO);
 		gpio_free(SPI_SCK_GPIO);
 		spi_master_put(master);
@@ -332,7 +353,8 @@ static int __exit spi_gpio_remove(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, NULL);
 
-	gpio_free(SPI_MISO_GPIO);
+	if (gpio_is_valid(SPI_MISO_GPIO))
+		gpio_free(SPI_MISO_GPIO);
 	gpio_free(SPI_MOSI_GPIO);
 	gpio_free(SPI_SCK_GPIO);
 
