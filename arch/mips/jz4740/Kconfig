@@ -7,6 +7,10 @@ config JZ4740_QI_LB60
 	bool "Qi Hardware Ben NanoNote"
 	select SOC_JZ4740
 
+config JZ4740_N516
+	bool "Hanvon n516 eBook reader"
+	select SOC_JZ4740
+
 endchoice
 
 config HAVE_PWM
