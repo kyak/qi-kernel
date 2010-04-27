@@ -690,7 +690,9 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	jzfb->fb = fb;
 
 	return 0;
+
 err_free_devmem:
+	fb_dealloc_cmap(&fb->cmap);
 	jzfb_free_devmem(jzfb);
 err_iounmap:
 	iounmap(jzfb->base);
@@ -707,11 +709,17 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 
 	jz_gpio_bulk_free(jz_lcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
 	jz_gpio_bulk_free(jz_lcd_data_pins, jzfb_num_data_pins(jzfb));
+
 	iounmap(jzfb->base);
 	release_mem_region(jzfb->mem->start, resource_size(jzfb->mem));
+
+	fb_dealloc_cmap(&jzfb->fb->cmap);
 	jzfb_free_devmem(jzfb);
+
 	platform_set_drvdata(pdev, NULL);
+
 	framebuffer_release(jzfb->fb);
+
 	return 0;
 }
 
