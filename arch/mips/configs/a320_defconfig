@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34-rc5
-# Sat May  1 18:23:38 2010
+# Sun May  2 01:13:34 2010
 #
 CONFIG_MIPS=y
 
@@ -695,6 +695,9 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 # CONFIG_FB_BROADSHEET is not set
 CONFIG_FB_JZ4740=y
 # CONFIG_FB_JZ4740_SLCD is not set
+# CONFIG_JZ_SLCD_LGDP4551 is not set
+# CONFIG_JZ_SLCD_SPFD5420A is not set
+# CONFIG_JZ_SLCD_TRULY is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_LCD_CLASS_DEVICE=y
 # CONFIG_LCD_ILI9320 is not set
@@ -1093,7 +1096,7 @@ CONFIG_TRACING_SUPPORT=y
 CONFIG_HAVE_ARCH_KGDB=y
 CONFIG_EARLY_PRINTK=y
 CONFIG_CMDLINE_BOOL=y
-CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs root=/dev/loop0 jz4740_udc.use_dma=0 console=ttyS0"
+CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs root=/dev/loop0 jz4740_udc.use_dma=0 console=ttyS0 mem=32M"
 CONFIG_CMDLINE_OVERRIDE=y
 
 #
