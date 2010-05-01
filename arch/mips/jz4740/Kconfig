@@ -17,8 +17,8 @@ config JZ4740_N526
 
 config JZ4740_A320
 	bool "Dingoo A320 game and media player"
-	select DMA_NONCOHERENT
 	select SOC_JZ4740
+	select SYS_SUPPORTS_ZBOOT
 
 endchoice
 
