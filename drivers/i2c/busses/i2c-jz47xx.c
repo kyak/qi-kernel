@@ -145,10 +145,11 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 	i2c_jz_enable();
 	i2c_jz_clear_drf();
 
-	if (length)
+	if (length > 1) {
 		i2c_jz_send_ack();
-	else
+	} else {
 		i2c_jz_send_nack();
+	}
 
 	i2c_jz_send_start();
 	i2c_jz_writeb((addr << 1) | I2C_READ, JZ_REG_I2C_DR);
@@ -184,8 +185,8 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 				schedule();
 
 		if (!time_before(jiffies, timeout)) {
-			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
-			dev_dbg(&adap->dev, "%s: ACKF: %s\n", __func__, (i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF) ? "NACK" : "ACK");
+			dev_warn(&adap->dev, "DRF timeout, length = %d\n", length);
+			dev_warn(&adap->dev, "%s: ACKF: %s\n", __func__, (i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF) ? "NACK" : "ACK");
 			ret = -ETIMEDOUT;
 			goto end;
 		}
@@ -200,6 +201,8 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 		i2c_jz_clear_drf();
 	}
 end:
+	i2c_jz_send_stop();
+	udelay(1000000 / DEFAULT_I2C_CLOCK * 5);
 	i2c_jz_disable();
 	clk_disable(the_i2c->clk);
 
@@ -211,6 +214,7 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 {
 	int l = length + 1;
 	int timeout;
+	int ret = 0;
 
 	dev_dbg(&adap->dev, "%s\n", __func__);
 
@@ -234,24 +238,26 @@ static int xfer_write(unsigned char addr, struct i2c_adapter *adap, unsigned cha
 			timeout--;
 
 		if (!timeout) {
-			dev_dbg(&adap->dev, "DRF timeout, length = %d\n", length);
-			i2c_jz_disable();
-			return -ETIMEDOUT;
+			dev_warn(&adap->dev, "DRF timeout, length = %d\n", length);
+			ret = -ETIMEDOUT;
+			goto end;
 		}
 
 		if (i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_ACKF) {
 			dev_dbg(&adap->dev, "NAK has been received during write\n");
-			i2c_jz_disable();
-			return -EINVAL;
+			ret = -EINVAL;
+			goto end;
 		}
 	}
 
+end:
 	i2c_jz_send_stop();
 	while (!(i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_TEND));
+	udelay(1000000 / DEFAULT_I2C_CLOCK * 2);
 
 	i2c_jz_disable();
 	clk_disable(the_i2c->clk);
-	return 0;
+	return ret;
 }
 
 static int i2c_jz_xfer(struct i2c_adapter *adap, struct i2c_msg *pmsg, int num)
