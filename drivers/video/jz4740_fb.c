@@ -633,25 +633,12 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 		goto err_put_ldclk;
 	}
 
-	if (IS_ERR(jzfb->ldclk)) {
-		ret = PTR_ERR(jzfb->ldclk);
-		dev_err(&pdev->dev, "Faild to get device clock: %d\n", ret);
-		goto err_put_lpclk;
-	}
-
-	if (IS_ERR(jzfb->lpclk)) {
-		ret = PTR_ERR(jzfb->ldclk);
-		dev_err(&pdev->dev, "Faild to get pixel clock: %d\n", ret);
-		goto err_framebuffer_release;
-	}
-
-
 	jzfb->base = ioremap(mem->start, resource_size(mem));
 
 	if (!jzfb->base) {
 		dev_err(&pdev->dev, "Failed to ioremap register memory region\n");
 		ret = -EBUSY;
-		goto err_framebuffer_release;
+		goto err_put_lpclk;
 	}
 
 	platform_set_drvdata(pdev, jzfb);
