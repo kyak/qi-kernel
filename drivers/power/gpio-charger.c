@@ -172,7 +172,7 @@ static int __init gpio_charger_init(void)
 }
 module_init(gpio_charger_init);
 
-static void gpio_charger_exit(void)
+static void __exit gpio_charger_exit(void)
 {
 	platform_driver_unregister(&gpio_charger_driver);
 }
