@@ -804,13 +804,13 @@ static struct platform_driver jzfb_driver = {
 	},
 };
 
-int __init jzfb_init(void)
+static int __init jzfb_init(void)
 {
 	return platform_driver_register(&jzfb_driver);
 }
 module_init(jzfb_init);
 
-void __exit jzfb_exit(void)
+static void __exit jzfb_exit(void)
 {
 	platform_driver_unregister(&jzfb_driver);
 }
