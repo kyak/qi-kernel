@@ -200,7 +200,7 @@ static void jz_battery_work(struct work_struct *work)
 	schedule_delayed_work(&jz_battery->work, interval);
 }
 
-static int jz_battery_probe(struct platform_device *pdev)
+static int __devinit jz_battery_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct jz_battery_platform_data *pdata = pdev->dev.platform_data;
@@ -283,7 +283,7 @@ err_free:
 	return ret;
 }
 
-static int jz_battery_remove(struct platform_device *pdev)
+static int __devexit jz_battery_remove(struct platform_device *pdev)
 {
 	struct jz_battery *jz_battery = platform_get_drvdata(pdev);
 
