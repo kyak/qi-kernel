@@ -2274,7 +2274,7 @@ static void gadget_release(struct device *_dev)
 }
 
 
-static int jz4740_udc_probe(struct platform_device *pdev)
+static int __devinit jz4740_udc_probe(struct platform_device *pdev)
 {
 	struct jz4740_udc *dev = &udc_dev;
 	int ret;
@@ -2354,7 +2354,7 @@ err_device_unregister:
         return ret;
 }
 
-static int jz4740_udc_remove(struct platform_device *pdev)
+static int __devexit jz4740_udc_remove(struct platform_device *pdev)
 {
 	struct jz4740_udc *dev = platform_get_drvdata(pdev);
 
@@ -2412,7 +2412,7 @@ static struct dev_pm_ops jz4740_udc_pm_ops = {
 
 static struct platform_driver udc_driver = {
 	.probe		= jz4740_udc_probe,
-	.remove		= jz4740_udc_remove,
+	.remove		= __devexit_p(jz4740_udc_remove),
 	.driver		= {
 		.name	= "jz-udc",
 		.owner	= THIS_MODULE,
