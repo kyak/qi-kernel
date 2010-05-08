@@ -903,7 +903,7 @@ err_free_host:
 	return ret;
 }
 
-static int jz4740_mmc_remove(struct platform_device *pdev)
+static int __devexit jz4740_mmc_remove(struct platform_device *pdev)
 {
 	struct jz4740_mmc_host *host = platform_get_drvdata(pdev);
 	struct jz4740_mmc_platform_data *pdata = host->pdata;
@@ -980,7 +980,7 @@ const struct dev_pm_ops jz4740_mmc_pm_ops = {
 
 static struct platform_driver jz4740_mmc_driver = {
 	.probe = jz4740_mmc_probe,
-	.remove = jz4740_mmc_remove,
+	.remove = __devexit_p(jz4740_mmc_remove),
 	.driver = {
 		.name = "jz4740-mmc",
 		.owner = THIS_MODULE,
