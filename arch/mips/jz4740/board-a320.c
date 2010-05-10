@@ -213,6 +213,34 @@ static struct platform_device a320_charger_device = {
 	},
 };
 
+static struct gpio_keys_button a320_buttons[] = {
+    { .gpio = 102,	.active_low = 1,	.code = KEY_UP},             /* D-pad up */
+	{ .gpio = 123,	.active_low = 1, 	.code = KEY_DOWN},           /* D-pad down */
+	{ .gpio = 101,	.active_low = 1,	.code = KEY_LEFT},           /* D-pad left */
+	{ .gpio = 114,	.active_low = 1,	.code = KEY_RIGHT},          /* D-pad right */
+	{ .gpio = 96,	.active_low = 1,	.code = KEY_LEFTCTRL},       /* A button */
+	{ .gpio = 97,	.active_low = 1,	.code = KEY_LEFTALT},        /* B button */
+	{ .gpio = 115,	.active_low = 1,	.code = KEY_SPACE},          /* X button */
+	{ .gpio = 98,	.active_low = 1,	.code = KEY_LEFTSHIFT},      /* Y button */
+	{ .gpio = 110,	.active_low = 1,	.code = KEY_TAB},            /* Left shoulder button */
+	{ .gpio = 111,	.active_low = 1,	.code = KEY_BACKSPACE},      /* Right shoulder button */
+	{ .gpio = 81,	.active_low = 1,	.code = KEY_ENTER},          /* START button */
+	{ .gpio = 113,	.active_low = 1,	.code = KEY_ESC},            /* SELECT button */
+    { .gpio = 125,  .active_low = 1,    .code = KEY_POWER},          /* POWER slider */
+};
+
+static struct gpio_keys_platform_data a320_gpio_keys_pdata = {
+    .buttons = a320_buttons,
+    .nbuttons = ARRAY_SIZE(a320_buttons),
+};
+
+static struct platform_device a320_gpio_keys_device = {
+    .name = "gpio-keys",
+    .id = -1,
+    .dev = {
+            .platform_data = &a320_gpio_keys_pdata,
+    },
+};
 
 static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_JZ47XX
@@ -237,9 +265,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_battery_device,
 	&a320_charger_device,
     &a320_backlight_device,
-
-	/* TODO(MtH): A320 equivalent?
-	&qi_lb60_gpio_keys, */
+    &a320_gpio_keys_device,
 };
 
 static void __init board_cpm_setup(void)
