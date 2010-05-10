@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.34-rc5
-# Sun May  2 01:13:34 2010
+# Linux kernel version: 2.6.34-rc6
+# Mon May 10 02:37:01 2010
 #
 CONFIG_MIPS=y
 
@@ -53,6 +53,7 @@ CONFIG_MACH_JZ=y
 # CONFIG_JZ4740_N516 is not set
 # CONFIG_JZ4740_N526 is not set
 CONFIG_JZ4740_A320=y
+CONFIG_HAVE_PWM=y
 CONFIG_SOC_JZ4740=y
 CONFIG_JZSOC=y
 CONFIG_JZRISC=y
@@ -694,16 +695,13 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 # CONFIG_FB_MB862XX is not set
 # CONFIG_FB_BROADSHEET is not set
 CONFIG_FB_JZ4740=y
-# CONFIG_FB_JZ4740_SLCD is not set
-# CONFIG_JZ_SLCD_LGDP4551 is not set
-# CONFIG_JZ_SLCD_SPFD5420A is not set
-# CONFIG_JZ_SLCD_TRULY is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_LCD_CLASS_DEVICE=y
 # CONFIG_LCD_ILI9320 is not set
 CONFIG_LCD_PLATFORM=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 # CONFIG_BACKLIGHT_GENERIC is not set
+CONFIG_BACKLIGHT_PWM=y
 
 #
 # Display device support

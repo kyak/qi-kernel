@@ -31,6 +31,10 @@
 #include <linux/power/gpio-charger.h>
 #include <linux/power/jz4740-battery.h>
 
+#include <linux/pwm_backlight.h>
+#include <linux/input.h>
+#include <linux/gpio_keys.h>
+
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
 #include <asm/mipsregs.h>
@@ -145,6 +149,22 @@ static struct jz4740_fb_platform_data a320_fb_pdata = {
 	.pixclk_falling_edge = 1,
 };
 
+
+static struct platform_pwm_backlight_data a320_backlight_pdata = {
+	.pwm_id = 7,
+	.max_brightness = 255,
+	.dft_brightness = 100,
+	.pwm_period_ns = 7500000,
+};
+
+static struct platform_device a320_backlight_device = {
+    .name = "pwm-backlight",
+    .id = -1,
+    .dev = {
+        .platform_data = &a320_backlight_pdata,
+    },
+};
+
 static struct jz4740_mmc_platform_data a320_mmc_pdata = {
 	.gpio_card_detect	= GPIO_SD_CD,
 	.gpio_read_only		= -1,
@@ -193,6 +213,7 @@ static struct platform_device a320_charger_device = {
 	},
 };
 
+
 static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_JZ47XX
 	&jz4740_i2c_device,
@@ -215,6 +236,8 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_adc_device,
 	&jz4740_battery_device,
 	&a320_charger_device,
+    &a320_backlight_device,
+
 	/* TODO(MtH): A320 equivalent?
 	&qi_lb60_gpio_keys, */
 };
