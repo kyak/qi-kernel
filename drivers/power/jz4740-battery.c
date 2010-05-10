@@ -353,6 +353,7 @@ static void __exit jz_battery_exit(void)
 }
 module_exit(jz_battery_exit);
 
+MODULE_ALIAS("platform:jz4740-battery");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jiejing Zhang <kzjeef@gmail.com>");
 MODULE_DESCRIPTION("JZ4720/JZ4740 SoC battery driver");
