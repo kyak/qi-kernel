@@ -60,16 +60,29 @@
 extern void __iomem *jz4740_timer_base;
 void __init jz4740_timer_init(void);
 
-static inline void jz4740_timer_enable(unsigned int timer)
+static inline void jz4740_timer_stop(unsigned int timer)
+{
+	writel(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
+}
+
+static inline void jz4740_timer_start(unsigned int timer)
 {
 	writel(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_STOP_CLEAR);
+}
+
+static inline bool jz4740_timer_is_enabled(unsigned int timer)
+{
+	return readb(jz4740_timer_base + JZ_REG_TIMER_ENABLE) & BIT(timer);
+}
+
+static inline void jz4740_timer_enable(unsigned int timer)
+{
 	writeb(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_ENABLE_SET);
 }
 
 static inline void jz4740_timer_disable(unsigned int timer)
 {
 	writeb(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_ENABLE_CLEAR);
-	writel(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
 }
 
 

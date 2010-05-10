@@ -39,4 +39,7 @@ void __init jz4740_timer_init(void)
 
 	if (!jz4740_timer_base)
 		panic("Failed to ioremap timer registers");
+
+	/* Disable all timers except those used as system timers */
+	writeb(0xfc, jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
 }

@@ -83,6 +83,8 @@ struct pwm_device *pwm_request(int id, const char *label)
 
 	jz_gpio_set_function(pwm->gpio, JZ_GPIO_FUNC_PWM);
 
+	jz4740_timer_start(id);
+
 	return pwm;
 }
 
@@ -94,19 +96,22 @@ void pwm_free(struct pwm_device *pwm)
 	jz_gpio_set_function(pwm->gpio, JZ_GPIO_FUNC_NONE);
 	gpio_free(pwm->gpio);
 
+	jz4740_timer_stop(pwm->id);
+
 	pwm->used = false;
+
 }
 
 int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 {
-
 	unsigned long long tmp;
 	unsigned long period, duty;
 	unsigned int prescaler = 0;
 	unsigned int id = pwm->id;
 	uint16_t ctrl;
+	bool is_enabled;
 
-	if (duty_ns > period_ns)
+	if (duty_ns < 0 || duty_ns > period_ns)
 		return -EINVAL;
 
 	tmp = (unsigned long long)clk_get_rate(jz4740_pwm_clk) * period_ns;
@@ -128,6 +133,13 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	do_div(tmp, period_ns);
 	duty = tmp;
 
+	if (duty >= period)
+		duty = period - 1;
+
+	is_enabled = jz4740_timer_is_enabled(id);
+	jz4740_timer_disable(id);
+
+	jz4740_timer_set_count(id, 0);
 	jz4740_timer_set_duty(id, duty);
 	jz4740_timer_set_period(id, period);
 
@@ -135,6 +147,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 		JZ_TIMER_CTRL_SRC_PCLK;
 
 	jz4740_timer_set_ctrl(id, ctrl);
+
+	if (is_enabled)
+		jz4740_timer_enable(id);
 
 	return 0;
 }
