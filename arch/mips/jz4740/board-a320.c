@@ -42,6 +42,7 @@
 
 #include <asm/mach-jz4740/board-a320.h>
 #include <asm/mach-jz4740/platform.h>
+#include <asm/mach-jz4740/gpio.h>
 
 #include "clock.h"
 
@@ -213,20 +214,29 @@ static struct platform_device a320_charger_device = {
 	},
 };
 
+    /* TODO(CongoZombie): Figure out a way to reimplement power slider functionality
+                          so that existing apps won't break. (Possible that an SDL
+                          remapping would fix this, but it is unclear how many apps
+                          use other interfaces)
+                          Original Dingux used SysRq keys to perform different tasks
+                          (restart, backlight, volume etc.)
+    */
+    /* TODO(CongoZombie): Confirm power slider pin (Booboo's docs seem unsure)  */
+
 static struct gpio_keys_button a320_buttons[] = {
-    { .gpio = 102,	.active_low = 1,	.code = KEY_UP},             /* D-pad up */
-	{ .gpio = 123,	.active_low = 1, 	.code = KEY_DOWN},           /* D-pad down */
-	{ .gpio = 101,	.active_low = 1,	.code = KEY_LEFT},           /* D-pad left */
-	{ .gpio = 114,	.active_low = 1,	.code = KEY_RIGHT},          /* D-pad right */
-	{ .gpio = 96,	.active_low = 1,	.code = KEY_LEFTCTRL},       /* A button */
-	{ .gpio = 97,	.active_low = 1,	.code = KEY_LEFTALT},        /* B button */
-	{ .gpio = 115,	.active_low = 1,	.code = KEY_SPACE},          /* X button */
-	{ .gpio = 98,	.active_low = 1,	.code = KEY_LEFTSHIFT},      /* Y button */
-	{ .gpio = 110,	.active_low = 1,	.code = KEY_TAB},            /* Left shoulder button */
-	{ .gpio = 111,	.active_low = 1,	.code = KEY_BACKSPACE},      /* Right shoulder button */
-	{ .gpio = 81,	.active_low = 1,	.code = KEY_ENTER},          /* START button */
-	{ .gpio = 113,	.active_low = 1,	.code = KEY_ESC},            /* SELECT button */
-    { .gpio = 125,  .active_low = 1,    .code = KEY_POWER},          /* POWER slider */
+    { .gpio = JZ_GPIO_PORTD(6), 	.active_low = 1,	.code = KEY_UP},             /* D-pad up */
+	{ .gpio = JZ_GPIO_PORTD(27), 	.active_low = 1, 	.code = KEY_DOWN},           /* D-pad down */
+	{ .gpio = JZ_GPIO_PORTD(5), 	.active_low = 1,	.code = KEY_LEFT},           /* D-pad left */
+	{ .gpio = JZ_GPIO_PORTD(18),    .active_low = 1,	.code = KEY_RIGHT},          /* D-pad right */
+	{ .gpio = JZ_GPIO_PORTD(19),	.active_low = 1,	.code = KEY_LEFTCTRL},       /* A button */
+	{ .gpio = JZ_GPIO_PORTD(1),	    .active_low = 1,	.code = KEY_LEFTALT},        /* B button */
+	{ .gpio = JZ_GPIO_PORTD(6), 	.active_low = 1,	.code = KEY_SPACE},          /* X button */
+	{ .gpio = JZ_GPIO_PORTD(2),	    .active_low = 1,	.code = KEY_LEFTSHIFT},      /* Y button */
+	{ .gpio = JZ_GPIO_PORTD(14),    .active_low = 1,	.code = KEY_TAB},            /* Left shoulder button */
+	{ .gpio = JZ_GPIO_PORTD(15), 	.active_low = 1,	.code = KEY_BACKSPACE},      /* Right shoulder button */
+	{ .gpio = JZ_GPIO_PORTC(17), 	.active_low = 1,	.code = KEY_ENTER},          /* START button */
+	{ .gpio = JZ_GPIO_PORTD(17),    .active_low = 1,	.code = KEY_ESC},            /* SELECT button */
+    { .gpio = JZ_GPIO_PORTD(29),    .active_low = 1,    .code = KEY_POWER},          /* POWER slider */
 };
 
 static struct gpio_keys_platform_data a320_gpio_keys_pdata = {
