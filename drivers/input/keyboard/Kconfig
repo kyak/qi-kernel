@@ -16,7 +16,7 @@ config KEYBOARD_AAED2000
 	tristate "AAED-2000 keyboard"
 	depends on MACH_AAED2000
 	select INPUT_POLLDEV
-	default y
+	default n
 	help
 	  Say Y here to enable the keyboard on the Agilent AAED-2000
 	  development board.
@@ -70,7 +70,7 @@ config KEYBOARD_ATARI
 
 config KEYBOARD_ATKBD
 	tristate "AT keyboard" if EMBEDDED || !X86
-	default y
+	default n
 	select SERIO
 	select SERIO_LIBPS2
 	select SERIO_I8042 if X86
@@ -89,7 +89,7 @@ config KEYBOARD_ATKBD
 config KEYBOARD_ATKBD_HP_KEYCODES
 	bool "Use HP keyboard scancodes"
 	depends on PARISC && KEYBOARD_ATKBD
-	default y
+	default n
 	help
 	  Say Y here if you have a PA-RISC machine and want to use an AT or
 	  PS/2 keyboard, and your keyboard uses keycodes that are specific to
@@ -204,7 +204,7 @@ config KEYBOARD_MATRIX
 config KEYBOARD_HIL_OLD
 	tristate "HP HIL keyboard support (simple driver)"
 	depends on GSC || HP300
-	default y
+	default n
 	help
 	  The "Human Interface Loop" is a older, 8-channel USB-like
 	  controller used in several Hewlett Packard models. This driver
@@ -221,7 +221,7 @@ config KEYBOARD_HIL_OLD
 config KEYBOARD_HIL
 	tristate "HP HIL keyboard/pointer support"
 	depends on GSC || HP300
-	default y
+	default n
 	select HP_SDC
 	select HIL_MLC
 	select SERIO
