@@ -40,7 +40,6 @@
 #include <asm/mipsregs.h>
 #include <asm/reboot.h>
 
-#include <asm/mach-jz4740/board-a320.h>
 #include <asm/mach-jz4740/platform.h>
 #include <asm/mach-jz4740/gpio.h>
 
