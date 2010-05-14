@@ -51,11 +51,12 @@
  * is passed to the kernel. The A320 does not have any LEDs, so the best
  * we can do is to blink the LCD backlight.
  *
- * TODO(IGP): this should use the LCD handling code.
+ * TODO(MtH): This should use the backlight driver instead of directly
+ *            manipulating the GPIO pin.
  */
 static long a320_panic_blink_callback(long time)
 {
-	gpio_direction_output(GPIO_LCD_BACKLIGHT, (time / 500) & 1);
+	gpio_direction_output(JZ_GPIO_PORTD(31), (time / 500) & 1);
 	return 0;
 }
 
@@ -167,7 +168,7 @@ static struct platform_device a320_backlight_device = {
 };
 
 static struct jz4740_mmc_platform_data a320_mmc_pdata = {
-	.gpio_card_detect	= GPIO_SD_CD,
+	.gpio_card_detect	= JZ_GPIO_PORTB(29),
 	.gpio_read_only		= -1,
 	.gpio_power		= -1,
 	// TODO(MtH): I don't know which GPIO pin the SD power is connected to.
@@ -183,7 +184,7 @@ static struct jz_battery_platform_data a320_battery_pdata = {
 	//            will invoke a hotplug event handler process on every status
 	//            change. Until it is clear how to avoid or handle that, it
 	//            is better not to use the charge status.
-	//.gpio_charge = GPIO_CHARG_STAT_N,
+	//.gpio_charge = JZ_GPIO_PORTB(30),
 	.gpio_charge = -1,
 	.gpio_charge_active_low = 1,
 	.info = {
@@ -201,7 +202,7 @@ static char *a320_batteries[] = {
 static struct gpio_charger_platform_data a320_charger_pdata = {
 	.name = "usb",
 	.type = POWER_SUPPLY_TYPE_USB,
-	.gpio = GPIO_USB_DETE,
+	.gpio = JZ_GPIO_PORTD(28),
 	.gpio_active_low = 1,
 	.batteries = a320_batteries,
 	.num_batteries = ARRAY_SIZE(a320_batteries),
@@ -286,6 +287,10 @@ static void __init board_cpm_setup(void)
 
 	/* TODO(IGP): stop the clocks to save power */
 }
+
+/* TODO(MtH): Not claimed yet by any driver. */
+#define GPIO_SND_MUTE_N		JZ_GPIO_PORTC(27)
+#define GPIO_SND_UNKNOWN	JZ_GPIO_PORTD(7)
 
 static void __init board_gpio_setup(void)
 {

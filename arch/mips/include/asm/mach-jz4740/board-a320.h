@@ -22,15 +22,4 @@
  */
 #define MEMSIZE			0x02000000
 
-/*======================================================================
- * GPIO
- */
-#define GPIO_SD_CD		JZ_GPIO_PORTB(29)
-#define GPIO_CHARG_STAT_N	JZ_GPIO_PORTB(30)
-#define GPIO_USB_DETE		JZ_GPIO_PORTD(28)
-#define GPIO_SND_MUTE_N		JZ_GPIO_PORTC(27)
-#define GPIO_SND_UNKNOWN	JZ_GPIO_PORTD(7)
-#define GPIO_LCD_BACKLIGHT	JZ_GPIO_PORTD(31)
-#define GPIO_UDC_HOTPLUG	GPIO_USB_DETE
-
 #endif /* __ASM_JZ4740_A320_H__ */
