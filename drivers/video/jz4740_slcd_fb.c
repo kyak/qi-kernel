@@ -116,7 +116,14 @@ static int jzfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= fb->cmap.len)
 		return -EINVAL;
 
-	((uint32_t *)fb->pseudo_palette)[regno] = red << 16 | green << 8 | blue;
+	red   = (red   * ((1 << fb->var.red.length  ) - 1)) / ((1 << 16) - 1);
+	green = (green * ((1 << fb->var.green.length) - 1)) / ((1 << 16) - 1);
+	blue  = (blue  * ((1 << fb->var.blue.length ) - 1)) / ((1 << 16) - 1);
+
+	((uint32_t *)fb->pseudo_palette)[regno] =
+		(red   << fb->var.red.offset  ) |
+		(green << fb->var.green.offset) |
+		(blue  << fb->var.blue.offset );
 
 	return 0;
 }
@@ -168,7 +175,7 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 	case 15:
 		var->red.offset = 10;
 		var->red.length = 5;
-		var->green.offset = 6;
+		var->green.offset = 5;
 		var->green.length = 5;
 		var->blue.offset = 0;
 		var->blue.length = 5;
@@ -176,7 +183,7 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 	case 16:
 		var->red.offset = 11;
 		var->red.length = 5;
-		var->green.offset = 6;
+		var->green.offset = 5;
 		var->green.length = 6;
 		var->blue.offset = 0;
 		var->blue.length = 5;
@@ -485,7 +492,6 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 	struct fb_videomode *mode = jzfb->pdata->modes;
 	void *page;
 	int i;
-	int x, y;
 
 	for (i = 0; i < jzfb->pdata->num_modes; ++mode, ++i) {
 		if (max_videosize < mode->xres * mode->yres)
@@ -513,17 +519,6 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 		 page < jzfb->vidmem + PAGE_ALIGN(jzfb->vidmem_size);
 		 page += PAGE_SIZE) {
 		SetPageReserved(virt_to_page(page));
-	}
-
-	// TODO: Remove this test code.
-	for (y = 0; y < 240; y++) {
-		for (x = 0; x < 320; x++) {
-			uint16_t r = y & 0x1F;
-			uint16_t g = x & 0x3F;
-			uint16_t b = (x + y) >> 3;
-			uint16_t rgb = ((r << 11) | (g << 5) | b);
-			writel(rgb, jzfb->vidmem + (x + 320 * y) * 2);
-		}
 	}
 
 	jzfb->framedesc->next = jzfb->framedesc_phys;
