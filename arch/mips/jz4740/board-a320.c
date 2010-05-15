@@ -126,30 +126,22 @@ static struct fb_videomode a320_video_modes[] = {
 		.name = "320x240",
 		.xres = 320,
 		.yres = 240,
-		/* TODO(MtH): Values below are from NanoNote; Dingux sets them to 0.
-		.refresh = 30,
-		.left_margin = 140,
-		.right_margin = 273,
-		.upper_margin = 20,
-		.lower_margin = 2,
-		.hsync_len = 1,
-		.vsync_len = 1,
-		*/
-		.sync = 0,
+		// TODO(MtH): Set refresh or pixclock.
 		.vmode = FB_VMODE_NONINTERLACED,
 	},
 };
 
 static struct jz4740_fb_platform_data a320_fb_pdata = {
-	.width		= 60,
-	.height		= 45,
-	.num_modes	= ARRAY_SIZE(a320_video_modes),
-	.modes		= a320_video_modes,
-	.bpp		= 16,
-	.lcd_type	= JZ_LCD_TYPE_8BIT_SERIAL,
-	.pixclk_falling_edge = 1,
+	.width				= 60,
+	.height				= 45,
+	.num_modes			= ARRAY_SIZE(a320_video_modes),
+	.modes				= a320_video_modes,
+	.bpp				= 16,
+	.lcd_type			= JZ_LCD_TYPE_SMART_PARALLEL_16_BIT,
+	.pixclk_falling_edge		= 0,
+	.chip_select_active_low		= 1,
+	.register_select_active_low	= 1,
 };
-
 
 static struct platform_pwm_backlight_data a320_backlight_pdata = {
 	.pwm_id = 7,
@@ -267,7 +259,8 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&qi_lb60_keypad, */
 	/* TODO(MtH): Not needed for Dingux?
 	&spigpio_device, */
-	&jz4740_framebuffer_device,
+	/*&jz4740_framebuffer_device,*/
+	&jz4740_slcd_framebuffer_device,
 	&jz4740_i2s_device,
 	&jz4740_codec_device,
 	&jz4740_rtc_device,
@@ -311,7 +304,8 @@ static void __init board_gpio_setup(void)
 
 static int __init a320_init_platform_devices(void)
 {
-	jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;
+	/*jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;*/
+	jz4740_slcd_framebuffer_device.dev.platform_data = &a320_fb_pdata;
 	jz4740_nand_device.dev.platform_data = &a320_nand_pdata;
 	jz4740_battery_device.dev.platform_data = &a320_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &a320_mmc_pdata;
