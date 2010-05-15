@@ -187,6 +187,27 @@ struct platform_device jz4740_framebuffer_device = {
 	},
 };
 
+static struct resource jz4740_slcd_framebuffer_resources[] = {
+	[0] = {
+		.start	= CPHYSADDR(JZ4740_SLCD_BASE_ADDR),
+		.end	= CPHYSADDR(JZ4740_SLCD_BASE_ADDR) + 0x10000 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static u64 jz4740_slcd_fb_dmamask = ~(u32)0;
+
+struct platform_device jz4740_slcd_framebuffer_device = {
+	.name = "jz4740-slcd-fb",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(jz4740_slcd_framebuffer_resources),
+	.resource = jz4740_slcd_framebuffer_resources,
+	.dev = {
+		.dma_mask = &jz4740_slcd_fb_dmamask,
+		.coherent_dma_mask = 0xffffffff,
+	},
+};
+
 static struct resource jz4740_i2s_resources[] = {
 	[0] = {
 		.start	= CPHYSADDR(JZ4740_AIC_BASE_ADDR),

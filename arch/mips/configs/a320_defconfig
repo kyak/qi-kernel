@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34-rc7
-# Tue May 11 00:03:18 2010
+# Sat May 15 06:30:49 2010
 #
 CONFIG_MIPS=y
 
@@ -706,7 +706,12 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 # CONFIG_FB_METRONOME is not set
 # CONFIG_FB_MB862XX is not set
 # CONFIG_FB_BROADSHEET is not set
-CONFIG_FB_JZ4740=y
+# CONFIG_FB_JZ4740 is not set
+CONFIG_FB_JZ4740_SLCD=y
+# CONFIG_JZ_SLCD_ILI9325 is not set
+CONFIG_JZ_SLCD_ILI9331=y
+# CONFIG_JZ_SLCD_LGDP4551 is not set
+# CONFIG_JZ_SLCD_SPFD5420A is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_LCD_CLASS_DEVICE=y
 # CONFIG_LCD_ILI9320 is not set
