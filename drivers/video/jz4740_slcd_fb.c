@@ -113,7 +113,7 @@ static void jzfb_free_gpio_pins(struct jzfb *jzfb)
 static int jzfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			unsigned blue, unsigned transp, struct fb_info *fb)
 {
-	if (regno >= fb->cmap.len)
+	if (regno >= 16)
 		return -EINVAL;
 
 	red   = (red   * ((1 << fb->var.red.length  ) - 1)) / ((1 << 16) - 1);
