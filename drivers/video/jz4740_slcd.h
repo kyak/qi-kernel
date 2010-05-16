@@ -95,7 +95,7 @@ struct jzfb {
 
 	struct delayed_work refresh_work;
 
-	uint32_t pseudo_palette[256];
+	uint32_t pseudo_palette[16];
 };
 
 struct jz_slcd_panel {
