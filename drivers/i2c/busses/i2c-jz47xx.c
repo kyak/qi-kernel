@@ -25,12 +25,12 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
+#include <linux/slab.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <linux/module.h>
 #include <asm/addrspace.h>
-#include <asm/mach-jz4740/regs.h>
 #include <asm/mach-jz4740/gpio.h>
 
 #include "i2c-jz47xx.h"
@@ -350,7 +350,7 @@ static int i2c_jz_probe(struct platform_device *dev)
 		ret = -EBUSY;
 		goto err_ioremap;
 	}
-	dev_info(&dev->dev, "I2C base addr is 0x%p (remapped from 0x%p)\n", i2c->base, mem->start);
+	dev_info(&dev->dev, "I2C base addr is 0x%p (remapped from 0x%08x)\n", i2c->base, mem->start);
 
 	i2c_jz_setclk(DEFAULT_I2C_CLOCK);
 	clk_enable(i2c->clk);
