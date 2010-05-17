@@ -34,9 +34,9 @@ enum jz4740_dma_request_type {
 };
 
 enum jz4740_dma_width {
-	JZ4740_DMA_WIDTH_8BIT,
-	JZ4740_DMA_WIDTH_16BIT,
-	JZ4740_DMA_WIDTH_32BIT,
+	JZ4740_DMA_WIDTH_8BIT  = 1,
+	JZ4740_DMA_WIDTH_16BIT = 2,
+	JZ4740_DMA_WIDTH_32BIT = 0,
 };
 
 enum jz4740_dma_transfer_size {
