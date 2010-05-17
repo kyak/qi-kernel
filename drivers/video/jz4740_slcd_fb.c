@@ -216,17 +216,57 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 	return 0;
 }
 
-static void sync_framebuffer(struct jzfb *jzfb)
-{
-	int num_pixels = 320 * 240;
-	int i;
-	uint16_t *p = jzfb->vidmem;
+static struct jz4740_dma_config jzfb_slcd_dma_config = {
+	.src_width = JZ4740_DMA_WIDTH_32BIT,
+	.dst_width = JZ4740_DMA_WIDTH_16BIT,
+	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE,
+	.request_type = JZ4740_DMA_TYPE_SLCD,
+	.flags = JZ4740_DMA_SRC_AUTOINC,
+	.mode = JZ4740_DMA_MODE_BLOCK,
+};
 
-	// TODO: How to signal the start of a transfer?
-	for (i = 0; i < num_pixels; i++) {
-		uint16_t rgb = *p++;
+static void jzfb_refresh_work_complete(
+		struct jz4740_dma_chan *dma, int res, void *dev)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	// TODO: Stick to refresh rate in mode description.
+	int interval = HZ / 60;
+
+	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
+	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) & ~SLCD_CTRL_DMA_EN,
+		jzfb->base + JZ_REG_SLCD_CTRL);
+
+	schedule_delayed_work(&jzfb->refresh_work, interval);
+}
+
+static void jzfb_refresh_work(struct work_struct *work)
+{
+	struct jzfb *jzfb = container_of(work, struct jzfb, refresh_work.work);
+	int num_pixels = 320 * 240;
+
+	if (1) {
+		/* Transfer frame by DMA. */
+		jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys);
+		jz4740_dma_set_dst_addr(jzfb->dma,
+			CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
+		jz4740_dma_set_transfer_count(jzfb->dma, num_pixels * 2);
+
 		while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
-		writel(SLCD_DATA_RS_DATA | rgb, jzfb->base + JZ_REG_SLCD_DATA);
+		writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
+			jzfb->base + JZ_REG_SLCD_CTRL);
+		jz4740_dma_enable(jzfb->dma);
+	} else {
+		/* Transfer frame by CPU. */
+		int i;
+		uint16_t *p = jzfb->vidmem;
+
+		for (i = 0; i < num_pixels; i++) {
+			uint16_t rgb = *p++;
+			while (readb(jzfb->base + JZ_REG_SLCD_STATE)
+				& SLCD_STATE_BUSY);
+			writel(SLCD_DATA_RS_DATA | rgb,
+			       jzfb->base + JZ_REG_SLCD_DATA);
+		}
 	}
 }
 
@@ -355,17 +395,10 @@ static int jzfb_set_par(struct fb_info *info)
 		clk_disable(jzfb->ldclk);
 	mutex_unlock(&jzfb->lock);
 
-	// TODO(MtH): Compute values instead of hardcoding them.
-	//clk_set_rate(jzfb->lpclk, rate);
-	//clk_set_rate(jzfb->ldclk, rate * 3);
+	// TODO(MtH): Use maximum transfer speed that panel can handle.
+	//            ILI9325 can do 10 MHz.
 	clk_set_rate(jzfb->lpclk, 16800000);
 	clk_set_rate(jzfb->ldclk, 42000000);
-
-	//sync_framebuffer(jzfb);
-
-	// TODO: Configure DMA.
-	if (jzfb->is_enabled)
-		; // TODO: Enable DMA.
 
 	return 0;
 }
@@ -404,19 +437,13 @@ static void jzfb_enable(struct jzfb *jzfb)
 
 static void jzfb_disable(struct jzfb *jzfb)
 {
-	//uint32_t ctrl;
-
 	cancel_delayed_work_sync(&jzfb->refresh_work);
 
-	// TODO: SLCD equivalents:
-#if 0
-	ctrl = readl(jzfb->base + JZ_REG_LCD_CTRL);
-	ctrl |= JZ_LCD_CTRL_DISABLE;
-	writel(ctrl, jzfb->base + JZ_REG_LCD_CTRL);
-	do {
-		ctrl = readl(jzfb->base + JZ_REG_LCD_STATE);
-	} while (!(ctrl & JZ_LCD_STATE_DISABLED));
-#endif
+	/* Abort any DMA transfer that might be in progress. */
+	jz4740_dma_disable(jzfb->dma);
+	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
+	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) & ~SLCD_CTRL_DMA_EN,
+		jzfb->base + JZ_REG_SLCD_CTRL);
 
 	jzfb->panel->disable(jzfb);
 	jz_gpio_bulk_suspend(jz_slcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
@@ -450,41 +477,6 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 
 	return 0;
 }
-
-static struct jz4740_dma_config jzfb_slcd_dma_config = {
-	.src_width = JZ4740_DMA_WIDTH_32BIT,
-	.dst_width = JZ4740_DMA_WIDTH_16BIT,
-	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_32BYTE,
-	.request_type = JZ4740_DMA_TYPE_SLCD,
-	.flags = JZ4740_DMA_SRC_AUTOINC,
-	.mode = JZ4740_DMA_MODE_BLOCK,
-};
-
-#if 0
-static int jzfb_slcd_dma_init(void)
-{
-	/* Request DMA channel and setup irq handler */
-	dma_chan = jz_request_dma(DMA_ID_AUTO, "auto", slcd_dma_irq, 0, NULL);
-	if (dma_chan < 0) {
-		printk("Request DMA Failed\n");
-		return -1;
-	}
-	printk("DMA channel %d is requested by SLCD!\n", dma_chan);
-
-	/*Init the SLCD DMA and Enable*/
-	REG_DMAC_DRSR(dma_chan) = DMAC_DRSR_RS_SLCD;
-	REG_DMAC_DCCSR(dma_chan) = DMAC_DCCSR_EN; /*Descriptor Transfer*/
-
-	if (jzfb.bpp <= 8)
-		REG_DMAC_DDA(dma_chan) = slcd_palette_desc_phys_addr;
-	else
-		REG_DMAC_DDA(dma_chan) = slcd_frame_desc_phys_addr;
-
-	/* DMA doorbell set -- start DMA now ... */
-	__dmac_channel_set_doorbell(dma_chan);
-	return 0;
-}
-#endif
 
 static int jzfb_alloc_devmem(struct jzfb *jzfb)
 {
@@ -554,16 +546,6 @@ static struct fb_ops jzfb_ops = {
 	.fb_imageblit		= sys_imageblit,
 };
 
-static void jzfb_refresh_work(struct work_struct *work)
-{
-	// TODO: Stick to refresh rate in mode description.
-	const int interval = HZ / 60;
-	struct jzfb *jzfb = container_of(work, struct jzfb, refresh_work.work);
-
-	sync_framebuffer(jzfb);
-	schedule_delayed_work(&jzfb->refresh_work, interval);
-}
-
 static int __devinit jzfb_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -613,6 +595,10 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 		ret = -EBUSY;
 		goto err_framebuffer_release;
 	}
+	/* MtH: Configuring the DMA only once is essential:
+	        if configured twice all following transfers will lose data. */
+	jz4740_dma_configure(jzfb->dma, &jzfb_slcd_dma_config);
+	jz4740_dma_set_complete_cb(jzfb->dma, &jzfb_refresh_work_complete);
 
 	jzfb->ldclk = clk_get(&pdev->dev, "lcd");
 	if (IS_ERR(jzfb->ldclk)) {
