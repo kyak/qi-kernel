@@ -2225,7 +2225,7 @@ config FB_JZ4740
 
 config FB_JZ4740_SLCD
 	tristate "JZ4740 Smart LCD framebuffer support"
-	depends on FB && SOC_JZ4740
+	depends on FB && SOC_JZ4740 && HAS_DMA
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT
