@@ -275,17 +275,13 @@ static int jzfb_set_par(struct fb_info *info)
 	struct jzfb *jzfb = info->par;
 	struct fb_var_screeninfo *var = &info->var;
 	struct fb_videomode *mode;
-	uint32_t lcd_cfg;
 	uint16_t slcd_cfg;
-	//unsigned long rate;
 
 	mode = jzfb_get_mode(jzfb, var);
 	if (mode == NULL)
 		return -EINVAL;
 
 	info->mode = mode;
-
-	lcd_cfg = JZ_LCD_CFG_SLCD;
 
 	slcd_cfg = SLCD_CFG_BURST_8_WORD;
 	/* command size */
@@ -385,11 +381,8 @@ static int jzfb_set_par(struct fb_info *info)
 	if (!jzfb->is_enabled)
 		clk_enable(jzfb->ldclk);
 
-	writel(lcd_cfg, jzfb->base + JZ_REG_LCD_CFG);
-
+	// TODO(MtH): We should not change config while DMA might be running.
 	writew(slcd_cfg, jzfb->base + JZ_REG_SLCD_CFG);
-
-	writeb(0, jzfb->base + JZ_REG_SLCD_CTRL);
 
 	if (!jzfb->is_enabled)
 		clk_disable(jzfb->ldclk);
@@ -654,7 +647,9 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	clk_enable(jzfb->ldclk);
 	jzfb->is_enabled = 1;
 
-	//writel(jzfb->framedesc->next, jzfb->base + JZ_REG_LCD_DA0);
+	writel(JZ_LCD_CFG_SLCD, jzfb->base + JZ_REG_LCD_CFG);
+	writeb(0, jzfb->base + JZ_REG_SLCD_CTRL);
+
 	jzfb_set_par(fb);
 
 	jz_gpio_bulk_request(jz_slcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
