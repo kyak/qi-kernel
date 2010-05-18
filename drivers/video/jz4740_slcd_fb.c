@@ -588,8 +588,6 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 		ret = -EBUSY;
 		goto err_framebuffer_release;
 	}
-	/* MtH: Configuring the DMA only once is essential:
-	        if configured twice all following transfers will lose data. */
 	jz4740_dma_configure(jzfb->dma, &jzfb_slcd_dma_config);
 	jz4740_dma_set_complete_cb(jzfb->dma, &jzfb_refresh_work_complete);
 
