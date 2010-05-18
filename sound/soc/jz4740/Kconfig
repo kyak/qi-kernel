@@ -35,3 +35,11 @@ config SND_JZ4740_SOC_N526
     select SND_SOC_JZCODEC
 	help
 	  Say Y if you want to enable support for SoC audio on the Hanvon N526.
+
+config SND_JZ4740_SOC_A320
+	bool "Soc Audio support for Dingoo A320 game and media player"
+	depends on SND_JZ4740_SOC && JZ4740_A320
+	select SND_JZ4740_SOC_I2S
+    select SND_SOC_JZCODEC
+	help
+	  Say Y if you want to add support for SoC audio of internal codec on Ingenic Jz4740 Dingoo A320 board.

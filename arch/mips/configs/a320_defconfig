@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34-rc7
-# Sat May 15 06:30:49 2010
+# Tue May 18 02:01:10 2010
 #
 CONFIG_MIPS=y
 
@@ -780,6 +780,7 @@ CONFIG_SND_VERBOSE_PROCFS=y
 CONFIG_SND_SOC=y
 CONFIG_SND_JZ4740_SOC=y
 CONFIG_SND_JZ4740_SOC_I2S=y
+CONFIG_SND_JZ4740_SOC_A320=y
 CONFIG_SND_SOC_I2C_AND_SPI=y
 # CONFIG_SND_SOC_ALL_CODECS is not set
 CONFIG_SND_SOC_JZCODEC=y
