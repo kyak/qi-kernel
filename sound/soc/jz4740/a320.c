@@ -27,8 +27,10 @@
 #include "jz4740-i2s.h"
 
 
-#define A320_SND_GPIO JZ_GPIO_PORTB(29)
-#define A320_AMP_GPIO JZ_GPIO_PORTD(4)
+// TODO(MtH): These GPIOs are related to audio according to booboo's notes,
+//            but what they do exactly is not clear at the moment.
+#define A320_SND_GPIO JZ_GPIO_PORTC(27)
+#define A320_AMP_GPIO JZ_GPIO_PORTD(7)
 
 static int a320_spk_event(struct snd_soc_dapm_widget *widget,
 			  struct snd_kcontrol *ctrl, int event)
@@ -46,14 +48,14 @@ static int a320_spk_event(struct snd_soc_dapm_widget *widget,
 }
 
 static const struct snd_soc_dapm_widget a320_widgets[] = {
-	SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
+	//SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
 	SND_SOC_DAPM_MIC("Mic", NULL),
 };
 
 static const struct snd_soc_dapm_route a320_routes[] = {
 	{"Mic", NULL, "MIC"},
-	{"Speaker", NULL, "LOUT"},
-	{"Speaker", NULL, "ROUT"},
+	//{"Speaker", NULL, "LOUT"},
+	//{"Speaker", NULL, "ROUT"},
 };
 
 #define A320_DAIFMT (SND_SOC_DAIFMT_I2S | \
@@ -143,8 +145,8 @@ static int __init a320_init(void)
 		goto err_gpio_free_snd;
 	}
 
-	gpio_direction_output(JZ_GPIO_PORTB(29), 0);
-	gpio_direction_output(JZ_GPIO_PORTD(4), 0);
+	gpio_direction_output(A320_SND_GPIO, 0);
+	gpio_direction_output(A320_AMP_GPIO, 0);
 
 	platform_set_drvdata(a320_snd_device, &a320_snd_devdata);
 	a320_snd_devdata.dev = &a320_snd_device->dev;
