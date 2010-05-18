@@ -48,14 +48,14 @@ static int a320_spk_event(struct snd_soc_dapm_widget *widget,
 }
 
 static const struct snd_soc_dapm_widget a320_widgets[] = {
-	//SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
+	SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
 	SND_SOC_DAPM_MIC("Mic", NULL),
 };
 
 static const struct snd_soc_dapm_route a320_routes[] = {
 	{"Mic", NULL, "MIC"},
-	//{"Speaker", NULL, "LOUT"},
-	//{"Speaker", NULL, "ROUT"},
+	{"Speaker", NULL, "LOUT"},
+	{"Speaker", NULL, "ROUT"},
 };
 
 #define A320_DAIFMT (SND_SOC_DAIFMT_I2S | \
