@@ -173,8 +173,7 @@ void jz4740_dma_configure(struct jz4740_dma_chan *dma,
 	cmd |= config->mode << JZ_DMA_CMD_MODE_OFFSET;
 	cmd |= JZ_DMA_CMD_TRANSFER_IRQ_ENABLE;
 
-	ctrl = JZ_DMA_STATUS_CTRL_NO_DESC;
-	ctrl |= JZ_DMA_STATUS_CTRL_HALT;
+	ctrl = JZ_DMA_STATUS_CTRL_HALT;
 
 	jz4740_dma_write(JZ_REG_DMA_CMD(dma->id), cmd);
 	jz4740_dma_write(JZ_REG_DMA_STATUS_CTRL(dma->id), ctrl);
@@ -219,12 +218,12 @@ EXPORT_SYMBOL_GPL(jz4740_dma_free);
 void jz4740_dma_enable(struct jz4740_dma_chan *dma)
 {
 	jz4740_dma_write_mask(JZ_REG_DMA_STATUS_CTRL(dma->id),
-			JZ_DMA_STATUS_CTRL_ENABLE,
-			JZ_DMA_STATUS_CTRL_ENABLE | JZ_DMA_STATUS_CTRL_HALT);
+			JZ_DMA_STATUS_CTRL_NO_DESC | JZ_DMA_STATUS_CTRL_ENABLE,
+			JZ_DMA_STATUS_CTRL_HALT);
 
 	jz4740_dma_write_mask(JZ_REG_DMA_CTRL,
 			JZ_DMA_CTRL_ENABLE,
-			JZ_DMA_CTRL_ENABLE | JZ_DMA_CTRL_HALT);
+			JZ_DMA_CTRL_HALT);
 }
 EXPORT_SYMBOL_GPL(jz4740_dma_enable);
 
