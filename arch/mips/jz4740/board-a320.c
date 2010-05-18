@@ -272,37 +272,6 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&a320_gpio_keys_device,
 };
 
-static void __init board_cpm_setup(void)
-{
-	/* Stop unused module clocks here.
-	 * We have started all module clocks at arch/mips/jz4740/setup.c.
-	 */
-
-	/* TODO(IGP): stop the clocks to save power */
-}
-
-/* TODO(MtH): Not claimed yet by any driver. */
-#define GPIO_SND_MUTE_N		JZ_GPIO_PORTC(27)
-#define GPIO_SND_UNKNOWN	JZ_GPIO_PORTD(7)
-
-static void __init board_gpio_setup(void)
-{
-	/* We only need to enable/disable pullup here for pins used in generic
-	 * drivers. Everything else is done by the drivers themselves.
-	 */
-
-	/* TODO(MtH): Check all drivers are registered. */
-	/* TODO(MtH): Check all drivers actually initialize the GPIO pins.
-	              The drivers from openwrt-xburst probably do, but drivers
-	              originating from Dingux might not. */
-	/*
-	gpio_as_output(GPIO_SND_MUTE_N);	TODO(IGP): production kernel should start muted
-	gpio_set_pin(GPIO_SND_MUTE_N);
-	gpio_as_output(GPIO_SND_UNKNOWN);
-	gpio_set_pin(GPIO_SND_UNKNOWN);
-	*/
-}
-
 static int __init a320_init_platform_devices(void)
 {
 	/*jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;*/
@@ -338,8 +307,6 @@ static int __init a320_board_setup(void)
 	panic_blink = a320_panic_blink_callback;
 
 	jz4740_clock_init();
-	board_cpm_setup();
-	board_gpio_setup();
 
 	if (a320_init_platform_devices())
 		panic("Failed to initalize platform devices\n");
