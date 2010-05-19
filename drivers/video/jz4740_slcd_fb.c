@@ -235,12 +235,13 @@ static struct jz4740_dma_config jzfb_slcd_dma_config = {
 
 static void jzfb_upload_frame_dma(struct jzfb *jzfb)
 {
-	int num_pixels = 320 * 240;
-
 	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys);
 	jz4740_dma_set_dst_addr(jzfb->dma,
 		CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
-	jz4740_dma_set_transfer_count(jzfb->dma, num_pixels * 2);
+	jz4740_dma_set_transfer_count(jzfb->dma,
+		jzfb->fb->mode->xres * jzfb->fb->mode->yres *
+			(jzfb_get_controller_bpp(jzfb) >> 3)
+		);
 
 	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
 	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
@@ -250,9 +251,9 @@ static void jzfb_upload_frame_dma(struct jzfb *jzfb)
 
 static void jzfb_upload_frame_cpu(struct jzfb *jzfb)
 {
-	int num_pixels = 320 * 240;
-	int i;
+	const int num_pixels = jzfb->fb->mode->xres * jzfb->fb->mode->yres;
 	uint16_t *p = jzfb->vidmem;
+	int i;
 
 	jzfb_disable_dma(jzfb);
 	for (i = 0; i < num_pixels; i++) {
