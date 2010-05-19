@@ -216,6 +216,14 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 	return 0;
 }
 
+static void jzfb_disable_dma(struct jzfb *jzfb)
+{
+	jz4740_dma_disable(jzfb->dma);
+	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
+	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) & ~SLCD_CTRL_DMA_EN,
+		jzfb->base + JZ_REG_SLCD_CTRL);
+}
+
 static struct jz4740_dma_config jzfb_slcd_dma_config = {
 	.src_width = JZ4740_DMA_WIDTH_32BIT,
 	.dst_width = JZ4740_DMA_WIDTH_16BIT,
@@ -225,6 +233,52 @@ static struct jz4740_dma_config jzfb_slcd_dma_config = {
 	.mode = JZ4740_DMA_MODE_BLOCK,
 };
 
+static void jzfb_upload_frame_dma(struct jzfb *jzfb)
+{
+	int num_pixels = 320 * 240;
+
+	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys);
+	jz4740_dma_set_dst_addr(jzfb->dma,
+		CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
+	jz4740_dma_set_transfer_count(jzfb->dma, num_pixels * 2);
+
+	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
+	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
+		jzfb->base + JZ_REG_SLCD_CTRL);
+	jz4740_dma_enable(jzfb->dma);
+}
+
+static void jzfb_upload_frame_cpu(struct jzfb *jzfb)
+{
+	int num_pixels = 320 * 240;
+	int i;
+	uint16_t *p = jzfb->vidmem;
+
+	jzfb_disable_dma(jzfb);
+	for (i = 0; i < num_pixels; i++) {
+		uint16_t rgb = *p++;
+		while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
+		writel(SLCD_DATA_RS_DATA | rgb, jzfb->base + JZ_REG_SLCD_DATA);
+	}
+}
+
+static void jzfb_refresh_work(struct work_struct *work)
+{
+	struct jzfb *jzfb = container_of(work, struct jzfb, refresh_work.work);
+
+	mutex_lock(&jzfb->lock);
+	if (jzfb->is_enabled) {
+		if (1) {
+			jzfb_upload_frame_dma(jzfb);
+			/* The DMA complete callback will reschedule. */
+		} else {
+			jzfb_upload_frame_cpu(jzfb);
+			schedule_delayed_work(&jzfb->refresh_work, HZ / 10);
+		}
+	}
+	mutex_unlock(&jzfb->lock);
+}
+
 static void jzfb_refresh_work_complete(
 		struct jz4740_dma_chan *dma, int res, void *dev)
 {
@@ -232,42 +286,7 @@ static void jzfb_refresh_work_complete(
 	// TODO: Stick to refresh rate in mode description.
 	int interval = HZ / 60;
 
-	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
-	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) & ~SLCD_CTRL_DMA_EN,
-		jzfb->base + JZ_REG_SLCD_CTRL);
-
 	schedule_delayed_work(&jzfb->refresh_work, interval);
-}
-
-static void jzfb_refresh_work(struct work_struct *work)
-{
-	struct jzfb *jzfb = container_of(work, struct jzfb, refresh_work.work);
-	int num_pixels = 320 * 240;
-
-	if (1) {
-		/* Transfer frame by DMA. */
-		jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys);
-		jz4740_dma_set_dst_addr(jzfb->dma,
-			CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
-		jz4740_dma_set_transfer_count(jzfb->dma, num_pixels * 2);
-
-		while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
-		writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
-			jzfb->base + JZ_REG_SLCD_CTRL);
-		jz4740_dma_enable(jzfb->dma);
-	} else {
-		/* Transfer frame by CPU. */
-		int i;
-		uint16_t *p = jzfb->vidmem;
-
-		for (i = 0; i < num_pixels; i++) {
-			uint16_t rgb = *p++;
-			while (readb(jzfb->base + JZ_REG_SLCD_STATE)
-				& SLCD_STATE_BUSY);
-			writel(SLCD_DATA_RS_DATA | rgb,
-			       jzfb->base + JZ_REG_SLCD_DATA);
-		}
-	}
 }
 
 static int jzfb_set_par(struct fb_info *info)
@@ -411,6 +430,7 @@ static void jzfb_enable(struct jzfb *jzfb)
 		jz_gpio_bulk_resume(jz_slcd_data_pins,
 				    jzfb_num_data_pins(jzfb));
 	}
+	jzfb_disable_dma(jzfb);
 	jzfb->panel->enable(jzfb);
 
 	// TODO: SLCD equivalents:
@@ -430,13 +450,12 @@ static void jzfb_enable(struct jzfb *jzfb)
 
 static void jzfb_disable(struct jzfb *jzfb)
 {
-	cancel_delayed_work_sync(&jzfb->refresh_work);
+	/* It is safe but wasteful to call refresh_work() while disabled. */
+	cancel_delayed_work(&jzfb->refresh_work);
 
-	/* Abort any DMA transfer that might be in progress. */
-	jz4740_dma_disable(jzfb->dma);
-	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
-	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) & ~SLCD_CTRL_DMA_EN,
-		jzfb->base + JZ_REG_SLCD_CTRL);
+	/* Abort any DMA transfer that might be in progress and allow direct
+	   writes to the panel. */
+	jzfb_disable_dma(jzfb);
 
 	jzfb->panel->disable(jzfb);
 	jz_gpio_bulk_suspend(jz_slcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
@@ -666,6 +685,7 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 		ret = -ENOENT;
 		goto err_free_devmem;
 	}
+	jzfb_disable_dma(jzfb);
 	jzfb->panel->init(jzfb);
 	jzfb->panel->enable(jzfb);
 
@@ -708,9 +728,11 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 {
 	struct jzfb *jzfb = platform_get_drvdata(pdev);
 
-	cancel_delayed_work_sync(&jzfb->refresh_work);
-
 	jzfb_blank(FB_BLANK_POWERDOWN, jzfb->fb);
+
+	/* Blanking will prevent future refreshes from behind scheduled.
+	   Now wait for a possible refresh in progress to finish. */
+	cancel_delayed_work_sync(&jzfb->refresh_work);
 
 	jzfb->panel->exit(jzfb);
 
