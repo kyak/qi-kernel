@@ -434,13 +434,6 @@ static void jzfb_enable(struct jzfb *jzfb)
 	jzfb_disable_dma(jzfb);
 	jzfb->panel->enable(jzfb);
 
-	// TODO: SLCD equivalents:
-#if 0
-	writel(0, jzfb->base + JZ_REG_LCD_STATE);
-
-	writel(jzfb->framedesc->next, jzfb->base + JZ_REG_LCD_DA0);
-#endif
-
 	ctrl = readl(jzfb->base + JZ_REG_LCD_CTRL);
 	ctrl |= JZ_LCD_CTRL_ENABLE;
 	ctrl &= ~JZ_LCD_CTRL_DISABLE;
@@ -739,10 +732,6 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 
 	jzfb_free_gpio_pins(jzfb);
 
-	// TODO: Which part of the code guarantees that a DMA transfer is
-	//       not still in progress?
-	//       * jz4740_dma_free() does not
-	//       * FB_BLANK_POWERDOWN should, I think; check it
 	jz4740_dma_free(jzfb->dma);
 
 	iounmap(jzfb->base);
