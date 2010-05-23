@@ -153,8 +153,8 @@ static int jz4740_i2s_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream, struct
-                              snd_soc_dai *dai)
+static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	uint32_t conf;
@@ -171,7 +171,7 @@ static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream, struct
 
 
 static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-			       struct snd_soc_dai *dai)
+			      struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	bool playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
@@ -180,9 +180,9 @@ static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	uint32_t mask;
 
 	if (playback) {
-	    mask = JZ_AIC_CTRL_ENABLE_PLAYBACK | JZ_AIC_CTRL_ENABLE_TX_DMA;
+		mask = JZ_AIC_CTRL_ENABLE_PLAYBACK | JZ_AIC_CTRL_ENABLE_TX_DMA;
 	} else {
-	    mask = JZ_AIC_CTRL_ENABLE_CAPTURE | JZ_AIC_CTRL_ENABLE_RX_DMA;
+		mask = JZ_AIC_CTRL_ENABLE_CAPTURE | JZ_AIC_CTRL_ENABLE_RX_DMA;
 	}
 
 	ctrl = jz4740_i2s_read(i2s, JZ_REG_AIC_CTRL);
@@ -191,15 +191,15 @@ static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-	    ctrl |= mask;
-	    break;
+		ctrl |= mask;
+		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-	    ctrl &= ~mask;
-	    break;
+		ctrl &= ~mask;
+		break;
 	default:
-	    return -EINVAL;
+		return -EINVAL;
 	}
 
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CTRL, ctrl);
@@ -208,8 +208,7 @@ static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 }
 
 
-static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai,
-			       unsigned int fmt)
+static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 
@@ -222,36 +221,36 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai,
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS:
-	    conf |= JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER;
-	    format |= JZ_AIC_I2S_FMT_ENABLE_SYS_CLK;
-	    break;
+		conf |= JZ_AIC_CONF_BIT_CLK_MASTER | JZ_AIC_CONF_SYNC_CLK_MASTER;
+		format |= JZ_AIC_I2S_FMT_ENABLE_SYS_CLK;
+		break;
 	case SND_SOC_DAIFMT_CBM_CFS:
-	    conf |= JZ_AIC_CONF_SYNC_CLK_MASTER;
-	    break;
+		conf |= JZ_AIC_CONF_SYNC_CLK_MASTER;
+		break;
 	case SND_SOC_DAIFMT_CBS_CFM:
-	    conf |= JZ_AIC_CONF_BIT_CLK_MASTER;
-	    break;
+		conf |= JZ_AIC_CONF_BIT_CLK_MASTER;
+		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
-	    break;
+		break;
 	default:
-	    return -EINVAL;
+		return -EINVAL;
 	}
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_MSB:
-	    format |= JZ_AIC_I2S_FMT_MSB;
-	    break;
+		format |= JZ_AIC_I2S_FMT_MSB;
+		break;
 	case SND_SOC_DAIFMT_I2S:
-	    break;
+		break;
 	default:
-	    return -EINVAL;
+		return -EINVAL;
 	}
 
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_NB_NF:
-	    break;
+		break;
 	default:
-	    return -EINVAL;
+		return -EINVAL;
 	}
 
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, conf);
@@ -261,8 +260,8 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai,
 }
 
 static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
-				 struct snd_pcm_hw_params *params,
-				 struct snd_soc_dai *dai)
+				struct snd_pcm_hw_params *params,
+				struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	bool playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
@@ -275,11 +274,11 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S8:
-	    sample_size = 0;
+		sample_size = 0;
 		dma_width = JZ4740_DMA_WIDTH_8BIT;
-	    break;
+		break;
 	case SNDRV_PCM_FORMAT_S16:
-	    sample_size = 1;
+		sample_size = 1;
 		dma_width = JZ4740_DMA_WIDTH_16BIT;
 		break;
 	default:
@@ -296,7 +295,7 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_channels(params)) {
 	case 2:
-	    break;
+		break;
 	case 1:
 		if (playback) {
 			ctrl |= JZ_AIC_CTRL_MONO_TO_STEREO;
