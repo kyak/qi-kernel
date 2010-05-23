@@ -95,8 +95,8 @@ struct jz4740_i2s {
 };
 
 static struct jz4740_dma_config jz4740_i2s_dma_playback_config = {
-	.src_width = JZ4740_DMA_WIDTH_16BIT,
-	.dst_width = JZ4740_DMA_WIDTH_32BIT,
+	.src_width = JZ4740_DMA_WIDTH_8BIT,
+	.dst_width = JZ4740_DMA_WIDTH_16BIT,
 	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE,
 	.request_type = JZ4740_DMA_TYPE_AIC_TRANSMIT,
 	.flags = JZ4740_DMA_SRC_AUTOINC,
@@ -104,8 +104,8 @@ static struct jz4740_dma_config jz4740_i2s_dma_playback_config = {
 };
 
 static struct jz4740_dma_config jz4740_i2s_dma_capture_config = {
-	.src_width = JZ4740_DMA_WIDTH_32BIT,
-	.dst_width = JZ4740_DMA_WIDTH_16BIT,
+	.src_width = JZ4740_DMA_WIDTH_16BIT,
+	.dst_width = JZ4740_DMA_WIDTH_8BIT,
 	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE,
 	.request_type = JZ4740_DMA_TYPE_AIC_RECEIVE,
 	.flags = JZ4740_DMA_DST_AUTOINC,
