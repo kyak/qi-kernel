@@ -441,13 +441,13 @@ struct snd_soc_dai jz4740_i2s_dai = {
 	.playback = {
 		.channels_min = 1,
 		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000_44100,
+		.rates = SNDRV_PCM_RATE_8000_48000,
 		.formats = JZ4740_I2S_FMTS,
 	},
 	.capture = {
 		.channels_min = 2,
 		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000_44100,
+		.rates = SNDRV_PCM_RATE_8000_48000,
 		.formats = JZ4740_I2S_FMTS,
 	},
 	.symmetric_rates = 1,
