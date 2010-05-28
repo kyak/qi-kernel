@@ -50,7 +50,7 @@ static const struct snd_pcm_hardware jz4740_pcm_hardware = {
 	.rates			= SNDRV_PCM_RATE_8000_48000,
 	.channels_min		= 1,
 	.channels_max		= 2,
-	.period_bytes_min	= 32,
+	.period_bytes_min	= 16,
 	.period_bytes_max	= 2 * PAGE_SIZE,
 	.periods_min		= 2,
 	.periods_max		= 128,
@@ -120,7 +120,7 @@ static int jz4740_pcm_hw_params(struct snd_pcm_substream *substream,
 	if (!prtd->dma)
 		return -EBUSY;
 
-	jz4740_dma_configure(prtd->dma, config->dma_config);
+	jz4740_dma_configure(prtd->dma, &config->dma_config);
 	prtd->fifo_addr = config->fifo_addr;
 
 	jz4740_dma_set_complete_cb(prtd->dma, jz4740_pcm_dma_transfer_done);

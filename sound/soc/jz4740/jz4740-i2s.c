@@ -90,37 +90,18 @@ struct jz4740_i2s {
 	struct clk *clk_aic;
 	struct clk *clk_i2s;
 
-	struct jz4740_pcm_config capture_pcm_config;
-	struct jz4740_pcm_config playback_pcm_config;
+	struct jz4740_pcm_config pcm_config_playback;
+	struct jz4740_pcm_config pcm_config_capture;
 };
-
-static struct jz4740_dma_config jz4740_i2s_dma_playback_config = {
-	.src_width = JZ4740_DMA_WIDTH_8BIT,
-	.dst_width = JZ4740_DMA_WIDTH_16BIT,
-	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE,
-	.request_type = JZ4740_DMA_TYPE_AIC_TRANSMIT,
-	.flags = JZ4740_DMA_SRC_AUTOINC,
-	.mode = JZ4740_DMA_MODE_SINGLE,
-};
-
-static struct jz4740_dma_config jz4740_i2s_dma_capture_config = {
-	.src_width = JZ4740_DMA_WIDTH_16BIT,
-	.dst_width = JZ4740_DMA_WIDTH_8BIT,
-	.transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE,
-	.request_type = JZ4740_DMA_TYPE_AIC_RECEIVE,
-	.flags = JZ4740_DMA_DST_AUTOINC,
-	.mode = JZ4740_DMA_MODE_SINGLE,
-};
-
 
 static inline uint32_t jz4740_i2s_read(const struct jz4740_i2s *i2s,
-		unsigned int reg)
+	unsigned int reg)
 {
 	return readl(i2s->base + reg);
 }
 
 static inline void jz4740_i2s_write(const struct jz4740_i2s *i2s,
-		unsigned int reg, uint32_t value)
+	unsigned int reg, uint32_t value)
 {
 	writel(value, i2s->base + reg);
 }
@@ -131,7 +112,7 @@ static inline struct jz4740_i2s *jz4740_dai_to_i2s(struct snd_soc_dai *dai)
 }
 
 static int jz4740_i2s_startup(struct snd_pcm_substream *substream,
-		struct snd_soc_dai *dai)
+	struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	uint32_t conf, ctrl;
@@ -139,22 +120,22 @@ static int jz4740_i2s_startup(struct snd_pcm_substream *substream,
 	if (dai->active)
 		return 0;
 
-	conf = jz4740_i2s_read(i2s, JZ_REG_AIC_CONF);
+
 	ctrl = jz4740_i2s_read(i2s, JZ_REG_AIC_CTRL);
-
-	conf |= JZ_AIC_CONF_ENABLE;
 	ctrl |= JZ_AIC_CTRL_FLUSH;
-
-
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CTRL, ctrl);
+
 	clk_enable(i2s->clk_i2s);
+
+	conf = jz4740_i2s_read(i2s, JZ_REG_AIC_CONF);
+	conf |= JZ_AIC_CONF_ENABLE;
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CONF, conf);
 
 	return 0;
 }
 
 static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream,
-				struct snd_soc_dai *dai)
+	struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	uint32_t conf;
@@ -171,7 +152,7 @@ static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream,
 
 
 static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-			      struct snd_soc_dai *dai)
+	struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	bool playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
@@ -179,11 +160,10 @@ static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	uint32_t ctrl;
 	uint32_t mask;
 
-	if (playback) {
+	if (playback)
 		mask = JZ_AIC_CTRL_ENABLE_PLAYBACK | JZ_AIC_CTRL_ENABLE_TX_DMA;
-	} else {
+	else
 		mask = JZ_AIC_CTRL_ENABLE_CAPTURE | JZ_AIC_CTRL_ENABLE_RX_DMA;
-	}
 
 	ctrl = jz4740_i2s_read(i2s, JZ_REG_AIC_CTRL);
 
@@ -260,8 +240,7 @@ static int jz4740_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 }
 
 static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
-				struct snd_pcm_hw_params *params,
-				struct snd_soc_dai *dai)
+	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	bool playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
@@ -308,23 +287,20 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CTRL, ctrl);
 
 	if (playback) {
-		jz4740_i2s_dma_playback_config.src_width = dma_width;
-		pcm_config = &i2s->playback_pcm_config;
-		pcm_config->dma_config = &jz4740_i2s_dma_playback_config;
+		pcm_config = &i2s->pcm_config_playback;
+		pcm_config->dma_config.dst_width = dma_width;
 	} else {
-		jz4740_i2s_dma_capture_config.dst_width = dma_width;
-		pcm_config = &i2s->capture_pcm_config;
-		pcm_config->dma_config = &jz4740_i2s_dma_capture_config;
+		pcm_config = &i2s->pcm_config_capture;
+		pcm_config->dma_config.src_width = dma_width;
 	}
-	pcm_config->fifo_addr = i2s->phys_base + JZ_REG_AIC_FIFO;
+
 
 	snd_soc_dai_set_dma_data(dai, substream, pcm_config);
 
 	return 0;
 }
 
-static int jz4740_i2s_set_clkdiv(struct snd_soc_dai *dai,
-				  int div_id, int div)
+static int jz4740_i2s_set_clkdiv(struct snd_soc_dai *dai, int div_id, int div)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 
@@ -342,7 +318,7 @@ static int jz4740_i2s_set_clkdiv(struct snd_soc_dai *dai,
 }
 
 static int jz4740_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-				  unsigned int freq, int dir)
+	unsigned int freq, int dir)
 {
 	struct jz4740_i2s *i2s = jz4740_dai_to_i2s(dai);
 	int ret = 0;
@@ -456,6 +432,29 @@ struct snd_soc_dai jz4740_i2s_dai = {
 };
 EXPORT_SYMBOL_GPL(jz4740_i2s_dai);
 
+static void __devinit jz4740_i2c_init_pcm_config(struct jz4740_i2s *i2s)
+{
+	struct jz4740_dma_config *dma_config;
+
+	/* Playback */
+	dma_config = &i2s->pcm_config_playback.dma_config;
+	dma_config->src_width = JZ4740_DMA_WIDTH_32BIT,
+	dma_config->transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE;
+	dma_config->request_type = JZ4740_DMA_TYPE_AIC_TRANSMIT;
+	dma_config->flags = JZ4740_DMA_SRC_AUTOINC;
+	dma_config->mode = JZ4740_DMA_MODE_SINGLE;
+	i2s->pcm_config_playback.fifo_addr = i2s->phys_base + JZ_REG_AIC_FIFO;
+
+	/* Capture */
+	dma_config = &i2s->pcm_config_capture.dma_config;
+	dma_config->dst_width = JZ4740_DMA_WIDTH_32BIT,
+	dma_config->transfer_size = JZ4740_DMA_TRANSFER_SIZE_16BYTE;
+	dma_config->request_type = JZ4740_DMA_TYPE_AIC_RECEIVE;
+	dma_config->flags = JZ4740_DMA_DST_AUTOINC;
+	dma_config->mode = JZ4740_DMA_MODE_SINGLE;
+	i2s->pcm_config_capture.fifo_addr = i2s->phys_base + JZ_REG_AIC_FIFO;
+}
+
 static int __devinit jz4740_i2s_dev_probe(struct platform_device *pdev)
 {
 	struct jz4740_i2s *i2s;
@@ -490,26 +489,24 @@ static int __devinit jz4740_i2s_dev_probe(struct platform_device *pdev)
 
 	i2s->phys_base = i2s->mem->start;
 
-	jz4740_i2s_dai.private_data = i2s;
-
-	ret = snd_soc_register_dai(&jz4740_i2s_dai);
-
 	i2s->clk_aic = clk_get(&pdev->dev, "aic");
-
 	if (IS_ERR(i2s->clk_aic)) {
 		ret = PTR_ERR(i2s->clk_aic);
 		goto err_iounmap;
 	}
 
-
 	i2s->clk_i2s = clk_get(&pdev->dev, "i2s");
-
 	if (IS_ERR(i2s->clk_i2s)) {
 		ret = PTR_ERR(i2s->clk_i2s);
 		goto err_iounmap;
 	}
 
 	clk_enable(i2s->clk_aic);
+
+	jz4740_i2c_init_pcm_config(i2s);
+
+	jz4740_i2s_dai.private_data = i2s;
+	ret = snd_soc_register_dai(&jz4740_i2s_dai);
 
 	platform_set_drvdata(pdev, i2s);
 
