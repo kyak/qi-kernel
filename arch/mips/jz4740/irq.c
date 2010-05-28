@@ -53,11 +53,6 @@ static void intc_irq_mask(unsigned int irq)
 	writel(IRQ_BIT(irq), jz_intc_base + JZ_REG_INTC_SET_MASK);
 }
 
-static void intc_irq_ack(unsigned int irq)
-{
-	writel(IRQ_BIT(irq), jz_intc_base + JZ_REG_INTC_PENDING);
-}
-
 static int intc_irq_set_wake(unsigned int irq, unsigned int on)
 {
 	if (on)
@@ -71,8 +66,8 @@ static int intc_irq_set_wake(unsigned int irq, unsigned int on)
 static struct irq_chip intc_irq_type = {
 	.name =		"INTC",
 	.mask =		intc_irq_mask,
+	.mask_ack =	intc_irq_mask,
 	.unmask =	intc_irq_unmask,
-	.ack =		intc_irq_ack,
 	.set_wake =	intc_irq_set_wake,
 };
 
@@ -82,6 +77,7 @@ static irqreturn_t jz4740_cascade(int irq, void *data)
 	int intc_irq;
 
 	irq_reg = readl(jz_intc_base + JZ_REG_INTC_PENDING);
+
 	intc_irq = ffs(irq_reg);
 	if (intc_irq)
 		generic_handle_irq(intc_irq - 1 + JZ4740_IRQ_BASE);
