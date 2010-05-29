@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.34-rc7
-# Wed May 19 16:05:53 2010
+# Linux kernel version: 2.6.34
+# Sat May 29 04:14:01 2010
 #
 CONFIG_MIPS=y
 
@@ -910,7 +910,6 @@ CONFIG_RTC_INTF_DEV=y
 # CONFIG_RTC_DRV_DS1511 is not set
 # CONFIG_RTC_DRV_DS1553 is not set
 # CONFIG_RTC_DRV_DS1742 is not set
-CONFIG_RTC_DRV_JZ4740=y
 # CONFIG_RTC_DRV_STK17TA8 is not set
 # CONFIG_RTC_DRV_M48T86 is not set
 # CONFIG_RTC_DRV_M48T35 is not set
@@ -923,6 +922,7 @@ CONFIG_RTC_DRV_JZ4740=y
 #
 # on-CPU RTC drivers
 #
+CONFIG_RTC_DRV_JZ4740=y
 # CONFIG_DMADEVICES is not set
 # CONFIG_AUXDISPLAY is not set
 # CONFIG_UIO is not set
