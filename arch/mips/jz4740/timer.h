@@ -127,4 +127,9 @@ static inline void jz4740_timer_set_ctrl(unsigned int timer, uint16_t ctrl)
 	writew(ctrl, jz4740_timer_base + JZ_REG_TIMER_CTRL(timer));
 }
 
+static inline uint16_t jz4740_timer_set_ctrl(unsigned int timer)
+{
+	return readw(jz4740_timer_base + JZ_REG_TIMER_CTRL(timer));
+}
+
 #endif
