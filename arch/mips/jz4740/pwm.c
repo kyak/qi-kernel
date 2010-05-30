@@ -137,7 +137,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 		duty = period - 1;
 
 	is_enabled = jz4740_timer_is_enabled(id);
-	jz4740_timer_disable(id);
+	if (is_enabled)
+		pwm_disable(pwm);
 
 	jz4740_timer_set_count(id, 0);
 	jz4740_timer_set_duty(id, duty);
@@ -148,7 +149,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	jz4740_timer_set_ctrl(id, ctrl);
 
 	if (is_enabled)
-		jz4740_timer_enable(id);
+		pwm_enable(pwm);
 
 	return 0;
 }
