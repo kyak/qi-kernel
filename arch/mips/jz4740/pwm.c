@@ -143,8 +143,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	jz4740_timer_set_duty(id, duty);
 	jz4740_timer_set_period(id, period);
 
-	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_PWM_ENABLE |
-		JZ_TIMER_CTRL_SRC_PCLK;
+	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_PCLK;
 
 	jz4740_timer_set_ctrl(id, ctrl);
 
@@ -156,6 +155,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 
 int pwm_enable(struct pwm_device *pwm)
 {
+	uint32_t ctrl = jz4740_timer_get_ctrl(id);
+	ctrl |= JZ_TIMER_CTRL_PWM_ENABLE;
+	jz4740_timer_set_ctrl(pwm->id, ctrl);
 	jz4740_timer_enable(pwm->id);
 
 	return 0;
@@ -163,5 +165,8 @@ int pwm_enable(struct pwm_device *pwm)
 
 void pwm_disable(struct pwm_device *pwm)
 {
+	uint32_t ctrl = jz4740_timer_get_ctrl(id);
+	ctrl &= ~JZ_TIMER_CTRL_PWM_ENABLE;
 	jz4740_timer_disable(pwm->id);
+	jz4740_timer_set_ctrl(pwm->id, ctrl);
 }
