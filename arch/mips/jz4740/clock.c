@@ -571,20 +571,6 @@ static struct clk jz_clk_ld = {
 	.ops = &jz_clk_ops_ld,
 };
 
-/* TODO: ops!!! */
-static struct clk jz_clk_cim_mclk = {
-	.name = "cim_mclk",
-	.parent = &jz_clk_high_speed_peripheral.clk,
-};
-
-static struct static_clk jz_clk_cim_pclk = {
-	.clk = {
-		.name = "cim_pclk",
-		.gate_bit = JZ_CLOCK_GATE_CIM,
-		.ops = &jz_clk_static_ops,
-	},
-};
-
 static const struct clk_ops jz_clk_i2s_ops = {
 	.set_rate = jz_clk_divided_set_rate,
 	.get_rate = jz_clk_divided_get_rate,
@@ -844,8 +830,6 @@ static void clk_register_clks(void)
 	clk_add(&jz_clk_low_speed_peripheral.clk);
 	clk_add(&jz_clk_ko);
 	clk_add(&jz_clk_ld);
-	clk_add(&jz_clk_cim_mclk);
-	clk_add(&jz_clk_cim_pclk.clk);
 	clk_add(&jz_clk_rtc.clk);
 
 	for (i = 0; i < ARRAY_SIZE(jz4740_clock_divided_clks); ++i)
