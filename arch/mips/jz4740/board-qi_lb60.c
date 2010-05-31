@@ -437,6 +437,8 @@ static int __init qi_lb60_init_platform_devices(void)
 	jz4740_battery_device.dev.platform_data = &qi_lb60_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &qi_lb60_mmc_pdata;
 
+	jz4740_serial_device_register();
+
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));
 
