@@ -49,7 +49,7 @@ struct pwm_device *pwm_request(int id, const char *label)
 	struct pwm_device *pwm;
 
 	if (!jz4740_pwm_clk) {
-		jz4740_pwm_clk = clk_get(NULL, "pclk");
+		jz4740_pwm_clk = clk_get(NULL, "ext");
 
 		if (IS_ERR(jz4740_pwm_clk))
 			return ERR_PTR(PTR_ERR(jz4740_pwm_clk));
@@ -131,31 +131,35 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 
 	tmp = (unsigned long long)period * duty_ns;
 	do_div(tmp, period_ns);
-	duty = tmp;
+	duty = period - tmp;
 
 	if (duty >= period)
 		duty = period - 1;
+	else if (duty == 0)
+		/* the hardware accepts duty 0 only in certain clock ranges */
+		prescaler = 0;
 
 	is_enabled = jz4740_timer_is_enabled(id);
-	jz4740_timer_disable(id);
+	if (is_enabled)
+		pwm_disable(pwm);
 
 	jz4740_timer_set_count(id, 0);
 	jz4740_timer_set_duty(id, duty);
 	jz4740_timer_set_period(id, period);
 
-	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_PCLK;
-
+	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_EXT;
+	ctrl |= JZ_TIMER_CTRL_PWM_ABRUPT_SHUTDOWN;
 	jz4740_timer_set_ctrl(id, ctrl);
 
 	if (is_enabled)
-		jz4740_timer_enable(id);
+		pwm_enable(pwm);
 
 	return 0;
 }
 
 int pwm_enable(struct pwm_device *pwm)
 {
-	uint32_t ctrl = jz4740_timer_get_ctrl(id);
+	uint32_t ctrl = jz4740_timer_get_ctrl(pwm->id);
 	ctrl |= JZ_TIMER_CTRL_PWM_ENABLE;
 	jz4740_timer_set_ctrl(pwm->id, ctrl);
 	jz4740_timer_enable(pwm->id);
@@ -165,7 +169,7 @@ int pwm_enable(struct pwm_device *pwm)
 
 void pwm_disable(struct pwm_device *pwm)
 {
-	uint32_t ctrl = jz4740_timer_get_ctrl(id);
+	uint32_t ctrl = jz4740_timer_get_ctrl(pwm->id);
 	ctrl &= ~JZ_TIMER_CTRL_PWM_ENABLE;
 	jz4740_timer_disable(pwm->id);
 	jz4740_timer_set_ctrl(pwm->id, ctrl);
