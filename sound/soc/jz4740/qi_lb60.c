@@ -81,13 +81,6 @@ static int qi_lb60_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	snd_soc_dapm_new_controls(codec, qi_lb60_widgets, ARRAY_SIZE(qi_lb60_widgets));
 
 	snd_soc_dapm_add_routes(codec, qi_lb60_routes, ARRAY_SIZE(qi_lb60_routes));

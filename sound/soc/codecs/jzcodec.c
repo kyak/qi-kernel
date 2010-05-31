@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Lars-Peter Clausen <lars@metafoo.de>
+ * Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -247,18 +247,9 @@ static int jz_codec_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	return 0;
 }
 
-static int jz_codec_set_sysclk(struct snd_soc_dai *codec_dai,
-		int clk_id, unsigned int freq, int dir)
-{
-	return 0;
-}
-
-
 static struct snd_soc_dai_ops jz_codec_dai_ops = {
 	.hw_params = jz_codec_hw_params,
 	.set_fmt = jz_codec_set_fmt,
-/*	.set_clkdiv = jz_codec_set_clkdiv,*/
-	.set_sysclk = jz_codec_set_sysclk,
 };
 
 struct snd_soc_dai jz_codec_dai = {

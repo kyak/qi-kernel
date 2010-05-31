@@ -14,8 +14,6 @@
 #ifndef _ICODEC_H
 #define _ICODEC_H
 
-#define JZCODEC_SYSCLK	0
-
 extern struct snd_soc_dai jz_codec_dai;
 extern struct snd_soc_codec_device soc_codec_dev_jzcodec;
 

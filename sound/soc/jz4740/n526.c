@@ -78,13 +78,6 @@ static int n526_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	snd_soc_dapm_new_controls(codec, n526_widgets, ARRAY_SIZE(n526_widgets));
 
 	snd_soc_add_controls(codec, n526_controls,
