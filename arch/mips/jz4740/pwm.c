@@ -131,7 +131,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 
 	tmp = (unsigned long long)period * duty_ns;
 	do_div(tmp, period_ns);
-	duty = tmp;
+	duty = period - tmp;
 
 	if (duty >= period)
 		duty = period - 1;
