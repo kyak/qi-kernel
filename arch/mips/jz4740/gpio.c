@@ -45,11 +45,6 @@
 #define JZ4740_IRQ_GPIO_BASE_C (JZ4740_IRQ_GPIO(0) + JZ4740_GPIO_BASE_C)
 #define JZ4740_IRQ_GPIO_BASE_D (JZ4740_IRQ_GPIO(0) + JZ4740_GPIO_BASE_D)
 
-#define JZ4740_IRQ_GPIO_A(num) (JZ4740_IRQ_GPIO_BASE_A + num)
-#define JZ4740_IRQ_GPIO_B(num) (JZ4740_IRQ_GPIO_BASE_B + num)
-#define JZ4740_IRQ_GPIO_C(num) (JZ4740_IRQ_GPIO_BASE_C + num)
-#define JZ4740_IRQ_GPIO_D(num) (JZ4740_IRQ_GPIO_BASE_D + num)
-
 #define JZ_REG_GPIO_PIN			0x00
 #define JZ_REG_GPIO_DATA		0x10
 #define JZ_REG_GPIO_DATA_SET		0x14
@@ -275,9 +270,19 @@ uint32_t jz_gpio_port_get_value(int port, uint32_t mask)
 }
 EXPORT_SYMBOL(jz_gpio_port_get_value);
 
+int gpio_to_irq(unsigned gpio)
+{
+	return JZ4740_IRQ_GPIO(0) + gpio;
+}
+EXPORT_SYMBOL_GPL(gpio_to_irq);
 
-#define IRQ_TO_GPIO(irq) (irq - JZ4740_IRQ_GPIO(0))
-#define IRQ_TO_BIT(irq) BIT(IRQ_TO_GPIO(irq) & 0x1f)
+int irq_to_gpio(unsigned irq)
+{
+	return irq - JZ4740_IRQ_GPIO(0);
+}
+EXPORT_SYMBOL_GPL(irq_to_gpio);
+
+#define IRQ_TO_BIT(irq) BIT(irq_to_gpio(irq) & 0x1f)
 
 static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 {
@@ -310,13 +315,12 @@ static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 
 static inline void jz_gpio_set_irq_bit(unsigned int irq, unsigned int reg)
 {
-	struct jz_gpio_chip *chip = get_irq_data(desc);
+	struct jz_gpio_chip *chip = get_irq_data(irq);
 	writel(IRQ_TO_BIT(irq), chip->base + reg);
 }
 
 static void jz_gpio_irq_mask(unsigned int irq)
 {
-	struct jz_gpio_chip *chip = get_irq_data(desc);
 	jz_gpio_set_irq_bit(irq, JZ_REG_GPIO_MASK_SET);
 };
 
@@ -414,18 +418,6 @@ static int jz_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 	set_irq_wake(chip->irq, on);
 	return 0;
 }
-
-int gpio_to_irq(unsigned gpio)
-{
-	return JZ4740_IRQ_GPIO(0) + gpio;
-}
-EXPORT_SYMBOL_GPL(gpio_to_irq);
-
-int irq_to_gpio(unsigned gpio)
-{
-	return IRQ_TO_GPIO(gpio);
-}
-EXPORT_SYMBOL_GPL(irq_to_gpio);
 
 /*
  * This lock class tells lockdep that GPIO irqs are in a different
@@ -536,9 +528,8 @@ int __init jz_gpiolib_init(void)
 	if (ret)
 		return ret;
 
-	for (i = 0; i < ARRAY_SIZE(jz4740_gpio_chips); ++i) {
+	for (i = 0; i < ARRAY_SIZE(jz4740_gpio_chips); ++i)
 		jz4740_gpio_chip_init(&jz4740_gpio_chips[i], i);
-	}
 
 	printk(KERN_INFO "JZ4740 GPIO initalized\n");
 
