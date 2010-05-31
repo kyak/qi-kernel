@@ -22,7 +22,7 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-#include "../codecs/jzcodec.h"
+#include "../codecs/jz4740-codec.h"
 #include "jz4740-pcm.h"
 #include "jz4740-i2s.h"
 
@@ -91,10 +91,10 @@ static int n526_codec_init(struct snd_soc_codec *codec)
 }
 
 static struct snd_soc_dai_link n526_dai = {
-	.name = "jz-codec",
-	.stream_name = "JZCODEC",
+	.name = "jz4740-codec",
+	.stream_name = "jz4740-codec",
 	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz_codec_dai,
+	.codec_dai = &jz4740_codec_dai,
 	.init = n526_codec_init,
 };
 
@@ -107,7 +107,7 @@ static struct snd_soc_card n526 = {
 
 static struct snd_soc_device n526_snd_devdata = {
 	.card = &n526,
-	.codec_dev = &soc_codec_dev_jzcodec,
+	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *n526_snd_device;
