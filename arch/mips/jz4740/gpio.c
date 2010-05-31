@@ -279,8 +279,6 @@ EXPORT_SYMBOL(jz_gpio_port_get_value);
 #define IRQ_TO_GPIO(irq) (irq - JZ4740_IRQ_GPIO(0))
 #define IRQ_TO_BIT(irq) BIT(IRQ_TO_GPIO(irq) & 0x1f)
 
-#define IRQ_TO_REG(irq, reg)  GPIO_TO_REG(IRQ_TO_GPIO(irq), reg)
-
 static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 {
 	uint32_t flag;
@@ -312,11 +310,13 @@ static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 
 static inline void jz_gpio_set_irq_bit(unsigned int irq, unsigned int reg)
 {
-	writel(IRQ_TO_BIT(irq), IRQ_TO_REG(irq, reg));
+	struct jz_gpio_chip *chip = get_irq_data(desc);
+	writel(IRQ_TO_BIT(irq), chip->base + reg);
 }
 
 static void jz_gpio_irq_mask(unsigned int irq)
 {
+	struct jz_gpio_chip *chip = get_irq_data(desc);
 	jz_gpio_set_irq_bit(irq, JZ_REG_GPIO_MASK_SET);
 };
 
@@ -364,7 +364,7 @@ static int jz_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 	jz_gpio_irq_mask(irq);
 
 	if (flow_type == IRQ_TYPE_EDGE_BOTH) {
-		uint32_t value = readl(IRQ_TO_REG(irq, JZ_REG_GPIO_PIN));
+		uint32_t value = readl(chip->base + JZ_REG_GPIO_PIN);
 		if (value & IRQ_TO_BIT(irq))
 			flow_type = IRQ_TYPE_EDGE_FALLING;
 		else
