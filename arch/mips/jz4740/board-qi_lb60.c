@@ -283,7 +283,7 @@ static struct platform_device spigpio_device = {
 
 static struct spi_board_info qi_lb60_spi_board_info[] = {
 	{
-		.modalias = "gpm940b0",
+		.modalias = "ili8960",
 		.controller_data = (void *)JZ_GPIO_PORTC(21),
 		.chip_select = 0,
 		.bus_num = 1,

@@ -57,6 +57,13 @@ config LCD_LTV350QV
 
 	  The LTV350QV panel is present on all ATSTK1000 boards.
 
+config LCD_ILI8960
+	tristate "Ilitek ili8960 LCD driver"
+	depends on LCD_CLASS_DEVICE && SPI
+	default n
+	help
+	  Driver for the Ilitek ili8960 LCD controller chip.
+
 config LCD_ILI9320
 	tristate
 	depends on LCD_CLASS_DEVICE && BACKLIGHT_LCD_SUPPORT
@@ -106,13 +113,6 @@ config LCD_HP700
 	help
 	  If you have an HP Jornada 700 series handheld (710/720/728)
 	  say Y to enable LCD control driver.
-
-config LCD_GPM940B0
-	tristate "Giantplus GPM940B0 LCD and backlight driver"
-	depends on LCD_CLASS_DEVICE && SPI
-	default n
-	help
-      LCD and backlight driver for the Giantplus GPM940B0 LCD module.
 
 #
 # Backlight
