@@ -49,7 +49,7 @@ struct pwm_device *pwm_request(int id, const char *label)
 	struct pwm_device *pwm;
 
 	if (!jz4740_pwm_clk) {
-		jz4740_pwm_clk = clk_get(NULL, "pclk");
+		jz4740_pwm_clk = clk_get(NULL, "ext");
 
 		if (IS_ERR(jz4740_pwm_clk))
 			return ERR_PTR(PTR_ERR(jz4740_pwm_clk));
@@ -144,7 +144,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	jz4740_timer_set_duty(id, duty);
 	jz4740_timer_set_period(id, period);
 
-	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_PCLK;
+	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_EXT |
+		JZ_TIMER_CTRL_PWM_ABBRUPT_SHUTDOWN;
 
 	jz4740_timer_set_ctrl(id, ctrl);
 
