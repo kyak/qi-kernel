@@ -315,7 +315,7 @@ static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 
 static inline void jz_gpio_set_irq_bit(unsigned int irq, unsigned int reg)
 {
-	struct jz_gpio_chip *chip = get_irq_data(irq);
+	struct jz_gpio_chip *chip = irq_to_jz_gpio_chip(irq);
 	writel(IRQ_TO_BIT(irq), chip->base + reg);
 }
 
