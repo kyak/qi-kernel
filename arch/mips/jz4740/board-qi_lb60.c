@@ -283,7 +283,7 @@ static struct platform_device spigpio_device = {
 
 static struct spi_board_info qi_lb60_spi_board_info[] = {
 	{
-		.modalias = "gpm940b0",
+		.modalias = "ili8960",
 		.controller_data = (void *)JZ_GPIO_PORTC(21),
 		.chip_select = 0,
 		.bus_num = 1,
@@ -436,6 +436,8 @@ static int __init qi_lb60_init_platform_devices(void)
 	jz4740_nand_device.dev.platform_data = &qi_lb60_nand_pdata;
 	jz4740_battery_device.dev.platform_data = &qi_lb60_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &qi_lb60_mmc_pdata;
+
+	jz4740_serial_device_register();
 
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));

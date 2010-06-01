@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *  JZ4740 setup code
+ *  Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
+ *  JZ4740 serial support
  *
  *  This program is free software; you can redistribute	 it and/or modify it
  *  under  the terms of	 the GNU General  Public License as published by the
@@ -13,21 +13,9 @@
  *
  */
 
-#include <linux/init.h>
-#include <linux/kernel.h>
+#ifndef __MIPS_JZ4740_SERIAL_H__
 
-#include <asm/mach-jz4740/base.h>
-#include <asm/mach-jz4740/clock.h>
+void jz4740_serial_out(struct uart_port *p, int offset, int value);
 
-#include "reset.h"
-#include "clock.h"
+#endif
 
-void __init plat_mem_setup(void)
-{
-	jz4740_reset_init();
-}
-
-const char *get_system_type(void)
-{
-	return "JZ4740";
-}

@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2009, Lars-Peter Clausen <lars@metafoo.de>
- *  JZ7420/JZ4740 platform device definitions
+ *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
+ *  JZ4740 platform device definitions
  *
  *  This program is free software; you can redistribute	 it and/or modify it
  *  under  the terms of	 the GNU General  Public License as published by the
@@ -31,5 +31,7 @@ extern struct platform_device jz4740_i2s_device;
 extern struct platform_device jz4740_codec_device;
 extern struct platform_device jz4740_adc_device;
 extern struct platform_device jz4740_battery_device;
+
+void jz4740_serial_device_register(void);
 
 #endif

@@ -22,7 +22,7 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-#include "../codecs/jzcodec.h"
+#include "../codecs/jz4740-codec.h"
 #include "jz4740-pcm.h"
 #include "jz4740-i2s.h"
 
@@ -81,13 +81,6 @@ static int qi_lb60_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	snd_soc_dapm_new_controls(codec, qi_lb60_widgets, ARRAY_SIZE(qi_lb60_widgets));
 
 	snd_soc_dapm_add_routes(codec, qi_lb60_routes, ARRAY_SIZE(qi_lb60_routes));
@@ -98,10 +91,10 @@ static int qi_lb60_codec_init(struct snd_soc_codec *codec)
 }
 
 static struct snd_soc_dai_link qi_lb60_dai = {
-	.name = "jz-codec",
-	.stream_name = "JZCODEC",
+	.name = "jz4740-codec",
+	.stream_name = "jz4740-codec",
 	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz_codec_dai,
+	.codec_dai = &jz4740_codec_dai,
 	.init = qi_lb60_codec_init,
 };
 
@@ -114,7 +107,7 @@ static struct snd_soc_card qi_lb60 = {
 
 static struct snd_soc_device qi_lb60_snd_devdata = {
 	.card = &qi_lb60,
-	.codec_dev = &soc_codec_dev_jzcodec,
+	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *qi_lb60_snd_device;

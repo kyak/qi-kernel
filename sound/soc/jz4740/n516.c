@@ -24,7 +24,7 @@
 #include <linux/gpio.h>
 #include <linux/workqueue.h>
 
-#include "../codecs/jzcodec.h"
+#include "../codecs/jz4740-codec.h"
 #include "jz4740-pcm.h"
 #include "jz4740-i2s.h"
 
@@ -158,13 +158,6 @@ static int n516_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	ret = snd_soc_add_controls(codec, n516_controls,
 		ARRAY_SIZE(n516_controls));
 	if (ret) {
@@ -192,10 +185,10 @@ static int n516_codec_init(struct snd_soc_codec *codec)
 }
 
 static struct snd_soc_dai_link n516_dai = {
-	.name = "jz-codec",
-	.stream_name = "JZCODEC",
+	.name = "jz4740-codec",
+	.stream_name = "jz4740-codec",
 	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz_codec_dai,
+	.codec_dai = &jz4740_codec_dai,
 	.init = n516_codec_init,
 };
 
@@ -208,7 +201,7 @@ static struct snd_soc_card n516_card = {
 
 static struct snd_soc_device n516_snd_devdata = {
 	.card = &n516_card,
-	.codec_dev = &soc_codec_dev_jzcodec,
+	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *n516_snd_device;

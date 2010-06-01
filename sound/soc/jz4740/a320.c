@@ -22,7 +22,7 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-#include "../codecs/jzcodec.h"
+#include "../codecs/jz4740-codec.h"
 #include "jz4740-pcm.h"
 #include "jz4740-i2s.h"
 
@@ -83,13 +83,6 @@ static int a320_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	snd_soc_dapm_new_controls(codec, a320_widgets, ARRAY_SIZE(a320_widgets));
 
 	snd_soc_dapm_add_routes(codec, a320_routes, ARRAY_SIZE(a320_routes));
@@ -100,10 +93,10 @@ static int a320_codec_init(struct snd_soc_codec *codec)
 }
 
 static struct snd_soc_dai_link a320_dai = {
-	.name = "jz-codec",
-	.stream_name = "JZCODEC",
+	.name = "jz4740-codec",
+	.stream_name = "jz4740-codec",
 	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz_codec_dai,
+	.codec_dai = &jz4740_codec_dai,
 	.init = a320_codec_init,
 };
 
@@ -116,7 +109,7 @@ static struct snd_soc_card a320 = {
 
 static struct snd_soc_device a320_snd_devdata = {
 	.card = &a320,
-	.codec_dev = &soc_codec_dev_jzcodec,
+	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *a320_snd_device;

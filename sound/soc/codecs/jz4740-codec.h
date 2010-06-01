@@ -11,12 +11,10 @@
  *
  */
 
-#ifndef _ICODEC_H
-#define _ICODEC_H
+#ifndef __SND_SOC_CODECS_JZ4740_CODEC_H__
+#define __SND_SOC_CODECS_JZ4740_CODEC_H__
 
-#define JZCODEC_SYSCLK	0
-
-extern struct snd_soc_dai jz_codec_dai;
-extern struct snd_soc_codec_device soc_codec_dev_jzcodec;
+extern struct snd_soc_dai jz4740_codec_dai;
+extern struct snd_soc_codec_device soc_codec_dev_jz4740_codec;
 
 #endif

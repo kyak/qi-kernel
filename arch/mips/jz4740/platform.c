@@ -23,6 +23,12 @@
 #include <asm/mach-jz4740/base.h>
 #include <asm/mach-jz4740/irq.h>
 
+#include <linux/serial_core.h>
+#include <linux/serial_8250.h>
+
+#include "serial.h"
+#include "clock.h"
+
 /* OHCI (USB full speed host controller) */
 static struct resource jz4740_usb_ohci_resources[] = {
 	[0] = {
@@ -265,3 +271,39 @@ struct platform_device jz4740_battery_device = {
 		.parent	= &jz4740_adc_device.dev
 	},
 };
+
+/* Serial */
+#define JZ4740_UART_DATA(_id) \
+	{ \
+		.flags = UPF_SKIP_TEST | UPF_IOREMAP | UPF_FIXED_TYPE, \
+		.iotype = UPIO_MEM, \
+		.regshift = 2, \
+		.serial_out = jz4740_serial_out, \
+		.type = PORT_16550A, \
+		.mapbase = CPHYSADDR(JZ4740_UART ## _id ## _BASE_ADDR), \
+		.irq = JZ4740_IRQ_UART ## _id, \
+	}
+
+static struct plat_serial8250_port jz4740_uart_data[] = {
+	JZ4740_UART_DATA(0),
+	JZ4740_UART_DATA(1),
+	{},
+};
+
+static struct platform_device jz4740_uart_device = {
+	.name = "serial8250",
+	.id = 0,
+	.dev = {
+		.platform_data = jz4740_uart_data,
+	},
+};
+
+void jz4740_serial_device_register(void)
+{
+	struct plat_serial8250_port *p;
+
+	for (p = jz4740_uart_data; p->flags != 0; ++p)
+		p->uartclk = jz4740_clock_bdata.ext_rate;
+
+	platform_device_register(&jz4740_uart_device);
+}

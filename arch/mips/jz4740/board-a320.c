@@ -280,6 +280,8 @@ static int __init a320_init_platform_devices(void)
 	jz4740_battery_device.dev.platform_data = &a320_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &a320_mmc_pdata;
 
+	jz4740_serial_device_register();
+
 	/* TODO(MtH): Dingux has no SPI support enabled.
 	              See drivers/spi/Kconfig.
 	spi_register_board_info(a320_spi_board_info,

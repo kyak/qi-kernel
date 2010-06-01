@@ -147,8 +147,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	jz4740_timer_set_duty(id, duty);
 	jz4740_timer_set_period(id, period);
 
-	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_EXT;
-	ctrl |= JZ_TIMER_CTRL_PWM_ABRUPT_SHUTDOWN;
+	ctrl = JZ_TIMER_CTRL_PRESCALER(prescaler) | JZ_TIMER_CTRL_SRC_EXT |
+		JZ_TIMER_CTRL_PWM_ABBRUPT_SHUTDOWN;
+
 	jz4740_timer_set_ctrl(id, ctrl);
 
 	if (is_enabled)
