@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2009, Lars-Peter Clausen <lars@metafoo.de>
+ *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
  *	JZ4740 SD/MMC controller driver
  *
  *  This program is free software; you can redistribute	 it and/or modify it
