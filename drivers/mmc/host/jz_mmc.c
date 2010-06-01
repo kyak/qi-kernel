@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2009, Lars-Peter Clausen <lars@metafoo.de>
- *      JZ7420/JZ4740 GPIO SD/MMC controller driver
+ *	JZ4740 SD/MMC controller driver
  *
  *  This program is free software; you can redistribute	 it and/or modify it
  *  under  the terms of	 the GNU General  Public License as published by the
@@ -152,7 +152,8 @@ static void jz4740_mmc_disable_irq(struct jz4740_mmc_host *host, unsigned int ir
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
-static void jz4740_mmc_clock_enable(struct jz4740_mmc_host *host, bool start_transfer)
+static void jz4740_mmc_clock_enable(struct jz4740_mmc_host *host,
+	bool start_transfer)
 {
 	uint16_t val = JZ_MMC_STRPCL_CLOCK_START;
 
@@ -214,7 +215,8 @@ static inline unsigned int jz4740_mmc_wait_irq(struct jz4740_mmc_host *host,
 	return timeout;
 }
 
-static void jz4740_mmc_write_data(struct jz4740_mmc_host *host, struct mmc_data *data)
+static void jz4740_mmc_write_data(struct jz4740_mmc_host *host,
+	struct mmc_data *data)
 {
 	struct scatterlist *sg;
 	uint32_t *sg_pointer;
@@ -276,18 +278,18 @@ err_timeout:
 	data->error = -ETIMEDOUT;
 	return;
 err:
-	if(status & (JZ_MMC_STATUS_TIMEOUT_WRITE)) {
+	if (status & (JZ_MMC_STATUS_TIMEOUT_WRITE)) {
 		host->req->cmd->error = -ETIMEDOUT;
 		data->error = -ETIMEDOUT;
 	} else {
-		host->req->cmd->error = -EILSEQ;
-		data->error = -EILSEQ;
+		host->req->cmd->error = -EIO;
+		data->error = -EIO;
 	}
 }
 
 static void jz4740_mmc_timeout(unsigned long data)
 {
-	struct jz4740_mmc_host *host = (struct jz4740_mmc_host*)data;
+	struct jz4740_mmc_host *host = (struct jz4740_mmc_host *)data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&host->lock, flags);
@@ -375,8 +377,8 @@ err:
 		host->req->cmd->error = -ETIMEDOUT;
 		data->error = -ETIMEDOUT;
 	} else {
-		host->req->cmd->error = -EILSEQ;
-		data->error = -EILSEQ;
+		host->req->cmd->error = -EIO;
+		data->error = -EIO;
 	}
 }
 
@@ -420,10 +422,8 @@ static irqreturn_t jz_mmc_irq(int irq, void *devid)
 		mmc_signal_sdio_irq(host->mmc);
 	}
 
-	if (!host->req || !host->cmd) {
+	if (!host->req || !host->cmd)
 		goto handled;
-	}
-
 
 	spin_lock_irqsave(&host->lock, flags);
 	if (!host->waiting) {
@@ -442,11 +442,11 @@ static irqreturn_t jz_mmc_irq(int irq, void *devid)
 		host->cmd->error = -ETIMEDOUT;
 	} else if (status & JZ_MMC_STATUS_CRC_RES_ERR) {
 		host->cmd->error = -EIO;
-	} else if(status & (JZ_MMC_STATUS_CRC_READ_ERROR |
-						JZ_MMC_STATUS_CRC_WRITE_ERROR)) {
+	} else if (status & (JZ_MMC_STATUS_CRC_READ_ERROR |
+			JZ_MMC_STATUS_CRC_WRITE_ERROR)) {
 		host->cmd->data->error = -EIO;
-	} else if(status & (JZ_MMC_STATUS_CRC_READ_ERROR |
-						JZ_MMC_STATUS_CRC_WRITE_ERROR)) {
+	} else if (status & (JZ_MMC_STATUS_CRC_READ_ERROR |
+			JZ_MMC_STATUS_CRC_WRITE_ERROR)) {
 		host->cmd->data->error = -EIO;
 	}
 
@@ -463,7 +463,8 @@ handled:
 	return IRQ_HANDLED;
 }
 
-static int jz4740_mmc_set_clock_rate(struct jz4740_mmc_host *host, int rate) {
+static int jz4740_mmc_set_clock_rate(struct jz4740_mmc_host *host, int rate)
+{
 	int div = 0;
 	int real_rate;
 
@@ -482,7 +483,8 @@ static int jz4740_mmc_set_clock_rate(struct jz4740_mmc_host *host, int rate) {
 }
 
 
-static void jz4740_mmc_read_response(struct jz4740_mmc_host *host, struct mmc_command *cmd)
+static void jz4740_mmc_read_response(struct jz4740_mmc_host *host,
+	struct mmc_command *cmd)
 {
 	int i;
 	uint16_t tmp;
@@ -501,7 +503,8 @@ static void jz4740_mmc_read_response(struct jz4740_mmc_host *host, struct mmc_co
 	}
 }
 
-static void jz4740_mmc_send_command(struct jz4740_mmc_host *host, struct mmc_command *cmd)
+static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
+	struct mmc_command *cmd)
 {
 	uint32_t cmdat = host->cmdat;
 
@@ -626,7 +629,7 @@ static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		host->cmdat |= JZ_MMC_CMDAT_BUS_WIDTH_4BIT;
 		break;
 	default:
-		dev_err(&host->pdev->dev, "Invalid bus width: %d\n", ios->bus_width);
+		break;
 	}
 }
 
@@ -747,6 +750,15 @@ static void jz4740_mmc_free_gpios(struct platform_device *pdev)
 		gpio_free(pdata->gpio_card_detect);
 }
 
+static inline size_t jz4740_mmc_num_pins(struct jz4740_mmc_host *host)
+{
+	size_t num_pins = ARRAY_SIZE(jz4740_mmc_pins);
+	if (host->pdata && host->pdata->data_1bit)
+		num_pins -= 3;
+
+	return num_pins;
+}
+
 static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 {
 	int ret;
@@ -764,6 +776,7 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 	}
 
 	host = mmc_priv(mmc);
+	host->pdata = pdata;
 
 	host->irq = platform_get_irq(pdev, 0);
 
@@ -788,8 +801,8 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 		goto err_clk_put;
 	}
 
-	host->mem = request_mem_region(host->mem->start, resource_size(host->mem),
-					pdev->name);
+	host->mem = request_mem_region(host->mem->start,
+					resource_size(host->mem), pdev->name);
 
 	if (!host->mem) {
 		ret = -EBUSY;
@@ -805,13 +818,9 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 		goto err_release_mem_region;
 	}
 
-	if (pdata && pdata->data_1bit)
-		ret = jz_gpio_bulk_request(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins) - 3);
-	else
-		ret = jz_gpio_bulk_request(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins));
-
+	ret = jz_gpio_bulk_request(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 	if (ret) {
-		dev_err(&pdev->dev, "Failed to request function pins: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to request mmc pins: %d\n", ret);
 		goto err_iounmap;
 	}
 
@@ -825,16 +834,17 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
 	mmc->caps = (pdata && pdata->data_1bit) ? 0 : MMC_CAP_4_BIT_DATA;
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
-	mmc->max_seg_size = 4096;
-	mmc->max_phys_segs = 128;
 
 	mmc->max_blk_size = (1 << 10) - 1;
 	mmc->max_blk_count = (1 << 15) - 1;
 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
 
+	mmc->max_phys_segs = 128;
+	mmc->max_hw_segs = 128;
+	mmc->max_seg_size = mmc->max_req_size;
+
 	host->mmc = mmc;
 	host->pdev = pdev;
-	host->pdata = pdata;
 	host->max_clock = JZ_MMC_CLK_RATE;
 	spin_lock_init(&host->lock);
 	host->irq_mask = 0xffff;
@@ -886,10 +896,7 @@ err_free_card_detect_irq:
 err_free_gpios:
 	jz4740_mmc_free_gpios(pdev);
 err_gpio_bulk_free:
-	if (pdata && pdata->data_1bit)
-		jz_gpio_bulk_free(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins) - 3);
-	else
-		jz_gpio_bulk_free(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins));
+	jz_gpio_bulk_free(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 err_iounmap:
 	iounmap(host->base);
 err_release_mem_region:
@@ -906,7 +913,6 @@ err_free_host:
 static int __devexit jz4740_mmc_remove(struct platform_device *pdev)
 {
 	struct jz4740_mmc_host *host = platform_get_drvdata(pdev);
-	struct jz4740_mmc_platform_data *pdata = host->pdata;
 
 	del_timer_sync(&host->timeout_timer);
 	jz4740_mmc_disable_irq(host, 0xff);
@@ -919,10 +925,7 @@ static int __devexit jz4740_mmc_remove(struct platform_device *pdev)
 		free_irq(host->card_detect_irq, host);
 
 	jz4740_mmc_free_gpios(pdev);
-	if (pdata && pdata->data_1bit)
-		jz_gpio_bulk_free(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins) - 3);
-	else
-		jz_gpio_bulk_free(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins));
+	jz_gpio_bulk_free(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 
 	iounmap(host->base);
 	release_mem_region(host->mem->start, resource_size(host->mem));
@@ -939,14 +942,10 @@ static int __devexit jz4740_mmc_remove(struct platform_device *pdev)
 static int jz4740_mmc_suspend(struct device *dev)
 {
 	struct jz4740_mmc_host *host = dev_get_drvdata(dev);
-	struct jz4740_mmc_platform_data *pdata = host->pdata;
 
-	mmc_suspend_host(host->mmc, PMSG_SUSPEND);
+	mmc_suspend_host(host->mmc, 0);
 
-	if (pdata && pdata->data_1bit)
-		jz_gpio_bulk_suspend(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins) - 3);
-	else
-		jz_gpio_bulk_suspend(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins));
+	jz_gpio_bulk_suspend(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 
 	return 0;
 }
@@ -954,12 +953,8 @@ static int jz4740_mmc_suspend(struct device *dev)
 static int jz4740_mmc_resume(struct device *dev)
 {
 	struct jz4740_mmc_host *host = dev_get_drvdata(dev);
-	struct jz4740_mmc_platform_data *pdata = host->pdata;
 
-	if (pdata && pdata->data_1bit)
-		jz_gpio_bulk_resume(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins) - 3);
-	else
-		jz_gpio_bulk_resume(jz4740_mmc_pins, ARRAY_SIZE(jz4740_mmc_pins));
+	jz_gpio_bulk_resume(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 
 	mmc_resume_host(host->mmc);
 
