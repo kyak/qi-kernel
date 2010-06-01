@@ -48,7 +48,8 @@ static struct nand_ecclayout qi_lb60_ecclayout_1gb = {
 		14, 15, 16, 17, 18, 19, 20, 21,
 		22, 23, 24, 25, 26, 27, 28, 29,
 		30, 31, 32, 33, 34, 35, 36, 37,
-		38, 39, 40, 41},
+		38, 39, 40, 41
+	},
 	.oobfree = {
 		{.offset = 2,
 		 .length = 4},
@@ -57,18 +58,21 @@ static struct nand_ecclayout qi_lb60_ecclayout_1gb = {
 };
 
 static struct mtd_partition qi_lb60_partitions_1gb[] = {
-	{ .name = "NAND BOOT partition",
-	  .offset = 0 * 0x100000,
-	  .size = 4 * 0x100000,
- 	},
-	{ .name = "NAND KERNEL partition",
-	  .offset = 4 * 0x100000,
-	  .size = 4 * 0x100000,
- 	},
-	{ .name = "NAND ROOTFS partition",
-	  .offset = 8 * 0x100000,
-	  .size = (504 + 512) * 0x100000,
- 	},
+	{
+		.name = "NAND BOOT partition",
+		.offset = 0 * 0x100000,
+		.size = 4 * 0x100000,
+	},
+	{
+		.name = "NAND KERNEL partition",
+		.offset = 4 * 0x100000,
+		.size = 4 * 0x100000,
+	},
+	{
+		.name = "NAND ROOTFS partition",
+		.offset = 8 * 0x100000,
+		.size = (504 + 512) * 0x100000,
+	},
 };
 
 static struct nand_ecclayout qi_lb60_ecclayout_2gb = {
@@ -82,26 +86,30 @@ static struct nand_ecclayout qi_lb60_ecclayout_2gb = {
 		52, 53, 54, 55, 56, 57, 58, 59,
 		60, 61, 62, 63, 64, 65, 66, 67,
 		68, 69, 70, 71, 72, 73, 74, 75,
-		76, 77, 78, 79, 80, 81, 82, 83},
+		76, 77, 78, 79, 80, 81, 82, 83
+	},
 	.oobfree = {
- 		{ .offset = 2, .length = 10},
-		{ .offset = 84, .length = 44},
+		{ .offset = 2, .length = 10 },
+		{ .offset = 84, .length = 44 },
 	},
 };
 
 static struct mtd_partition qi_lb60_partitions_2gb[] = {
-	{ .name = "NAND BOOT partition",
-	  .offset = 0 * 0x100000,
-	  .size = 4 * 0x100000,
- 	},
-	{ .name = "NAND KERNEL partition",
-	  .offset = 4 * 0x100000,
-	  .size = 4 * 0x100000,
- 	},
-	{ .name = "NAND ROOTFS partition",
-	  .offset = 8 * 0x100000,
-	  .size = (504 + 512 + 1024) * 0x100000,
- 	},
+	{
+		.name = "NAND BOOT partition",
+		.offset = 0 * 0x100000,
+		.size = 4 * 0x100000,
+	},
+	{
+		.name = "NAND KERNEL partition",
+		.offset = 4 * 0x100000,
+		.size = 4 * 0x100000,
+	},
+	{
+		.name = "NAND ROOTFS partition",
+		.offset = 8 * 0x100000,
+		.size = (504 + 512 + 1024) * 0x100000,
+	},
 };
 
 static void qi_lb60_nand_ident(struct platform_device *pdev,
