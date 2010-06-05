@@ -59,7 +59,6 @@ static inline void jz4740_rtc_wait_write_ready(struct jz4740_rtc *rtc)
 	} while (!(ctrl & JZ_RTC_CTRL_WRDY));
 }
 
-
 static inline void jz4740_rtc_reg_write(struct jz4740_rtc *rtc, size_t reg,
 					uint32_t val)
 {
@@ -242,7 +241,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	rtc->mem = request_mem_region(rtc->mem->start, resource_size(rtc->mem),
 					pdev->name);
-
 	if (!rtc->mem) {
 		ret = -EBUSY;
 		dev_err(&pdev->dev, "Failed to request mmio memory region\n");
@@ -250,7 +248,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	}
 
 	rtc->base = ioremap_nocache(rtc->mem->start, resource_size(rtc->mem));
-
 	if (!rtc->base) {
 		ret = -EBUSY;
 		dev_err(&pdev->dev, "Failed to ioremap mmio memory\n");
@@ -272,7 +269,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	ret = request_irq(rtc->irq, jz4740_rtc_irq, 0,
 				pdev->name, rtc);
-
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request rtc irq: %d\n", ret);
 		goto err_unregister_rtc;
