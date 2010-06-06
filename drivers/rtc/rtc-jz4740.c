@@ -219,6 +219,8 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	uint32_t scratchpad;
 
 	rtc = kmalloc(sizeof(*rtc), GFP_KERNEL);
+	if (!rtc)
+		return -ENOMEM;
 
 	rtc->irq = platform_get_irq(pdev, 0);
 	if (rtc->irq < 0) {
