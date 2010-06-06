@@ -87,14 +87,9 @@ static void jz4740_rtc_ctrl_set_bits(struct jz4740_rtc *rtc, uint32_t mask,
 	spin_unlock_irqrestore(&rtc->lock, flags);
 }
 
-static inline struct jz4740_rtc *dev_to_rtc(struct device *dev)
-{
-	return dev_get_drvdata(dev);
-}
-
 static int jz4740_rtc_read_time(struct device *dev, struct rtc_time *time)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	uint32_t secs, secs2;
 
 	secs = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
@@ -112,7 +107,7 @@ static int jz4740_rtc_read_time(struct device *dev, struct rtc_time *time)
 
 static int jz4740_rtc_set_mmss(struct device *dev, unsigned long secs)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 
 	if ((uint32_t)secs != secs)
 		return -EINVAL;
@@ -124,7 +119,7 @@ static int jz4740_rtc_set_mmss(struct device *dev, unsigned long secs)
 
 static int jz4740_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	uint32_t secs, secs2;
 	uint32_t ctrl;
 
@@ -148,7 +143,7 @@ static int jz4740_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static int jz4740_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	unsigned long secs;
 
 	rtc_tm_to_time(&alrm->time, &secs);
@@ -165,7 +160,7 @@ static int jz4740_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static int jz4740_rtc_update_irq_enable(struct device *dev, unsigned int enable)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_1HZ_IRQ,
 					enable ? JZ_RTC_CTRL_1HZ_IRQ : 0);
 	return 0;
@@ -174,7 +169,7 @@ static int jz4740_rtc_update_irq_enable(struct device *dev, unsigned int enable)
 
 static int jz4740_rtc_alarm_irq_enable(struct device *dev, unsigned int enable)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_AF_IRQ,
 					enable ? JZ_RTC_CTRL_AF_IRQ : 0);
 	return 0;
