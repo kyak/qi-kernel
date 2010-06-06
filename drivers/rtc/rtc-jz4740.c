@@ -54,9 +54,11 @@ static inline uint32_t jz4740_rtc_reg_read(struct jz4740_rtc *rtc, size_t reg)
 static inline void jz4740_rtc_wait_write_ready(struct jz4740_rtc *rtc)
 {
 	uint32_t ctrl;
+	int timeout = 10;
+
 	do {
 		ctrl = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_CTRL);
-	} while (!(ctrl & JZ_RTC_CTRL_WRDY));
+	} while (!(ctrl & JZ_RTC_CTRL_WRDY) && timeout--);
 }
 
 static inline void jz4740_rtc_reg_write(struct jz4740_rtc *rtc, size_t reg,
@@ -91,14 +93,22 @@ static int jz4740_rtc_read_time(struct device *dev, struct rtc_time *time)
 {
 	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	uint32_t secs, secs2;
+	int timeout = 5;
 
+	/* If the seconds register is read while it is updated, it can contain a
+	 * bogus value. This can be avoided by making sure that two consecutive
+	 * reads have the same value.
+	 */
 	secs = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 	secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 
-	while (secs != secs2) {
+	while (secs != secs2 && timeout--) {
 		secs = secs2;
 		secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 	}
+
+	if (timeout == 0)
+		return -EIO;
 
 	rtc_time_to_tm(secs, time);
 
@@ -120,16 +130,10 @@ static int jz4740_rtc_set_mmss(struct device *dev, unsigned long secs)
 static int jz4740_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
 	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
-	uint32_t secs, secs2;
+	uint32_t secs;
 	uint32_t ctrl;
 
 	secs = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-	secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-
-	while (secs != secs2) {
-		secs = secs2;
-		secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-	}
 
 	ctrl = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_CTRL);
 
