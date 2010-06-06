@@ -29,15 +29,39 @@ Developers can be found on the #dingoonity channel on freenode IRC:
 ** Quickstart **
 ----------------
 
-Use "make a320_defconfig" for a default configuration (LCD driver ILI9325).
+First download booboo's Dingux toolchain from:
+	http://code.google.com/p/dingoo-linux/downloads/list
+It must be unpacked in /opt, otherwise applications will fail to link.
 
-If your A320 is one of the newer models, you must change the LCD driver
-to ILI9331:
+Tell the Linux kernel build that you want to compile for MIPS:
+	export ARCH=mips
+Alternatively, you can pass "ARCH=mips" to every "make" command.
+
+Use "make a320_defconfig" for a default configuration.
+
+If your A320 is one of the older models, you must change the LCD driver
+to ILI9325: (the default config uses ILI9331)
 
     Device drivers
     |---Graphics support
         |---Support for framebuffer devices
             |---SLCD panel
+
+If you have an A330, keep the ILI9331 setting. If you want to use the full
+64 MB of RAM, you need a new boot loader:
+  http://boards.dingoonity.org/dingux-releases/(release)-64mb-dingux-for-a330
+Also, you should tell Linux that there is 64 MB present:
+
+    Kernel hacking
+    |---Built-in kernel command line
+        (... mem=64M)
+
+You can modify the kernel configuration using "make menuconfig".
+
+To build the kernel, use "make vmlinuz.bin". It will produce the kernel
+binary named "vmlinuz.bin" in the top-level directory. The current u-boot
+boot loaders expect the kernel image under its old name "zImage", so you
+have to rename it if you put it on an SD card.
 
 --------------
 ** Keyboard **
@@ -93,20 +117,21 @@ have any suggestions, please do not hesitate to contact me.
 ** Sound **
 -----------
 
-Sound driver is still OSS. It's quite buggy, but stick to S16 sample
-format and everything should be ok.
+The audio driver uses ALSA. For backwards compatibility, the OSS PCM API
+driver is enabled as well.
+
+The build of SDL in booboo's rootfs contains only OSS support. Some
+applications are statically linked against an SDL that contains both OSS
+and ALSA support. However, the latter tries to load libalsa at runtime,
+which is not included in the rootfs. To force the use of OSS, set the
+following environment variable:
+	export SDL_AUDIODRIVER=dsp
 
 ---------------------------------
 ** IPU (Image Processing Unit) **
 ---------------------------------
 
-IPU (Image Processing Unit) memory reservation at startup is disabled
-(saves 4MB). If you intend to test video playing, you might want to
-enable it:
-
-    General setup
-    |---Configure standard kernel features (for small sytems)
-        |---Reserve memory for IPU on Ingenic JZ4740 SOC
+There is no IPU driver yet in this new kernel.
 
 ---------------------------
 ** CPU frequency scaling **
@@ -122,29 +147,21 @@ frequency below the 336MHz set by the boot hardware initialization code
 ** Battery **
 -------------
 
-You can read the battery status by reading from /proc/jz/battery. You will
-read a single line with a decimal value which is the battery voltage in
-millivolts.
+You can read the battery status from the following file:
+	/sys/class/power_supply/battery/capacity
+It contains a percentage: 0 is empty and 100 is full.
 
-We want a platform independent way of reading the battery status, and thus
-we need something like a percentage of full battery charge. When this and
-other info reading is implemented, it will be available in the second and
-further lines read from /proc/jz/battery.
+The /proc/jz interface of the old kernel is no longer supported. The new
+interface is platform independent, so using it will improve the portability
+of your applications.
 
 -------------------
 ** LCD backlight **
 -------------------
 
-You can change the LCD backlight level by using the FBIOSETBACKLIGHT ioctl
-command on the /dev/fb0 interface or by writing to /proc/jz/lcd_backlight.
-I recommend the later method since the first requires kernel headers,
-which Ingenic didn't event bother to place in the right place (the ioctl
-defintions are in drivers/video/jz4740_slcd.h).
-
-Write a value between 0 and 100.
-
-Note: the relation between the value and the luminosity is not linear.
-This is likely to be fixed some day.
+You can change the LCD backlight level by writing a value between 0 (off)
+and 255 (max) to:
+	/sys/class/backlight/pwm-backlight/brightness
 
 -------------------
 ** Miscellaneous **
