@@ -14,10 +14,12 @@
  */
 
 #include <linux/device.h>
-#include <linux/platform_device.h>
-#include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/platform_device.h>
 #include <linux/resource.h>
+
+#include <linux/dma-mapping.h>
 
 #include <asm/mach-jz4740/platform.h>
 #include <asm/mach-jz4740/base.h>
@@ -88,7 +90,7 @@ struct platform_device jz4740_usb_gdt_device = {
 static struct resource jz4740_mmc_resources[] = {
 	[0] = {
 		.start	= CPHYSADDR(JZ4740_MSC_BASE_ADDR),
-		.end	= CPHYSADDR(JZ4740_MSC_BASE_ADDR) + 0x10000 - 1,
+		.end	= CPHYSADDR(JZ4740_MSC_BASE_ADDR) + 0x1000 - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
