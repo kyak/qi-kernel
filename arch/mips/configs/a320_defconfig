@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Tue Jun  1 02:20:28 2010
+# Mon Jun  7 03:29:48 2010
 #
 CONFIG_MIPS=y
 
@@ -955,6 +955,8 @@ CONFIG_STAGING=y
 #
 # CONFIG_RAR_REGISTER is not set
 # CONFIG_IIO is not set
+CONFIG_ZRAM=y
+CONFIG_ZRAM_STATS=y
 # CONFIG_BATMAN_ADV is not set
 # CONFIG_STRIP is not set
 # CONFIG_FB_SM7XX is not set
@@ -1147,6 +1149,8 @@ CONFIG_GENERIC_FIND_LAST_BIT=y
 CONFIG_CRC32=y
 # CONFIG_CRC7 is not set
 # CONFIG_LIBCRC32C is not set
+CONFIG_LZO_COMPRESS=y
+CONFIG_LZO_DECOMPRESS=y
 CONFIG_HAS_IOMEM=y
 CONFIG_HAS_IOPORT=y
 CONFIG_HAS_DMA=y
