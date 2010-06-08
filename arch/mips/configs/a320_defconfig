@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Mon Jun  7 03:29:48 2010
+# Tue Jun  8 02:32:22 2010
 #
 CONFIG_MIPS=y
 
@@ -187,7 +187,7 @@ CONFIG_KERNEL_GZIP=y
 # CONFIG_KERNEL_BZIP2 is not set
 # CONFIG_KERNEL_LZMA is not set
 # CONFIG_KERNEL_LZO is not set
-# CONFIG_SWAP is not set
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 CONFIG_SYSVIPC_SYSCTL=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -336,6 +336,7 @@ CONFIG_PM_ADVANCED_DEBUG=y
 CONFIG_PM_VERBOSE=y
 # CONFIG_PM_SLEEP_ADVANCED_DEBUG is not set
 # CONFIG_SUSPEND is not set
+# CONFIG_HIBERNATION is not set
 # CONFIG_PM_RUNTIME is not set
 CONFIG_NET=y
 
