@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Tue Jun  8 02:32:22 2010
+# Wed Jun  9 03:10:23 2010
 #
 CONFIG_MIPS=y
 
@@ -730,11 +730,7 @@ CONFIG_BACKLIGHT_PWM=y
 #
 # Display device support
 #
-CONFIG_DISPLAY_SUPPORT=y
-
-#
-# Display hardware drivers
-#
+# CONFIG_DISPLAY_SUPPORT is not set
 
 #
 # Console display driver support
