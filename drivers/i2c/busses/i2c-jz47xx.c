@@ -156,7 +156,7 @@ static int xfer_read(__u16 addr, struct i2c_adapter *adap, unsigned char *buf, i
 
 	timeout = jiffies + I2C_TIMEOUT;
 	i2c_jz_set_drf();
-	udelay(1000000 / DEFAULT_I2C_CLOCK * 5);
+	udelay(1000000 / DEFAULT_I2C_CLOCK * 8);
 
 	timeout = jiffies + I2C_TIMEOUT;
 	while (!(i2c_jz_readb(JZ_REG_I2C_SR) & JZ_I2C_SR_TEND))
