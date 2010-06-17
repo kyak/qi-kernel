@@ -88,7 +88,7 @@ struct platform_device jz4740_usb_gdt_device = {
 static struct resource jz4740_mmc_resources[] = {
 	[0] = {
 		.start	= CPHYSADDR(JZ4740_MSC_BASE_ADDR),
-		.end	= CPHYSADDR(JZ4740_MSC_BASE_ADDR) + 0x10000 - 1,
+		.end	= CPHYSADDR(JZ4740_MSC_BASE_ADDR) + 0x1000 - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
