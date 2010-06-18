@@ -81,20 +81,13 @@ config MMC_RICOH_MMC
 
 	  If unsure, say Y.
 
-config MMC_JZ
+config MMC_JZ4740
 	tristate "JZ SD/Multimedia Card Interface support"
-	depends on SOC_JZ4720 || SOC_JZ4740
+	depends on SOC_JZ4740
 	help
-	  This selects the Ingenic JZ4720/JZ4740 SD/Multimedia card Interface.
-	  If you have abIngenic platform with a Multimedia Card slot,
+	  This selects the Ingenic Z4740 SD/Multimedia card Interface.
+	  If you have an ngenic platform with a Multimedia Card slot,
 	  say Y or M here.
-
-	  If unsure, say N.
-
-	  To compile this driver as a module, choose M here:
-	  the module will be called ricoh_mmc.
-
-	  If unsure, say Y.
 
 config MMC_SDHCI_OF
 	tristate "SDHCI support on OpenFirmware platforms"

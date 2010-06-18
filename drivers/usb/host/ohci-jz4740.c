@@ -18,9 +18,8 @@ static inline struct jz4740_ohci_hcd *hcd_to_jz4740_hcd(struct usb_hcd *hcd)
 
 static inline struct usb_hcd *jz4740_hcd_to_hcd(struct jz4740_ohci_hcd *jz4740_ohci)
 {
-	return container_of ((void *) jz4740_ohci, struct usb_hcd, hcd_priv);
+	return container_of((void *)jz4740_ohci, struct usb_hcd, hcd_priv);
 }
-
 
 static int ohci_jz4740_start(struct usb_hcd *hcd)
 {
@@ -48,12 +47,15 @@ static int ohci_jz4740_set_vbus_power(struct jz4740_ohci_hcd *jz4740_ohci,
 {
 	int ret = 0;
 
-    if (enabled && !jz4740_ohci->vbus_enabled) {
+	if (!jz4740_ohci->vbus)
+		return 0;
+
+	if (enabled && !jz4740_ohci->vbus_enabled) {
 		ret = regulator_enable(jz4740_ohci->vbus);
 		if (ret)
 			dev_err(jz4740_hcd_to_hcd(jz4740_ohci)->self.controller,
 				"Could not power vbus\n");
-	} else if(!enabled && jz4740_ohci->vbus_enabled) {
+	} else if (!enabled && jz4740_ohci->vbus_enabled) {
 		ret = regulator_disable(jz4740_ohci->vbus);
 	}
 
@@ -69,17 +71,15 @@ static int ohci_jz4740_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	struct jz4740_ohci_hcd *jz4740_ohci = hcd_to_jz4740_hcd(hcd);
 	int ret;
 
-	if (jz4740_ohci->vbus) {
-		switch (typeReq) {
-		case SetHubFeature:
-			if (wValue == USB_PORT_FEAT_POWER)
-				ret = ohci_jz4740_set_vbus_power(jz4740_ohci, true);
-			break;
-		case ClearHubFeature:
-			if (wValue == USB_PORT_FEAT_POWER)
-				ret = ohci_jz4740_set_vbus_power(jz4740_ohci, false);
-			break;
-		}
+	switch (typeReq) {
+	case SetHubFeature:
+		if (wValue == USB_PORT_FEAT_POWER)
+			ret = ohci_jz4740_set_vbus_power(jz4740_ohci, true);
+		break;
+	case ClearHubFeature:
+		if (wValue == USB_PORT_FEAT_POWER)
+			ret = ohci_jz4740_set_vbus_power(jz4740_ohci, false);
+		break;
 	}
 
 	if (ret)

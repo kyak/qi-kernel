@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *	JZ4720/JZ4740 SoC NAND controller driver
+ *	JZ4740 SoC NAND controller driver
  *
  *  This program is free software; you can redistribute	 it and/or modify it
  *  under  the terms of	 the GNU General  Public License as published by the
@@ -133,8 +133,8 @@ static void jz_nand_hwctl(struct mtd_info *mtd, int mode)
 }
 
 
-static int jz_nand_calculate_ecc_rs(struct mtd_info* mtd, const uint8_t *dat,
-					uint8_t *ecc_code)
+static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
+	uint8_t *ecc_code)
 {
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	uint32_t reg, status;
@@ -191,7 +191,7 @@ static void correct_data(uint8_t *dat, int index, int mask)
 }
 
 static int jz_nand_correct_ecc_rs(struct mtd_info *mtd, uint8_t *dat,
-				  uint8_t *read_ecc, uint8_t *calc_ecc)
+	uint8_t *read_ecc, uint8_t *calc_ecc)
 {
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	int i, error_count, index;
@@ -326,7 +326,6 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	mtd->name	= "jz4740-nand";
 
 	chip->ecc.hwctl		= jz_nand_hwctl;
-
 	chip->ecc.calculate	= jz_nand_calculate_ecc_rs;
 	chip->ecc.correct	= jz_nand_correct_ecc_rs;
 	chip->ecc.mode		= NAND_ECC_HW_OOB_FIRST;
@@ -439,6 +438,5 @@ module_exit(jz_nand_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
-MODULE_DESCRIPTION("NAND controller driver for JZ4720/JZ4740 SoC");
+MODULE_DESCRIPTION("NAND controller driver for JZ4740 SoC");
 MODULE_ALIAS("platform:jz4740-nand");
-MODULE_ALIAS("platform:jz4720-nand");

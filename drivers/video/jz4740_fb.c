@@ -70,7 +70,7 @@ static struct fb_fix_screeninfo jzfb_fix __devinitdata = {
 	.accel		= FB_ACCEL_NONE,
 };
 
-const static struct jz_gpio_bulk_request jz_lcd_ctrl_pins[] = {
+static const struct jz_gpio_bulk_request jz_lcd_ctrl_pins[] = {
 	JZ_GPIO_BULK_PIN(LCD_PCLK),
 	JZ_GPIO_BULK_PIN(LCD_HSYNC),
 	JZ_GPIO_BULK_PIN(LCD_VSYNC),
@@ -79,7 +79,7 @@ const static struct jz_gpio_bulk_request jz_lcd_ctrl_pins[] = {
 	JZ_GPIO_BULK_PIN(LCD_REV),
 };
 
-const static struct jz_gpio_bulk_request jz_lcd_data_pins[] = {
+static const struct jz_gpio_bulk_request jz_lcd_data_pins[] = {
 	JZ_GPIO_BULK_PIN(LCD_DATA0),
 	JZ_GPIO_BULK_PIN(LCD_DATA1),
 	JZ_GPIO_BULK_PIN(LCD_DATA2),
@@ -142,6 +142,13 @@ static unsigned int jzfb_num_data_pins(struct jzfb *jzfb)
 	return num;
 }
 
+/* Based on CNVT_TOHW macro from skeletonfb.c */
+static inline uint32_t jzfb_convert_color_to_hw(unsigned val,
+	struct fb_bitfield *bf)
+{
+	return (((val << bf->length) + 0x7FFF - val) >> 16) << bf->offset;
+}
+
 static int jzfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			unsigned blue, unsigned transp, struct fb_info *fb)
 {
@@ -150,19 +157,12 @@ static int jzfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= 16)
 		return -EINVAL;
 
-#define CNVT_TOHW(val,width) ((((val)<<(width))+0x7FFF-(val))>>16)
-	red = CNVT_TOHW(red, fb->var.red.length);
-	green = CNVT_TOHW(green, fb->var.green.length);
-	blue = CNVT_TOHW(blue, fb->var.blue.length);
-	transp = CNVT_TOHW(transp, fb->var.transp.length);
-#undef CNVT_TOHW
+	color = jzfb_convert_color_to_hw(red, fb->var.red.length);
+	color |= jzfb_convert_color_to_hw(green, fb->var.green.length);
+	color |= jzfb_convert_color_to_hw(blue, fb->var.blue.length);
+	color |= jzfb_convert_color_to_hw(transp, fb->var.transp.length);
 
-	color = (red << fb->var.red.offset) |
-		(green << fb->var.green.offset) |
-		(blue << fb->var.blue.offset) |
-		(transp << fb->var.transp.offset);
-
-	((uint32_t*)(fb->pseudo_palette))[regno] = color;
+	((uint32_t *)(fb->pseudo_palette))[regno] = color;
 
 	return 0;
 }
@@ -180,7 +180,8 @@ static int jzfb_get_controller_bpp(struct jzfb *jzfb)
 	}
 }
 
-static struct fb_videomode *jzfb_get_mode(struct jzfb *jzfb, struct fb_var_screeninfo *var)
+static struct fb_videomode *jzfb_get_mode(struct jzfb *jzfb,
+	struct fb_var_screeninfo *var)
 {
 	size_t i;
 	struct fb_videomode *mode = jzfb->pdata->modes;
@@ -459,16 +460,16 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 	max_videosize *= jzfb_get_controller_bpp(jzfb) >> 3;
 
 	jzfb->framedesc = dma_alloc_coherent(&jzfb->pdev->dev,
-				    sizeof(*jzfb->framedesc),
-				    &jzfb->framedesc_phys, GFP_KERNEL);
+					sizeof(*jzfb->framedesc),
+					&jzfb->framedesc_phys, GFP_KERNEL);
 
 	if (!jzfb->framedesc)
 		return -ENOMEM;
 
 	jzfb->vidmem_size = PAGE_ALIGN(max_videosize);
 	jzfb->vidmem = dma_alloc_coherent(&jzfb->pdev->dev,
-						jzfb->vidmem_size,
-						&jzfb->vidmem_phys, GFP_KERNEL);
+					jzfb->vidmem_size,
+					&jzfb->vidmem_phys, GFP_KERNEL);
 
 	if (!jzfb->vidmem)
 		goto err_free_framedesc;
@@ -478,7 +479,6 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 		 page += PAGE_SIZE) {
 		SetPageReserved(virt_to_page(page));
 	}
-
 
 	jzfb->framedesc->next = jzfb->framedesc_phys;
 	jzfb->framedesc->addr = jzfb->vidmem_phys;
@@ -527,22 +527,18 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-
 	if (!mem) {
 		dev_err(&pdev->dev, "Failed to get register memory resource\n");
 		return -ENOENT;
 	}
 
 	mem = request_mem_region(mem->start, resource_size(mem), pdev->name);
-
 	if (!mem) {
 		dev_err(&pdev->dev, "Failed to request register memory region\n");
 		return -EBUSY;
 	}
 
-
 	fb = framebuffer_alloc(sizeof(struct jzfb), &pdev->dev);
-
 	if (!fb) {
 		dev_err(&pdev->dev, "Failed to allocate framebuffer device\n");
 		ret = -ENOMEM;
