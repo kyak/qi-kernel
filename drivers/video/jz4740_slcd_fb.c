@@ -410,7 +410,7 @@ static int jzfb_set_par(struct fb_info *info)
 
 	// TODO(MtH): Use maximum transfer speed that panel can handle.
 	//            ILI9325 can do 10 MHz.
-	clk_set_rate(jzfb->lpclk, 16800000);
+	clk_set_rate(jzfb->lpclk, 12000000);
 	clk_set_rate(jzfb->ldclk, 42000000);
 
 	return 0;
@@ -541,6 +541,86 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 				jzfb->framedesc, jzfb->framedesc_phys);
 }
 
+#include "jz4740_lcd.h"
+
+#define FBIOA320TVOUT 0x46F0
+#define FB_A320TV_OFF 0
+#define FB_A320TV_NTSC 1
+#define FB_A320TV_PAL 2
+
+static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
+{
+	printk("A320 TV out: %d\n", mode);
+	
+	if (mode != FB_A320TV_OFF) {
+		cancel_delayed_work(&jzfb->refresh_work);
+		/* Abort any DMA transfer that might be in progress and
+		   allow direct writes to the panel.  */
+		jzfb_disable_dma(jzfb);
+		jzfb->panel->disable(jzfb);
+
+		/* set up LCD controller for TV output */
+		
+		writel(JZ_LCD_CFG_HSYNC_ACTIVE_LOW |
+		       JZ_LCD_CFG_VSYNC_ACTIVE_LOW,
+		       jzfb->base + JZ_REG_LCD_CFG);
+		
+		/* V-Sync pulse end position */
+		writel(10, jzfb->base + JZ_REG_LCD_VSYNC);
+		
+		if (mode == FB_A320TV_PAL) {
+			/* PAL */
+			/* H-Sync pulse start position */
+			writel(125, jzfb->base + JZ_REG_LCD_HSYNC);
+			/* virtual area size */
+			writel(0x036c0112, jzfb->base + JZ_REG_LCD_VAT);
+			/* horizontal start/end point */
+			writel(0x02240364, jzfb->base + JZ_REG_LCD_DAH);
+			/* vertical start/end point */
+			writel(0x1b010b, jzfb->base + JZ_REG_LCD_DAV);
+		}
+		else {
+			/* NTSC */
+			writel(0x3c, jzfb->base + JZ_REG_LCD_HSYNC);
+			writel(0x02e00110, jzfb->base + JZ_REG_LCD_VAT);
+			writel(0x019902d9, jzfb->base + JZ_REG_LCD_DAH);
+			writel(0x1d010d, jzfb->base + JZ_REG_LCD_DAV);
+		}
+		writel(0, jzfb->base + JZ_REG_LCD_PS);
+		writel(0, jzfb->base + JZ_REG_LCD_CLS);
+		writel(0, jzfb->base + JZ_REG_LCD_SPL);
+		writel(0, jzfb->base + JZ_REG_LCD_REV);
+		/* reset status register */
+		writel(0, jzfb->base + JZ_REG_LCD_STATE);
+		
+		/* tell LCDC about the frame descriptor address */
+		writel(jzfb->framedesc_phys, jzfb->base + JZ_REG_LCD_DA0);
+
+		writel(JZ_LCD_CTRL_BURST_16 | JZ_LCD_CTRL_ENABLE |
+		       JZ_LCD_CTRL_BPP_15_16,
+		       jzfb->base + JZ_REG_LCD_CTRL);
+	}
+	else {
+		/* disable LCD controller and re-enable SLCD */
+		writel(JZ_LCD_CFG_SLCD, jzfb->base + JZ_REG_LCD_CFG);
+		jzfb->panel->enable(jzfb);
+		schedule_delayed_work(&jzfb->refresh_work, 0);
+	}
+}
+
+static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+{
+	struct jzfb *jzfb = info->par;
+	switch (cmd) {
+		case FBIOA320TVOUT:
+			jzfb_tv_out(jzfb, arg);
+			break;
+		default:
+			return -EINVAL;
+	}
+	return 0;
+}
+
 static struct fb_ops jzfb_ops = {
 	.owner			= THIS_MODULE,
 	.fb_check_var 		= jzfb_check_var,
@@ -550,6 +630,7 @@ static struct fb_ops jzfb_ops = {
 	.fb_fillrect		= sys_fillrect,
 	.fb_copyarea		= sys_copyarea,
 	.fb_imageblit		= sys_imageblit,
+	.fb_ioctl		= jzfb_ioctl,
 };
 
 static int __devinit jzfb_probe(struct platform_device *pdev)
