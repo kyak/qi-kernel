@@ -35,6 +35,7 @@ config SOC_JZ4740
 	select IRQ_CPU
 	select DMA_NONCOHERENT
 	select HAVE_PWM
+	select CPU_SUPPORTS_CPUFREQ
 
 config JZSOC
 	bool
