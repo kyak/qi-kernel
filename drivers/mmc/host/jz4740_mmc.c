@@ -218,46 +218,52 @@ static inline unsigned int jz4740_mmc_wait_irq(struct jz4740_mmc_host *host,
 static void jz4740_mmc_write_data(struct jz4740_mmc_host *host,
 	struct mmc_data *data)
 {
-	struct scatterlist *sg;
-	uint32_t *sg_pointer;
+	struct sg_mapping_iter miter;
+	uint32_t *buf;
 	int status;
 	unsigned int timeout;
 	size_t i, j;
 
-	for (sg = data->sg; sg; sg = sg_next(sg)) {
-		sg_pointer = sg_virt(sg);
-		i = sg->length / 4;
+	sg_miter_start(&miter, data->sg, data->sg_len, SG_MITER_FROM_SG);
+	while (sg_miter_next(&miter)) {
+		buf = miter.addr;
+		i = miter.length / 4;
 		j = i >> 3;
 		i = i & 0x7;
 		while (j) {
 			timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_TXFIFO_WR_REQ);
-			if (unlikely(timeout == 0))
+			if (unlikely(timeout == 0)) {
+				sg_miter_stop(&miter);
 				goto err_timeout;
+			}
 
-			writel(sg_pointer[0], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[1], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[2], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[3], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[4], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[5], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[6], host->base + JZ_REG_MMC_TXFIFO);
-			writel(sg_pointer[7], host->base + JZ_REG_MMC_TXFIFO);
-			sg_pointer += 8;
+			writel(buf[0], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[1], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[2], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[3], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[4], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[5], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[6], host->base + JZ_REG_MMC_TXFIFO);
+			writel(buf[7], host->base + JZ_REG_MMC_TXFIFO);
+			buf += 8;
 			--j;
 		}
-		if (i) {
+		if (unlikely(i)) {
 			timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_TXFIFO_WR_REQ);
-			if (unlikely(timeout == 0))
+			if (unlikely(timeout == 0)) {
+				sg_miter_stop(&miter);
 				goto err_timeout;
+			}
 
 			while (i) {
-				writel(*sg_pointer, host->base + JZ_REG_MMC_TXFIFO);
-				++sg_pointer;
+				writel(*buf, host->base + JZ_REG_MMC_TXFIFO);
+				++buf;
 				--i;
 			}
 		}
-		data->bytes_xfered += sg->length;
+		data->bytes_xfered += miter.length;
 	}
+	sg_miter_stop(&miter);
 
 	status = readl(host->base + JZ_REG_MMC_STATUS);
 	if (status & JZ_MMC_STATUS_WRITE_ERROR_MASK)
@@ -287,75 +293,62 @@ err:
 	}
 }
 
-static void jz4740_mmc_timeout(unsigned long data)
-{
-	struct jz4740_mmc_host *host = (struct jz4740_mmc_host *)data;
-	unsigned long flags;
-
-	spin_lock_irqsave(&host->lock, flags);
-	if (!host->waiting) {
-		spin_unlock_irqrestore(&host->lock, flags);
-		return;
-	}
-
-	host->waiting = 0;
-
-	spin_unlock_irqrestore(&host->lock, flags);
-
-	host->req->cmd->error = -ETIMEDOUT;
-	jz4740_mmc_request_done(host);
-}
-
 static void jz4740_mmc_read_data(struct jz4740_mmc_host *host,
 				struct mmc_data *data)
 {
-	struct scatterlist *sg;
-	uint32_t *sg_pointer;
+	struct sg_mapping_iter miter;
+	uint32_t *buf;
 	uint32_t d;
 	uint16_t status = 0;
 	size_t i, j;
 	unsigned int timeout;
 
-	for (sg = data->sg; sg; sg = sg_next(sg)) {
-		sg_pointer = sg_virt(sg);
-		i = sg->length;
+	sg_miter_start(&miter, data->sg, data->sg_len, SG_MITER_TO_SG);
+	while (sg_miter_next(&miter)) {
+		buf = miter.addr;
+		i = miter.length;
 		j = i >> 5;
 		i = i & 0x1f;
 		while (j) {
 			timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_RXFIFO_RD_REQ);
-			if (unlikely(timeout == 0))
+			if (unlikely(timeout == 0)) {
+				sg_miter_stop(&miter);
 				goto err_timeout;
+			}
 
-			sg_pointer[0] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[1] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[2] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[3] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[4] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[5] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[6] = readl(host->base + JZ_REG_MMC_RXFIFO);
-			sg_pointer[7] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[0] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[1] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[2] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[3] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[4] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[5] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[6] = readl(host->base + JZ_REG_MMC_RXFIFO);
+			buf[7] = readl(host->base + JZ_REG_MMC_RXFIFO);
 
-			sg_pointer += 8;
+			buf += 8;
 			--j;
 		}
 
 		while (i >= 4) {
 			timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_RXFIFO_RD_REQ);
-			if (unlikely(timeout == 0))
+			if (unlikely(timeout == 0)) {
+				sg_miter_stop(&miter);
 				goto err_timeout;
+			}
 
-			*sg_pointer = readl(host->base + JZ_REG_MMC_RXFIFO);
-			++sg_pointer;
+			*buf++ = readl(host->base + JZ_REG_MMC_RXFIFO);
 			i -= 4;
 		}
-		if (i > 0) {
+		if (unlikely(i > 0)) {
 			d = readl(host->base + JZ_REG_MMC_RXFIFO);
-			memcpy(sg_pointer, &d, i);
+			memcpy(buf, &d, i);
 		}
-		data->bytes_xfered += sg->length;
+		data->bytes_xfered += miter.length;
 
-		flush_dcache_page(sg_page(sg));
+		/* This can go away once MIPS implements flush_kernel_dcache_page */
+		flush_dcache_page(miter.page);
 	}
+	sg_miter_stop(&miter);
 
 	status = readl(host->base + JZ_REG_MMC_STATUS);
 	if (status & JZ_MMC_STATUS_READ_ERROR_MASK)
@@ -380,6 +373,25 @@ err:
 		host->req->cmd->error = -EIO;
 		data->error = -EIO;
 	}
+}
+
+static void jz4740_mmc_timeout(unsigned long data)
+{
+	struct jz4740_mmc_host *host = (struct jz4740_mmc_host *)data;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+	if (!host->waiting) {
+		spin_unlock_irqrestore(&host->lock, flags);
+		return;
+	}
+
+	host->waiting = 0;
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	host->req->cmd->error = -ETIMEDOUT;
+	jz4740_mmc_request_done(host);
 }
 
 static irqreturn_t jz_mmc_irq_worker(int irq, void *devid)
