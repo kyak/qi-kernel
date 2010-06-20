@@ -120,7 +120,6 @@ static int jz4740_i2s_startup(struct snd_pcm_substream *substream,
 	if (dai->active)
 		return 0;
 
-
 	ctrl = jz4740_i2s_read(i2s, JZ_REG_AIC_CTRL);
 	ctrl |= JZ_AIC_CTRL_FLUSH;
 	jz4740_i2s_write(i2s, JZ_REG_AIC_CTRL, ctrl);
@@ -149,7 +148,6 @@ static void jz4740_i2s_shutdown(struct snd_pcm_substream *substream,
 
 	clk_disable(i2s->clk_i2s);
 }
-
 
 static int jz4740_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	struct snd_soc_dai *dai)
@@ -293,7 +291,6 @@ static int jz4740_i2s_hw_params(struct snd_pcm_substream *substream,
 		pcm_config = &i2s->pcm_config_capture;
 		pcm_config->dma_config.src_width = dma_width;
 	}
-
 
 	snd_soc_dai_set_dma_data(dai, substream, pcm_config);
 
