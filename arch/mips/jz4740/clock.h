@@ -62,6 +62,7 @@ struct clk {
 
 #define JZ4740_CLK_NOT_GATED ((uint32_t)-1)
 
+void clk_pll_init(unsigned int clock);
 int clk_is_enabled(struct clk *clk);
 
 #ifdef CONFIG_DEBUG_FS

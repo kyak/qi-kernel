@@ -1,5 +1,7 @@
 /*
+ *  Copyright (c) 2006-2007, Ingenic Semiconductor Inc.
  *  Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
+ *  Copyright (c) 2010, Ulrich Hecht <ulrich.hecht@gmail.com>
  *  JZ4740 SoC clock support
  *
  *  This program is free software; you can redistribute	 it and/or modify it
@@ -90,6 +92,7 @@
 #define JZ_CLOCK_PLL_M_OFFSET		23
 #define JZ_CLOCK_PLL_N_OFFSET		18
 #define JZ_CLOCK_PLL_OD_OFFSET		16
+#define JZ_CLOCK_PLL_STABILIZE_OFFSET	0
 
 #define JZ_CLOCK_LOW_POWER_MODE_DOZE BIT(2)
 #define JZ_CLOCK_LOW_POWER_MODE_SLEEP BIT(0)
@@ -97,9 +100,14 @@
 #define JZ_CLOCK_SLEEP_CTRL_SUSPEND_UHC BIT(7)
 #define JZ_CLOCK_SLEEP_CTRL_ENABLE_UDC BIT(6)
 
+#define JZ_REG_EMC_RTCNT	0x88
+#define JZ_REG_EMC_RTCOR	0x8C
+
 static void __iomem *jz_clock_base;
 static spinlock_t jz_clock_lock;
 static LIST_HEAD(jz_clocks);
+
+static void __iomem *jz_emc_base;
 
 struct main_clk {
 	struct clk clk;
@@ -810,6 +818,99 @@ void clk_put(struct clk *clk)
 }
 EXPORT_SYMBOL_GPL(clk_put);
 
+#define SDRAM_TREF 15625   /* Refresh period: 4096 refresh cycles/64ms */
+
+static unsigned int sdram_convert(unsigned int pllin)
+{
+	unsigned int ns, ret;
+
+	ns = 1000000000 / pllin;
+	ret = (SDRAM_TREF / ns) / 64 + 1;
+	if (ret > 0xff) ret = 0xff;
+	return ret;
+}
+
+void clk_pll_init(unsigned int clock)
+{
+	unsigned int cfcr, plcr1;
+	unsigned int sdramclock;
+	unsigned int tmp = 0;
+	unsigned int wait =
+		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
+	int n2FR[33] = {
+		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
+		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+		9
+	};
+	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
+	int nf, pllout2;
+
+	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
+		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(n2FR[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(n2FR[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
+		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
+
+	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? clock : (clock / 2);
+
+	/* Init UHC clock */
+	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
+
+	nf = clock * 2 / jz_clk_ext.rate;
+	plcr1 = ((nf - 2) << JZ_CLOCK_PLL_M_OFFSET) |	  /* FD */
+		(0 << JZ_CLOCK_PLL_N_OFFSET) |		  /* RD=0, NR=2 */
+		(0 << JZ_CLOCK_PLL_OD_OFFSET) |		  /* OD=0, NO=1 */
+		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) | /* PLL stable time */
+		JZ_CLOCK_PLL_ENABLED;			  /* enable PLL */
+
+	sdramclock = sdram_convert(clock);
+	if (sdramclock > 0) {
+		/* Set refresh registers */
+		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCOR);
+		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
+	} else {
+		BUG();
+	}
+
+	/* init PLL */
+	/* delay loops lifted from the old Ingenic cpufreq driver */
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".align 5\n"
+		"sw %1,0(%0)\n\t"
+		"li %3,0\n\t"
+		"1:\n\t"
+		"bne %3,%2,1b\n\t"
+		"addi %3, 1\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		".set reorder\n\t"
+		:
+		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (cfcr),
+		  "r" (wait), "r" (tmp));
+
+	/* LCD pixclock */
+	writel(clock / 12000000 / 2 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
+
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".align 5\n"
+		"sw %1,0(%0)\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		".set reorder\n\t"
+		:
+		: "r" (jz_clock_base + JZ_REG_CLOCK_PLL), "r" (plcr1));
+}
+
 
 static inline void clk_add(struct clk *clk)
 {
@@ -891,6 +992,10 @@ int jz4740_clock_init(void)
 
 	jz_clock_base = ioremap(CPHYSADDR(JZ4740_CPM_BASE_ADDR), 0x100);
 	if (!jz_clock_base)
+		return -EBUSY;
+
+	jz_emc_base = ioremap(CPHYSADDR(JZ4740_EMC_BASE_ADDR), 0x100);
+	if (!jz_emc_base)
 		return -EBUSY;
 
 	spin_lock_init(&jz_clock_lock);
