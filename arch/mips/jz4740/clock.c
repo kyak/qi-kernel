@@ -598,17 +598,7 @@ static const struct clk_ops jz_clk_divided_ops = {
 };
 
 static struct divided_clk jz4740_clock_divided_clks[] = {
-	{
-		.clk = {
-			.name = "lcd_pclk",
-			.parent = &jz_clk_pll_half,
-			.gate_bit = JZ4740_CLK_NOT_GATED,
-			.ops = &jz_clk_divided_ops,
-		},
-		.reg = JZ_REG_CLOCK_LCD,
-		.mask = JZ_CLOCK_LCD_DIV_MASK,
-	},
-	{
+	[0] = {
 		.clk = {
 			.name = "i2s",
 			.parent = &jz_clk_ext.clk,
@@ -618,7 +608,7 @@ static struct divided_clk jz4740_clock_divided_clks[] = {
 		.reg = JZ_REG_CLOCK_I2S,
 		.mask = JZ_CLOCK_I2S_DIV_MASK,
 	},
-	{
+	[1] = {
 		.clk = {
 			.name = "spi",
 			.parent = &jz_clk_ext.clk,
@@ -628,7 +618,17 @@ static struct divided_clk jz4740_clock_divided_clks[] = {
 		.reg = JZ_REG_CLOCK_SPI,
 		.mask = JZ_CLOCK_SPI_DIV_MASK,
 	},
-	{
+	[2] = {
+		.clk = {
+			.name = "lcd_pclk",
+			.parent = &jz_clk_pll_half,
+			.gate_bit = JZ4740_CLK_NOT_GATED,
+			.ops = &jz_clk_divided_ops,
+		},
+		.reg = JZ_REG_CLOCK_LCD,
+		.mask = JZ_CLOCK_LCD_DIV_MASK,
+	},
+	[3] = {
 		.clk = {
 			.name = "mmc",
 			.parent = &jz_clk_pll_half,
@@ -638,7 +638,7 @@ static struct divided_clk jz4740_clock_divided_clks[] = {
 		.reg = JZ_REG_CLOCK_MMC,
 		.mask = JZ_CLOCK_MMC_DIV_MASK,
 	},
-	{
+	[4] = {
 		.clk = {
 			.name = "uhc",
 			.parent = &jz_clk_pll_half,
@@ -666,48 +666,48 @@ static const struct clk_ops jz_clk_simple_ops = {
 };
 
 static struct clk jz4740_clock_simple_clks[] = {
-	{
+	[0] = {
 		.name = "udc",
 		.parent = &jz_clk_ext.clk,
 		.ops = &jz_clk_udc_ops,
 	},
-	{
+	[1] = {
 		.name = "uart0",
 		.parent = &jz_clk_ext.clk,
 		.gate_bit = JZ_CLOCK_GATE_UART0,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[2] = {
 		.name = "uart1",
 		.parent = &jz_clk_ext.clk,
 		.gate_bit = JZ_CLOCK_GATE_UART1,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[3] = {
 		.name = "dma",
 		.parent = &jz_clk_high_speed_peripheral.clk,
 		.gate_bit = JZ_CLOCK_GATE_UART0,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[4] = {
 		.name = "ipu",
 		.parent = &jz_clk_high_speed_peripheral.clk,
 		.gate_bit = JZ_CLOCK_GATE_IPU,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[5] = {
 		.name = "adc",
 		.parent = &jz_clk_ext.clk,
 		.gate_bit = JZ_CLOCK_GATE_ADC,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[6] = {
 		.name = "i2c",
 		.parent = &jz_clk_ext.clk,
 		.gate_bit = JZ_CLOCK_GATE_I2C,
 		.ops = &jz_clk_simple_ops,
 	},
-	{
+	[7] = {
 		.name = "aic",
 		.parent = &jz_clk_ext.clk,
 		.gate_bit = JZ_CLOCK_GATE_AIC,
