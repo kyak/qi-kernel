@@ -779,13 +779,17 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
 	int ret;
+	int enabled;
 
 	if (!clk->ops->set_parent)
 		return -EINVAL;
 
-	clk_disable(clk);
+	enabled = clk_is_enabled(clk);
+	if (enabled)
+		clk_disable(clk);
 	ret = clk->ops->set_parent(clk, parent);
-	clk_enable(clk);
+	if (enabled)
+		clk_enable(clk);
 
 	jz4740_clock_debugfs_update_parent(clk);
 
