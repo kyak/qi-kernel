@@ -35,6 +35,7 @@ struct jz4740_freq_percpu_info {
 	struct cpufreq_frequency_table table[12];
 };
 
+static struct clk *pll;
 static struct clk *cclk;
 
 static struct jz4740_freq_percpu_info jz4740_freq_table;
@@ -66,9 +67,7 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 	dprintk(KERN_INFO "%s: cclk %p, setting to %d\n", __FUNCTION__, cclk,
 	        table[new_index].frequency);
 
-	clk_pll_init(table[new_index].frequency * 1000);
-
-	return 0;
+	return clk_set_rate(pll, table[new_index].frequency * 1000);
 }
 
 static int jz4740_freq_verify(struct cpufreq_policy *policy)
@@ -80,6 +79,7 @@ static int jz4740_freq_verify(struct cpufreq_policy *policy)
 static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 {
 	struct cpufreq_frequency_table *table =	&jz4740_freq_table.table[0];
+	int ret;
 	int i;
 
 	dprintk(KERN_INFO "Jz4740 cpufreq driver\n");
@@ -87,9 +87,17 @@ static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 	if (policy->cpu != 0)
 		return -EINVAL;
 
+	pll = clk_get(NULL, "pll");
+	if (IS_ERR(pll)) {
+		ret = PTR_ERR(pll);
+		goto err_exit;
+	}
+
 	cclk = clk_get(NULL, "cclk");
-	if (IS_ERR(cclk))
-		return PTR_ERR(cclk);
+	if (IS_ERR(cclk)) {
+		ret = PTR_ERR(cclk);
+		goto err_clk_put_pll;
+	}
 
 	/* FIXME: These hardcoded numbers should be board-specific, I guess. */
 	policy->cur = 336000; /* in kHz */
@@ -113,6 +121,11 @@ static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 #endif
 
 	return cpufreq_frequency_table_cpuinfo(policy, table);
+
+err_clk_put_pll:
+	clk_put(pll);
+err_exit:
+	return ret;
 }
 
 static struct cpufreq_driver cpufreq_jz4740_driver = {

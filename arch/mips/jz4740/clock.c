@@ -243,6 +243,104 @@ static unsigned long jz_clk_pll_half_get_rate(struct clk *clk)
 	return jz_clk_pll_get_rate(clk->parent) >> 1;
 }
 
+#define SDRAM_TREF 15625   /* Refresh period: 4096 refresh cycles/64ms */
+
+static unsigned int sdram_convert(unsigned int pllin)
+{
+	unsigned int ns, ret;
+
+	ns = 1000000000 / pllin;
+	ret = (SDRAM_TREF / ns) / 64 + 1;
+	if (ret > 0xff) ret = 0xff;
+	return ret;
+}
+
+static struct main_clk jz_clk_cpu;
+static struct static_clk jz_clk_ext;
+
+static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
+{
+	unsigned int cfcr, plcr1;
+	unsigned int sdramclock;
+	unsigned int tmp = 0;
+	unsigned int wait =
+		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
+	int n2FR[33] = {
+		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
+		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+		9
+	};
+	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
+	int nf, pllout2;
+
+	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
+		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(n2FR[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(n2FR[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
+		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
+
+	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? rate : (rate / 2);
+
+	/* Init UHC clock */
+	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
+
+	nf = rate * 2 / jz_clk_ext.rate;
+	plcr1 = ((nf - 2) << JZ_CLOCK_PLL_M_OFFSET) |	  /* FD */
+		(0 << JZ_CLOCK_PLL_N_OFFSET) |		  /* RD=0, NR=2 */
+		(0 << JZ_CLOCK_PLL_OD_OFFSET) |		  /* OD=0, NO=1 */
+		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) | /* PLL stable time */
+		JZ_CLOCK_PLL_ENABLED;			  /* enable PLL */
+
+	sdramclock = sdram_convert(rate);
+	if (sdramclock > 0) {
+		/* Set refresh registers */
+		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCOR);
+		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
+	} else {
+		BUG();
+	}
+
+	/* init PLL */
+	/* delay loops lifted from the old Ingenic cpufreq driver */
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".align 5\n"
+		"sw %1,0(%0)\n\t"
+		"li %3,0\n\t"
+		"1:\n\t"
+		"bne %3,%2,1b\n\t"
+		"addi %3, 1\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		".set reorder\n\t"
+		:
+		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (cfcr),
+		  "r" (wait), "r" (tmp));
+
+	/* LCD pixclock */
+	writel(rate / 12000000 / 2 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
+
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".align 5\n"
+		"sw %1,0(%0)\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		".set reorder\n\t"
+		:
+		: "r" (jz_clock_base + JZ_REG_CLOCK_PLL), "r" (plcr1));
+
+	return 0;
+}
+
 static const int jz_clk_main_divs[] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
 
 static unsigned long jz_clk_main_round_rate(struct clk *clk, unsigned long rate)
@@ -315,6 +413,7 @@ static struct static_clk jz_clk_ext = {
 
 static struct clk_ops jz_clk_pll_ops = {
 	.get_rate = jz_clk_pll_get_rate,
+	.set_rate = jz_clk_pll_set_rate,
 };
 
 static struct clk jz_clk_pll = {
@@ -821,99 +920,6 @@ void clk_put(struct clk *clk)
 {
 }
 EXPORT_SYMBOL_GPL(clk_put);
-
-#define SDRAM_TREF 15625   /* Refresh period: 4096 refresh cycles/64ms */
-
-static unsigned int sdram_convert(unsigned int pllin)
-{
-	unsigned int ns, ret;
-
-	ns = 1000000000 / pllin;
-	ret = (SDRAM_TREF / ns) / 64 + 1;
-	if (ret > 0xff) ret = 0xff;
-	return ret;
-}
-
-void clk_pll_init(unsigned int clock)
-{
-	unsigned int cfcr, plcr1;
-	unsigned int sdramclock;
-	unsigned int tmp = 0;
-	unsigned int wait =
-		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
-	int n2FR[33] = {
-		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
-		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
-		9
-	};
-	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
-	int nf, pllout2;
-
-	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
-		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
-		(n2FR[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
-		(n2FR[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
-		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
-		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
-
-	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? clock : (clock / 2);
-
-	/* Init UHC clock */
-	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
-
-	nf = clock * 2 / jz_clk_ext.rate;
-	plcr1 = ((nf - 2) << JZ_CLOCK_PLL_M_OFFSET) |	  /* FD */
-		(0 << JZ_CLOCK_PLL_N_OFFSET) |		  /* RD=0, NR=2 */
-		(0 << JZ_CLOCK_PLL_OD_OFFSET) |		  /* OD=0, NO=1 */
-		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) | /* PLL stable time */
-		JZ_CLOCK_PLL_ENABLED;			  /* enable PLL */
-
-	sdramclock = sdram_convert(clock);
-	if (sdramclock > 0) {
-		/* Set refresh registers */
-		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCOR);
-		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
-	} else {
-		BUG();
-	}
-
-	/* init PLL */
-	/* delay loops lifted from the old Ingenic cpufreq driver */
-	__asm__ __volatile__(
-		".set noreorder\n\t"
-		".align 5\n"
-		"sw %1,0(%0)\n\t"
-		"li %3,0\n\t"
-		"1:\n\t"
-		"bne %3,%2,1b\n\t"
-		"addi %3, 1\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		".set reorder\n\t"
-		:
-		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (cfcr),
-		  "r" (wait), "r" (tmp));
-
-	/* LCD pixclock */
-	writel(clock / 12000000 / 2 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
-
-	__asm__ __volatile__(
-		".set noreorder\n\t"
-		".align 5\n"
-		"sw %1,0(%0)\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		".set reorder\n\t"
-		:
-		: "r" (jz_clock_base + JZ_REG_CLOCK_PLL), "r" (plcr1));
-}
 
 
 static inline void clk_add(struct clk *clk)
