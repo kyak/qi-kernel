@@ -306,7 +306,7 @@ static struct static_clk jz_clk_ext = {
 };
 
 static struct clk_ops jz_clk_pll_ops = {
-	.get_rate = jz_clk_static_get_rate,
+	.get_rate = jz_clk_pll_get_rate,
 };
 
 static struct clk jz_clk_pll = {
