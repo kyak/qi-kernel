@@ -222,7 +222,7 @@ static unsigned long jz_clk_pll_get_rate(struct clk *clk)
 	n = ((val >> 18) & 0x1f) + 2;
 	od = (val >> 16) & 0x3;
 
-	return clk_get_rate(clk->parent) * (m / n) / pllno[od];
+	return ((clk_get_rate(clk->parent) / n) * m) / pllno[od];
 }
 
 static unsigned long jz_clk_pll_half_get_rate(struct clk *clk)
