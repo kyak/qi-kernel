@@ -277,8 +277,8 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 	/* The frequency after the input divider must be between 1 and 15 MHz.
 	   The highest divider yields the best resolution. */
 	inputDiv = jz_clk_ext.rate / 1000000;
-	if (inputDiv >= 32)
-		inputDiv = 31;
+	if (inputDiv >= 34)
+		inputDiv = 33;
 
 	/* The frequency before the output divider must be between 100 and
 	   500 MHz. The highest divider yields the best resolution. */
