@@ -40,6 +40,8 @@ static struct clk *cclk;
 
 static struct jz4740_freq_percpu_info jz4740_freq_table;
 
+static struct cpufreq_driver cpufreq_jz4740_driver;
+
 static unsigned int jz4740_freq_get(unsigned int cpu)
 {
 	return clk_get_rate(cclk) / 1000;
@@ -50,7 +52,9 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 			  unsigned int relation)
 {
 	struct cpufreq_frequency_table *table =	&jz4740_freq_table.table[0];
+	struct cpufreq_freqs freqs;
 	unsigned int new_index = 0;
+	int ret;
 
 	if (cpufreq_frequency_table_target(policy,
 					   &jz4740_freq_table.table[0],
@@ -60,14 +64,24 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 	dprintk(KERN_INFO "%s: target_freq %d new_index %d\n", __FUNCTION__,
 	        target_freq, new_index);
 
+	freqs = (struct cpufreq_freqs) {
+		.old = jz4740_freq_get(policy->cpu),
+		.new = table[new_index].frequency,
+		.cpu = policy->cpu,
+		.flags = cpufreq_jz4740_driver.flags,
+	};
+
 	/* Is there anything to do anyway? */
-	if (table[new_index].frequency == jz4740_freq_get(policy->cpu))
+	if (freqs.new == freqs.old)
 		return 0;
 
-	dprintk(KERN_INFO "%s: cclk %p, setting to %d\n", __FUNCTION__, cclk,
-	        table[new_index].frequency);
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	dprintk(KERN_INFO "%s: cclk %p, setting from %d to %d\n",
+		__FUNCTION__, cclk, freqs.old, freqs.new);
+	ret = clk_set_rate(pll, freqs.new * 1000);
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
-	return clk_set_rate(pll, table[new_index].frequency * 1000);
+	return ret;
 }
 
 static int jz4740_freq_verify(struct cpufreq_policy *policy)
