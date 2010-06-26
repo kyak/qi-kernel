@@ -2,6 +2,7 @@
  *  Copyright (c) 2006-2007, Ingenic Semiconductor Inc.
  *  Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
  *  Copyright (c) 2010, Ulrich Hecht <ulrich.hecht@gmail.com>
+ *  Copyright (c) 2010, Maarten ter Huurne <maarten@treewalker.org>
  *  JZ4740 SoC clock support
  *
  *  This program is free software; you can redistribute	 it and/or modify it
@@ -271,7 +272,39 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		9
 	};
 	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
-	int nf, pllout2;
+	unsigned int feedback, inputDiv, outputDiv, target, pllout, pllout2;
+
+	/* The frequency after the input divider must be between 1 and 15 MHz.
+	   The highest divider yields the best resolution. */
+	inputDiv = jz_clk_ext.rate / 1000000;
+	if (inputDiv >= 32)
+		inputDiv = 31;
+
+	/* The frequency before the output divider must be between 100 and
+	   500 MHz. The highest divider yields the best resolution. */
+	if (rate < 25000000) {
+		return -EINVAL;
+	} else if (rate <= 125000000) {
+		outputDiv = 4;
+		target = rate * 4;
+	} else if (rate <= 250000000) {
+		outputDiv = 2;
+		target = rate * 2;
+	} else if (rate <= 500000000) {
+		outputDiv = 1;
+		target = rate;
+	} else {
+		return -EINVAL;
+	}
+
+	/* Compute the feedback divider.
+	   Since the divided input is at least 1 MHz and the target frequency
+	   at most 500 MHz, the feedback will be at most 500 and will therefore
+	   always fit in the 9-bit register.
+	   Similarly, the divided input is at most 15 MHz and the target
+	   frequency at least 100 MHz, so the feedback will be at least 6
+	   where the minimum supported value is 2. */
+	feedback = ((target / 1000) * inputDiv) / (jz_clk_ext.rate / 1000);
 
 	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
 		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
@@ -280,17 +313,17 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
 		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
 
-	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? rate : (rate / 2);
+	pllout = ((jz_clk_ext.rate / inputDiv) * feedback) / outputDiv;
+	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? pllout : (pllout / 2);
 
 	/* Init UHC clock */
 	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
 
-	nf = rate * 2 / jz_clk_ext.rate;
-	plcr1 = ((nf - 2) << JZ_CLOCK_PLL_M_OFFSET) |	  /* FD */
-		(0 << JZ_CLOCK_PLL_N_OFFSET) |		  /* RD=0, NR=2 */
-		(0 << JZ_CLOCK_PLL_OD_OFFSET) |		  /* OD=0, NO=1 */
-		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) | /* PLL stable time */
-		JZ_CLOCK_PLL_ENABLED;			  /* enable PLL */
+	plcr1 = ((feedback - 2) << JZ_CLOCK_PLL_M_OFFSET) |
+		((inputDiv - 2) << JZ_CLOCK_PLL_N_OFFSET) |
+		((outputDiv - 1) << JZ_CLOCK_PLL_OD_OFFSET) |
+		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) |
+		JZ_CLOCK_PLL_ENABLED;
 
 	sdramclock = sdram_convert(rate);
 	if (sdramclock > 0) {
