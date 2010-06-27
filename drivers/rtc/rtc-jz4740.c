@@ -1,14 +1,14 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *		JZ4720/JZ4740 SoC RTC driver
+ *	JZ4740 SoC RTC driver
  *
- *  This program is free software; you can redistribute	 it and/or modify it
- *  under  the terms of	 the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the	License, or (at your
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under  the terms of  the GNU General Public License as published by the
+ *  Free Software Foundation;  either version 2 of the License, or (at your
  *  option) any later version.
  *
- *  You should have received a copy of the  GNU General Public License along
- *  with this program; if not, write  to the Free Software Foundation, Inc.,
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
@@ -60,14 +60,14 @@ static inline void jz4740_rtc_wait_write_ready(struct jz4740_rtc *rtc)
 }
 
 static inline void jz4740_rtc_reg_write(struct jz4740_rtc *rtc, size_t reg,
-					uint32_t val)
+	uint32_t val)
 {
 	jz4740_rtc_wait_write_ready(rtc);
 	writel(val, rtc->base + reg);
 }
 
 static void jz4740_rtc_ctrl_set_bits(struct jz4740_rtc *rtc, uint32_t mask,
-					uint32_t val)
+	uint32_t val)
 {
 	unsigned long flags;
 	uint32_t ctrl;
@@ -221,7 +221,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	rtc = kmalloc(sizeof(*rtc), GFP_KERNEL);
 
 	rtc->irq = platform_get_irq(pdev, 0);
-
 	if (rtc->irq < 0) {
 		ret = -ENOENT;
 		dev_err(&pdev->dev, "Failed to get platform irq\n");
@@ -256,7 +255,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc = rtc_device_register(pdev->name, &pdev->dev, &jz4740_rtc_ops,
 					THIS_MODULE);
-
 	if (IS_ERR(rtc->rtc)) {
 		ret = PTR_ERR(rtc->rtc);
 		dev_err(&pdev->dev, "Failed to register rtc device: %d\n", ret);
