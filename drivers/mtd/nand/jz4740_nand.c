@@ -1,14 +1,14 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *	JZ4740 SoC NAND controller driver
+ *  JZ4740 SoC NAND controller driver
  *
- *  This program is free software; you can redistribute	 it and/or modify it
- *  under  the terms of	 the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the	License, or (at your
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under  the terms of the GNU General  Public License as published by the
+ *  Free Software Foundation;  either version 2 of the License, or (at your
  *  option) any later version.
  *
- *  You should have received a copy of the  GNU General Public License along
- *  with this program; if not, write  to the Free Software Foundation, Inc.,
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
@@ -108,7 +108,6 @@ static void jz_nand_hwctl(struct mtd_info *mtd, int mode)
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	uint32_t reg;
 
-
 	writel(0, nand->base + JZ_REG_NAND_IRQ_STAT);
 	reg = readl(nand->base + JZ_REG_NAND_ECC_CTRL);
 
@@ -131,7 +130,6 @@ static void jz_nand_hwctl(struct mtd_info *mtd, int mode)
 
 	writel(reg, nand->base + JZ_REG_NAND_ECC_CTRL);
 }
-
 
 static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
 	uint8_t *ecc_code)
@@ -164,27 +162,19 @@ static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
 	return 0;
 }
 
-/*#define printkd printk*/
-#define printkd(...)
-
 static void correct_data(uint8_t *dat, int index, int mask)
 {
 	int offset = index & 0x7;
 	uint16_t data;
-	printkd("correct: ");
 
 	index += (index >> 3);
 
 	data = dat[index];
 	data |= dat[index+1] << 8;
 
-	printkd("0x%x -> ", data);
-
 	mask ^= (data >> offset) & 0x1ff;
 	data &= ~(0x1ff << offset);
 	data |= (mask << offset);
-
-	printkd("0x%x\n", data);
 
 	dat[index] = data & 0xff;
 	dat[index+1] = (data >> 8) & 0xff;
@@ -232,21 +222,10 @@ static int jz_nand_correct_ecc_rs(struct mtd_info *mtd, uint8_t *dat,
 	writel(reg, nand->base + JZ_REG_NAND_ECC_CTRL);
 
 	if (status & JZ_NAND_STATUS_ERROR) {
-		if (status & JZ_NAND_STATUS_UNCOR_ERROR) {
-			printkd("uncorrectable ecc:");
-			for (i = 0; i < 9; ++i)
-				printkd(" 0x%x", read_ecc[i]);
-			printkd("\n");
-			printkd("uncorrectable data:");
-			for (i = 0; i < 32; ++i)
-				printkd(" 0x%x", dat[i]);
-			printkd("\n");
+		if (status & JZ_NAND_STATUS_UNCOR_ERROR)
 			return -1;
-		}
 
 		error_count = (status & JZ_NAND_STATUS_ERR_COUNT) >> 29;
-
-		printkd("error_count: %d %x\n", error_count, status);
 
 		for (i = 0; i < error_count; ++i) {
 			error = readl(nand->base + JZ_REG_NAND_ERR(i));
@@ -294,7 +273,6 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 
 	nand->mem = request_mem_region(nand->mem->start,
 					resource_size(nand->mem), pdev->name);
-
 	if (!nand->mem) {
 		dev_err(&pdev->dev, "Failed to request mmio memory region\n");
 		ret = -EBUSY;
@@ -302,7 +280,6 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	}
 
 	nand->base = ioremap(nand->mem->start, resource_size(nand->mem));
-
 	if (!nand->base) {
 		dev_err(&pdev->dev, "Failed to ioremap mmio memory region\n");
 		ret = -EBUSY;
@@ -401,23 +378,24 @@ err_free:
 	return ret;
 }
 
-static void __devexit jz_nand_remove(struct platform_device *pdev)
+static int __devexit jz_nand_remove(struct platform_device *pdev)
 {
 	struct jz_nand *nand = platform_get_drvdata(pdev);
 
 	nand_release(&nand->mtd);
 
 	iounmap(nand->base);
-
 	release_mem_region(nand->mem->start, resource_size(nand->mem));
 
 	platform_set_drvdata(pdev, NULL);
 	kfree(nand);
+
+	return 0;
 }
 
 struct platform_driver jz_nand_driver = {
 	.probe = jz_nand_probe,
-	.remove = __devexit_p(jz_nand_probe),
+	.remove = __devexit_p(jz_nand_remove),
 	.driver = {
 		.name = "jz4740-nand",
 		.owner = THIS_MODULE,
