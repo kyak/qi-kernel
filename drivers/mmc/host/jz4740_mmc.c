@@ -24,10 +24,12 @@
 #include <linux/clk.h>
 #include <linux/mmc/jz4740_mmc.h>
 
+#include <linux/bitops.h>
 #include <linux/gpio.h>
 #include <asm/mach-jz4740/gpio.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
+
 
 #define JZ_REG_MMC_STRPCL	0x00
 #define JZ_REG_MMC_STATUS	0x04
@@ -186,7 +188,7 @@ static void jz4740_mmc_request_done(struct jz4740_mmc_host *host)
 	spin_lock_irqsave(&host->lock, flags);
 	req = host->req;
 	host->req = NULL;
-	host->waiting = 0;
+	clear_bit(0, &host->waiting);
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	if (!unlikely(req))
@@ -371,17 +373,9 @@ err_timeout:
 static void jz4740_mmc_timeout(unsigned long data)
 {
 	struct jz4740_mmc_host *host = (struct jz4740_mmc_host *)data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&host->lock, flags);
-	if (!host->waiting) {
-		spin_unlock_irqrestore(&host->lock, flags);
+	if (!test_and_clear_bit(0, &host->waiting))
 		return;
-	}
-
-	host->waiting = 0;
-
-	spin_unlock_irqrestore(&host->lock, flags);
 
 	host->req->cmd->error = -ETIMEDOUT;
 	jz4740_mmc_request_done(host);
@@ -427,14 +421,8 @@ static irqreturn_t jz_mmc_irq(int irq, void *devid)
 	if (!host->req || !host->cmd)
 		goto handled;
 
-	spin_lock_irqsave(&host->lock, flags);
-	if (!host->waiting) {
-		spin_unlock_irqrestore(&host->lock, flags);
+	if (!test_and_clear_bit(0, &host->waiting))
 		goto handled;
-	}
-
-	host->waiting = 0;
-	spin_unlock_irqrestore(&host->lock, flags);
 
 	del_timer(&host->timeout_timer);
 
@@ -548,7 +536,7 @@ static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
 	writel(cmd->arg, host->base + JZ_REG_MMC_ARG);
 	writel(cmdat, host->base + JZ_REG_MMC_CMDAT);
 
-	host->waiting = 1;
+	set_bit(0, &host->waiting);
 	jz4740_mmc_clock_enable(host, 1);
 	mod_timer(&host->timeout_timer, jiffies + 5*HZ);
 }
