@@ -1,14 +1,14 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *		JZ4720/JZ4740 SoC RTC driver
+ *  JZ4740 SoC RTC driver
  *
- *  This program is free software; you can redistribute	 it and/or modify it
- *  under  the terms of	 the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the	License, or (at your
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under  the terms of  the GNU General Public License as published by the
+ *  Free Software Foundation;  either version 2 of the License, or (at your
  *  option) any later version.
  *
- *  You should have received a copy of the  GNU General Public License along
- *  with this program; if not, write  to the Free Software Foundation, Inc.,
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
@@ -51,25 +51,33 @@ static inline uint32_t jz4740_rtc_reg_read(struct jz4740_rtc *rtc, size_t reg)
 	return readl(rtc->base + reg);
 }
 
-static inline void jz4740_rtc_wait_write_ready(struct jz4740_rtc *rtc)
+static int jz4740_rtc_wait_write_ready(struct jz4740_rtc *rtc)
 {
 	uint32_t ctrl;
+	int timeout = 1000;
+
 	do {
 		ctrl = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_CTRL);
-	} while (!(ctrl & JZ_RTC_CTRL_WRDY));
+	} while (!(ctrl & JZ_RTC_CTRL_WRDY) && --timeout);
+
+	return timeout ? 0 : -EIO;
 }
 
-
-static inline void jz4740_rtc_reg_write(struct jz4740_rtc *rtc, size_t reg,
-					uint32_t val)
+static inline int jz4740_rtc_reg_write(struct jz4740_rtc *rtc, size_t reg,
+	uint32_t val)
 {
-	jz4740_rtc_wait_write_ready(rtc);
-	writel(val, rtc->base + reg);
+	int ret;
+	ret = jz4740_rtc_wait_write_ready(rtc);
+	if (ret == 0)
+		writel(val, rtc->base + reg);
+
+	return ret;
 }
 
-static void jz4740_rtc_ctrl_set_bits(struct jz4740_rtc *rtc, uint32_t mask,
-					uint32_t val)
+static int jz4740_rtc_ctrl_set_bits(struct jz4740_rtc *rtc, uint32_t mask,
+	bool set)
 {
+	int ret;
 	unsigned long flags;
 	uint32_t ctrl;
 
@@ -80,31 +88,38 @@ static void jz4740_rtc_ctrl_set_bits(struct jz4740_rtc *rtc, uint32_t mask,
 	/* Don't clear interrupt flags by accident */
 	ctrl |= JZ_RTC_CTRL_1HZ | JZ_RTC_CTRL_AF;
 
-	ctrl &= ~mask;
-	ctrl |= val;
+	if (set)
+		ctrl |= mask;
+	else
+		ctrl &= ~mask;
 
-	jz4740_rtc_reg_write(rtc, JZ_REG_RTC_CTRL, ctrl);
+	ret = jz4740_rtc_reg_write(rtc, JZ_REG_RTC_CTRL, ctrl);
 
 	spin_unlock_irqrestore(&rtc->lock, flags);
-}
 
-static inline struct jz4740_rtc *dev_to_rtc(struct device *dev)
-{
-	return dev_get_drvdata(dev);
+	return ret;
 }
 
 static int jz4740_rtc_read_time(struct device *dev, struct rtc_time *time)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	uint32_t secs, secs2;
+	int timeout = 5;
 
+	/* If the seconds register is read while it is updated, it can contain a
+	 * bogus value. This can be avoided by making sure that two consecutive
+	 * reads have the same value.
+	 */
 	secs = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 	secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 
-	while (secs != secs2) {
+	while (secs != secs2 && --timeout) {
 		secs = secs2;
 		secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC);
 	}
+
+	if (timeout == 0)
+		return -EIO;
 
 	rtc_time_to_tm(secs, time);
 
@@ -113,29 +128,18 @@ static int jz4740_rtc_read_time(struct device *dev, struct rtc_time *time)
 
 static int jz4740_rtc_set_mmss(struct device *dev, unsigned long secs)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 
-	if ((uint32_t)secs != secs)
-		return -EINVAL;
-
-	jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC, secs);
-
-	return 0;
+	return jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC, secs);
 }
 
 static int jz4740_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
-	uint32_t secs, secs2;
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
+	uint32_t secs;
 	uint32_t ctrl;
 
 	secs = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-	secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-
-	while (secs != secs2) {
-		secs = secs2;
-		secs2 = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SEC_ALARM);
-	}
 
 	ctrl = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_CTRL);
 
@@ -149,36 +153,29 @@ static int jz4740_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static int jz4740_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
+	int ret;
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
 	unsigned long secs;
 
 	rtc_tm_to_time(&alrm->time, &secs);
 
-	if ((uint32_t)secs != secs)
-		return -EINVAL;
+	ret = jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC_ALARM, secs);
+	if (!ret)
+		ret = jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_AE, alrm->enabled);
 
-	jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC_ALARM, (uint32_t)secs);
-	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_AE,
-					alrm->enabled ? JZ_RTC_CTRL_AE : 0);
-
-	return 0;
+	return ret;
 }
 
 static int jz4740_rtc_update_irq_enable(struct device *dev, unsigned int enable)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
-	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_1HZ_IRQ,
-					enable ? JZ_RTC_CTRL_1HZ_IRQ : 0);
-	return 0;
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
+	return jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_1HZ_IRQ, enable);
 }
-
 
 static int jz4740_rtc_alarm_irq_enable(struct device *dev, unsigned int enable)
 {
-	struct jz4740_rtc *rtc = dev_to_rtc(dev);
-	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_AF_IRQ,
-					enable ? JZ_RTC_CTRL_AF_IRQ : 0);
-	return 0;
+	struct jz4740_rtc *rtc = dev_get_drvdata(dev);
+	return jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_AF_IRQ, enable);
 }
 
 static struct rtc_class_ops jz4740_rtc_ops = {
@@ -195,6 +192,7 @@ static irqreturn_t jz4740_rtc_irq(int irq, void *data)
 	struct jz4740_rtc *rtc = data;
 	uint32_t ctrl;
 	unsigned long events = 0;
+
 	ctrl = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_CTRL);
 
 	if (ctrl & JZ_RTC_CTRL_1HZ)
@@ -205,7 +203,7 @@ static irqreturn_t jz4740_rtc_irq(int irq, void *data)
 
 	rtc_update_irq(rtc->rtc, 1, events);
 
-	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_1HZ | JZ_RTC_CTRL_AF, 0);
+	jz4740_rtc_ctrl_set_bits(rtc, JZ_RTC_CTRL_1HZ | JZ_RTC_CTRL_AF, false);
 
 	return IRQ_HANDLED;
 }
@@ -223,10 +221,11 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	struct jz4740_rtc *rtc;
 	uint32_t scratchpad;
 
-	rtc = kmalloc(sizeof(*rtc), GFP_KERNEL);
+	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
+	if (!rtc)
+		return -ENOMEM;
 
 	rtc->irq = platform_get_irq(pdev, 0);
-
 	if (rtc->irq < 0) {
 		ret = -ENOENT;
 		dev_err(&pdev->dev, "Failed to get platform irq\n");
@@ -242,7 +241,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	rtc->mem = request_mem_region(rtc->mem->start, resource_size(rtc->mem),
 					pdev->name);
-
 	if (!rtc->mem) {
 		ret = -EBUSY;
 		dev_err(&pdev->dev, "Failed to request mmio memory region\n");
@@ -250,7 +248,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	}
 
 	rtc->base = ioremap_nocache(rtc->mem->start, resource_size(rtc->mem));
-
 	if (!rtc->base) {
 		ret = -EBUSY;
 		dev_err(&pdev->dev, "Failed to ioremap mmio memory\n");
@@ -263,7 +260,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc = rtc_device_register(pdev->name, &pdev->dev, &jz4740_rtc_ops,
 					THIS_MODULE);
-
 	if (IS_ERR(rtc->rtc)) {
 		ret = PTR_ERR(rtc->rtc);
 		dev_err(&pdev->dev, "Failed to register rtc device: %d\n", ret);
@@ -272,7 +268,6 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	ret = request_irq(rtc->irq, jz4740_rtc_irq, 0,
 				pdev->name, rtc);
-
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request rtc irq: %d\n", ret);
 		goto err_unregister_rtc;
@@ -280,12 +275,18 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	scratchpad = jz4740_rtc_reg_read(rtc, JZ_REG_RTC_SCRATCHPAD);
 	if (scratchpad != 0x12345678) {
-		jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SCRATCHPAD, 0x12345678);
-		jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC, 0);
+		ret = jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SCRATCHPAD, 0x12345678);
+		ret = jz4740_rtc_reg_write(rtc, JZ_REG_RTC_SEC, 0);
+		if (ret) {
+			dev_err(&pdev->dev, "Could not write write to RTC registers\n");
+			goto err_free_irq;
+		}
 	}
 
 	return 0;
 
+err_free_irq:
+	free_irq(rtc->irq, rtc);
 err_unregister_rtc:
 	rtc_device_unregister(rtc->rtc);
 err_iounmap:
@@ -340,5 +341,5 @@ module_exit(jz4740_rtc_exit);
 
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("RTC driver for the JZ4720/JZ4740 SoC\n");
+MODULE_DESCRIPTION("RTC driver for the JZ4740 SoC\n");
 MODULE_ALIAS("platform:jz4740-rtc");

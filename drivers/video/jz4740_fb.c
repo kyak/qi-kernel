@@ -1,14 +1,14 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *		JZ4740 SoC LCD framebuffer driver
+ *	JZ4740 SoC LCD framebuffer driver
  *
- *  This program is free software; you can redistribute	 it and/or modify it
- *  under  the terms of	 the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the	License, or (at your
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under  the terms of  the GNU General Public License as published by the
+ *  Free Software Foundation;  either version 2 of the License, or (at your
  *  option) any later version.
  *
- *  You should have received a copy of the  GNU General Public License along
- *  with this program; if not, write  to the Free Software Foundation, Inc.,
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
@@ -36,7 +36,7 @@ struct jzfb_framedesc {
 	uint32_t addr;
 	uint32_t id;
 	uint32_t cmd;
-} __attribute__((packed));
+} __packed;
 
 struct jzfb {
 	struct fb_info *fb;
@@ -60,7 +60,7 @@ struct jzfb {
 	uint32_t pseudo_palette[16];
 };
 
-static struct fb_fix_screeninfo jzfb_fix __devinitdata = {
+static const struct fb_fix_screeninfo jzfb_fix __devinitdata = {
 	.id		= "JZ4740 FB",
 	.type		= FB_TYPE_PACKED_PIXELS,
 	.visual		= FB_VISUAL_TRUECOLOR,
@@ -157,10 +157,10 @@ static int jzfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno >= 16)
 		return -EINVAL;
 
-	color = jzfb_convert_color_to_hw(red, fb->var.red.length);
-	color |= jzfb_convert_color_to_hw(green, fb->var.green.length);
-	color |= jzfb_convert_color_to_hw(blue, fb->var.blue.length);
-	color |= jzfb_convert_color_to_hw(transp, fb->var.transp.length);
+	color = jzfb_convert_color_to_hw(red, &fb->var.red);
+	color |= jzfb_convert_color_to_hw(green, &fb->var.green);
+	color |= jzfb_convert_color_to_hw(blue, &fb->var.blue);
+	color |= jzfb_convert_color_to_hw(transp, &fb->var.transp);
 
 	((uint32_t *)(fb->pseudo_palette))[regno] = color;
 
@@ -272,6 +272,9 @@ static int jzfb_set_par(struct fb_info *info)
 	if (mode == NULL)
 		return -EINVAL;
 
+	if (mode == info->mode)
+		return 0;
+
 	info->mode = mode;
 
 	hds = mode->hsync_len + mode->left_margin;
@@ -311,11 +314,8 @@ static int jzfb_set_par(struct fb_info *info)
 		break;
 	}
 
-	cfg = 0;
-	cfg |= JZ_LCD_CFG_PS_DISABLE;
-	cfg |= JZ_LCD_CFG_CLS_DISABLE;
-	cfg |= JZ_LCD_CFG_SPL_DISABLE;
-	cfg |= JZ_LCD_CFG_REV_DISABLE;
+	cfg = JZ_LCD_CFG_PS_DISABLE | JZ_LCD_CFG_CLS_DISABLE |
+		JZ_LCD_CFG_SPL_DISABLE | JZ_LCD_CFG_REV_DISABLE;
 
 	if (!(mode->sync & FB_SYNC_HOR_HIGH_ACT))
 		cfg |= JZ_LCD_CFG_HSYNC_ACTIVE_LOW;
@@ -366,6 +366,7 @@ static int jzfb_set_par(struct fb_info *info)
 
 	if (!jzfb->is_enabled)
 		clk_disable(jzfb->ldclk);
+
 	mutex_unlock(&jzfb->lock);
 
 	clk_set_rate(jzfb->lpclk, rate);
@@ -426,7 +427,6 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 		jzfb->is_enabled = 1;
 
 		mutex_unlock(&jzfb->lock);
-
 		break;
 	default:
 		mutex_lock(&jzfb->lock);
@@ -436,8 +436,8 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 		}
 
 		jzfb_disable(jzfb);
-
 		jzfb->is_enabled = 0;
+
 		mutex_unlock(&jzfb->lock);
 		break;
 	}
@@ -568,7 +568,6 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	}
 
 	jzfb->base = ioremap(mem->start, resource_size(mem));
-
 	if (!jzfb->base) {
 		dev_err(&pdev->dev, "Failed to ioremap register memory region\n");
 		ret = -EBUSY;
@@ -577,11 +576,11 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, jzfb);
 
+	mutex_init(&jzfb->lock);
+
 	fb_videomode_to_modelist(pdata->modes, pdata->num_modes,
 				 &fb->modelist);
-	fb->mode = pdata->modes;
-
-	fb_videomode_to_var(&fb->var, fb->mode);
+	fb_videomode_to_var(&fb->var, pdata->modes);
 	fb->var.bits_per_pixel = pdata->bpp;
 	jzfb_check_var(&fb->var, fb);
 
@@ -602,12 +601,12 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 
 	fb_alloc_cmap(&fb->cmap, 256, 0);
 
-	mutex_init(&jzfb->lock);
-
 	clk_enable(jzfb->ldclk);
 	jzfb->is_enabled = 1;
 
 	writel(jzfb->framedesc->next, jzfb->base + JZ_REG_LCD_DA0);
+
+	fb->mode = NULL;
 	jzfb_set_par(fb);
 
 	jz_gpio_bulk_request(jz_lcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
@@ -738,5 +737,5 @@ module_exit(jzfb_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
-MODULE_DESCRIPTION("JZ4720/JZ4740 SoC LCD framebuffer driver");
+MODULE_DESCRIPTION("JZ4740 SoC LCD framebuffer driver");
 MODULE_ALIAS("platform:jz4740-fb");
