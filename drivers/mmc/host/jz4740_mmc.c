@@ -439,9 +439,7 @@ static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
 	writel(cmd->arg, host->base + JZ_REG_MMC_ARG);
 	writel(cmdat, host->base + JZ_REG_MMC_CMDAT);
 
-	set_bit(0, &host->waiting);
 	jz4740_mmc_clock_enable(host, 1);
-	mod_timer(&host->timeout_timer, jiffies + 5*HZ);
 }
 
 
@@ -569,6 +567,9 @@ static void jz4740_mmc_request(struct mmc_host *mmc, struct mmc_request *req)
 
 	writew(JZ_MMC_IRQ_END_CMD_RES, host->base + JZ_REG_MMC_IREG);
 	jz4740_mmc_set_irq_enabled(host, JZ_MMC_IRQ_END_CMD_RES, true);
+
+	set_bit(0, &host->waiting);
+	mod_timer(&host->timeout_timer, jiffies + 5*HZ);
 	jz4740_mmc_send_command(host, req->cmd);
 }
 
