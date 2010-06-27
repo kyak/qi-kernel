@@ -831,8 +831,8 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 		}
 	}
 
-	ret = request_threaded_irq(host->irq, jz_mmc_irq, jz_mmc_irq_worker, 0,
-			dev_name(&pdev->dev), host);
+	ret = request_threaded_irq(host->irq, jz_mmc_irq, jz_mmc_irq_worker,
+				    IRQF_DISABLED, dev_name(&pdev->dev), host);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request irq: %d\n", ret);
 		goto err_free_card_detect_irq;
