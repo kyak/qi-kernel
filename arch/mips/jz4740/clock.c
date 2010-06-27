@@ -213,25 +213,79 @@ static int jz_clk_ko_is_enabled(struct clk *clk)
 	return !!(jz_clk_reg_read(JZ_REG_CLOCK_CTRL) & JZ_CLOCK_CTRL_KO_ENABLE);
 }
 
+static struct static_clk jz_clk_ext;
+
+static unsigned long jz_clk_pll_calc_rate(
+	unsigned int in_div, unsigned int feedback, unsigned int out_div)
+{
+	return ((jz_clk_ext.rate / in_div) * feedback) / out_div;
+}
+
+static void jz_clk_pll_calc_dividers(unsigned long rate,
+	unsigned int *in_div, unsigned int *feedback, unsigned int *out_div)
+{
+	unsigned int target;
+
+	/* The frequency after the input divider must be between 1 and 15 MHz.
+	   The highest divider yields the best resolution. */
+	*in_div = jz_clk_ext.rate / 1000000;
+	if (*in_div >= 34)
+		*in_div = 33;
+
+	/* The frequency before the output divider must be between 100 and
+	   500 MHz. The highest divider yields the best resolution. */
+	if (rate < 25000000) {
+		*out_div = 4;
+		target = 25000000 * 4;
+	} else if (rate <= 125000000) {
+		*out_div = 4;
+		target = rate * 4;
+	} else if (rate <= 250000000) {
+		*out_div = 2;
+		target = rate * 2;
+	} else if (rate <= 500000000) {
+		*out_div = 1;
+		target = rate;
+	} else {
+		*out_div = 1;
+		target = 500000000;
+	}
+
+	/* Compute the feedback divider.
+	   Since the divided input is at least 1 MHz and the target frequency
+	   at most 500 MHz, the feedback will be at most 500 and will therefore
+	   always fit in the 9-bit register.
+	   Similarly, the divided input is at most 15 MHz and the target
+	   frequency at least 100 MHz, so the feedback will be at least 6
+	   where the minimum supported value is 2. */
+	*feedback = ((target / 1000) * *in_div) / (jz_clk_ext.rate / 1000);
+}
+
+static unsigned long jz_clk_pll_round_rate(struct clk *clk, unsigned long rate)
+{
+	unsigned int in_div, feedback, out_div;
+
+	jz_clk_pll_calc_dividers(rate, &in_div, &feedback, &out_div);
+	return jz_clk_pll_calc_rate(in_div, feedback, out_div);
+}
+
 static const int pllno[] = {1, 2, 2, 4};
 
 static unsigned long jz_clk_pll_get_rate(struct clk *clk)
 {
 	uint32_t val;
-	int m;
-	int n;
-	int od;
+	unsigned int in_div, feedback, out_div;
 
 	val = jz_clk_reg_read(JZ_REG_CLOCK_PLL);
 
 	if (val & JZ_CLOCK_PLL_BYPASS)
 		return clk_get_rate(clk->parent);
 
-	m = ((val >> 23) & 0x1ff) + 2;
-	n = ((val >> 18) & 0x1f) + 2;
-	od = (val >> 16) & 0x3;
+	feedback = ((val >> 23) & 0x1ff) + 2;
+	in_div = ((val >> 18) & 0x1f) + 2;
+	out_div = pllno[(val >> 16) & 0x3];
 
-	return ((clk_get_rate(clk->parent) / n) * m) / pllno[od];
+	return jz_clk_pll_calc_rate(in_div, feedback, out_div);
 }
 
 static unsigned long jz_clk_pll_half_get_rate(struct clk *clk)
@@ -257,7 +311,6 @@ static unsigned int sdram_convert(unsigned int pllin)
 }
 
 static struct main_clk jz_clk_cpu;
-static struct static_clk jz_clk_ext;
 
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
@@ -272,39 +325,9 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		9
 	};
 	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
-	unsigned int feedback, inputDiv, outputDiv, target, pllout, pllout2;
+	unsigned int feedback, in_div, out_div, pllout, pllout2;
 
-	/* The frequency after the input divider must be between 1 and 15 MHz.
-	   The highest divider yields the best resolution. */
-	inputDiv = jz_clk_ext.rate / 1000000;
-	if (inputDiv >= 34)
-		inputDiv = 33;
-
-	/* The frequency before the output divider must be between 100 and
-	   500 MHz. The highest divider yields the best resolution. */
-	if (rate < 25000000) {
-		return -EINVAL;
-	} else if (rate <= 125000000) {
-		outputDiv = 4;
-		target = rate * 4;
-	} else if (rate <= 250000000) {
-		outputDiv = 2;
-		target = rate * 2;
-	} else if (rate <= 500000000) {
-		outputDiv = 1;
-		target = rate;
-	} else {
-		return -EINVAL;
-	}
-
-	/* Compute the feedback divider.
-	   Since the divided input is at least 1 MHz and the target frequency
-	   at most 500 MHz, the feedback will be at most 500 and will therefore
-	   always fit in the 9-bit register.
-	   Similarly, the divided input is at most 15 MHz and the target
-	   frequency at least 100 MHz, so the feedback will be at least 6
-	   where the minimum supported value is 2. */
-	feedback = ((target / 1000) * inputDiv) / (jz_clk_ext.rate / 1000);
+	jz_clk_pll_calc_dividers(rate, &in_div, &feedback, &out_div);
 
 	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
 		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
@@ -313,15 +336,15 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
 		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
 
-	pllout = ((jz_clk_ext.rate / inputDiv) * feedback) / outputDiv;
+	pllout = jz_clk_pll_calc_rate(in_div, feedback, out_div);
 	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? pllout : (pllout / 2);
 
 	/* Init UHC clock */
 	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
 
 	plcr1 = ((feedback - 2) << JZ_CLOCK_PLL_M_OFFSET) |
-		((inputDiv - 2) << JZ_CLOCK_PLL_N_OFFSET) |
-		((outputDiv - 1) << JZ_CLOCK_PLL_OD_OFFSET) |
+		((in_div - 2) << JZ_CLOCK_PLL_N_OFFSET) |
+		((out_div - 1) << JZ_CLOCK_PLL_OD_OFFSET) |
 		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) |
 		JZ_CLOCK_PLL_ENABLED;
 
@@ -447,6 +470,7 @@ static struct static_clk jz_clk_ext = {
 static struct clk_ops jz_clk_pll_ops = {
 	.get_rate = jz_clk_pll_get_rate,
 	.set_rate = jz_clk_pll_set_rate,
+	.round_rate = jz_clk_pll_round_rate,
 };
 
 static struct clk jz_clk_pll = {
