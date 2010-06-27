@@ -181,13 +181,9 @@ static void jz4740_mmc_reset(struct jz4740_mmc_host *host)
 static void jz4740_mmc_request_done(struct jz4740_mmc_host *host)
 {
 	struct mmc_request *req;
-	unsigned long flags;
 
-	spin_lock_irqsave(&host->lock, flags);
 	req = host->req;
 	host->req = NULL;
-	clear_bit(0, &host->waiting);
-	spin_unlock_irqrestore(&host->lock, flags);
 
 	if (!unlikely(req))
 		return;
@@ -491,15 +487,12 @@ static irqreturn_t jz_mmc_irq(int irq, void *devid)
 {
 	struct jz4740_mmc_host *host = devid;
 	uint16_t irq_reg, status, tmp;
-	unsigned long flags;
 	irqreturn_t ret = IRQ_HANDLED;
 
 	irq_reg = readw(host->base + JZ_REG_MMC_IREG);
 
 	tmp = irq_reg;
-	spin_lock_irqsave(&host->lock, flags);
 	irq_reg &= ~host->irq_mask;
-	spin_unlock_irqrestore(&host->lock, flags);
 
 	tmp &= ~(JZ_MMC_IRQ_TXFIFO_WR_REQ | JZ_MMC_IRQ_RXFIFO_RD_REQ |
 			JZ_MMC_IRQ_PRG_DONE | JZ_MMC_IRQ_DATA_TRAN_DONE);
