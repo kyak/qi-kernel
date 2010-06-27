@@ -222,7 +222,7 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	struct jz4740_rtc *rtc;
 	uint32_t scratchpad;
 
-	rtc = kmalloc(sizeof(*rtc), GFP_KERNEL);
+	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
 	if (!rtc)
 		return -ENOMEM;
 
