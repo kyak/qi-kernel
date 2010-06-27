@@ -131,8 +131,6 @@ struct jz4740_mmc_host {
 	struct timer_list timeout_timer;
 };
 
-static void jz4740_mmc_cmd_done(struct jz4740_mmc_host *host);
-
 static void jz4740_mmc_set_irq_enabled(struct jz4740_mmc_host *host,
 	unsigned int irq, bool enabled)
 {
@@ -381,14 +379,110 @@ static void jz4740_mmc_timeout(unsigned long data)
 	jz4740_mmc_request_done(host);
 }
 
+static void jz4740_mmc_read_response(struct jz4740_mmc_host *host,
+	struct mmc_command *cmd)
+{
+	int i;
+	uint16_t tmp;
+
+	if (cmd->flags & MMC_RSP_136) {
+		tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
+		for (i = 0; i < 4; ++i) {
+			cmd->resp[i] = tmp << 24;
+			cmd->resp[i] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) << 8;
+			tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
+			cmd->resp[i] |= tmp >> 8;
+		}
+	} else {
+		cmd->resp[0] = readw(host->base + JZ_REG_MMC_RESP_FIFO) << 24;
+		cmd->resp[0] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) << 8;
+		cmd->resp[0] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) & 0xff;
+	}
+}
+
+static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
+	struct mmc_command *cmd)
+{
+	uint32_t cmdat = host->cmdat;
+
+	host->cmdat &= ~JZ_MMC_CMDAT_INIT;
+	jz4740_mmc_clock_disable(host);
+
+	host->cmd = cmd;
+
+	if (cmd->flags & MMC_RSP_BUSY)
+		cmdat |= JZ_MMC_CMDAT_BUSY;
+
+	switch (mmc_resp_type(cmd)) {
+	case MMC_RSP_R1B:
+	case MMC_RSP_R1:
+		cmdat |= JZ_MMC_CMDAT_RSP_R1;
+		break;
+	case MMC_RSP_R2:
+		cmdat |= JZ_MMC_CMDAT_RSP_R2;
+		break;
+	case MMC_RSP_R3:
+		cmdat |= JZ_MMC_CMDAT_RSP_R3;
+		break;
+	default:
+		break;
+	}
+
+	if (cmd->data) {
+		cmdat |= JZ_MMC_CMDAT_DATA_EN;
+		if (cmd->data->flags & MMC_DATA_WRITE)
+			cmdat |= JZ_MMC_CMDAT_WRITE;
+		if (cmd->data->flags & MMC_DATA_STREAM)
+			cmdat |= JZ_MMC_CMDAT_STREAM;
+
+		writew(cmd->data->blksz, host->base + JZ_REG_MMC_BLKLEN);
+		writew(cmd->data->blocks, host->base + JZ_REG_MMC_NOB);
+	}
+
+	writeb(cmd->opcode, host->base + JZ_REG_MMC_CMD);
+	writel(cmd->arg, host->base + JZ_REG_MMC_ARG);
+	writel(cmdat, host->base + JZ_REG_MMC_CMDAT);
+
+	set_bit(0, &host->waiting);
+	jz4740_mmc_clock_enable(host, 1);
+	mod_timer(&host->timeout_timer, jiffies + 5*HZ);
+}
+
+
 static irqreturn_t jz_mmc_irq_worker(int irq, void *devid)
 {
 	struct jz4740_mmc_host *host = (struct jz4740_mmc_host *)devid;
+	struct mmc_command *cmd = host->req->cmd;
+	struct mmc_request *req = host->req;
+	unsigned int timeout = JZ4740_MMC_MAX_TIMEOUT;
+	uint32_t status;
 
-	if (host->cmd->error)
-		jz4740_mmc_request_done(host);
-	else
-		jz4740_mmc_cmd_done(host);
+	if (cmd->error)
+		goto done;
+
+	if (cmd->flags & MMC_RSP_PRESENT)
+		jz4740_mmc_read_response(host, cmd);
+
+	if (cmd->data) {
+		if (cmd->data->flags & MMC_DATA_READ)
+			jz4740_mmc_read_data(host, cmd->data);
+		else
+			jz4740_mmc_write_data(host, cmd->data);
+	}
+
+	if (req->stop) {
+		jz4740_mmc_send_command(host, req->stop);
+		do {
+			status = readw(host->base + JZ_REG_MMC_IREG);
+		} while ((status & JZ_MMC_IRQ_PRG_DONE) == 0 && --timeout);
+		writew(JZ_MMC_IRQ_PRG_DONE, host->base + JZ_REG_MMC_IREG);
+	}
+
+	if (unlikely(timeout == 0))
+		req->stop->error = -ETIMEDOUT;
+
+done:
+	jz4740_mmc_request_done(host);
 
 	return IRQ_HANDLED;
 }
@@ -470,106 +564,6 @@ static int jz4740_mmc_set_clock_rate(struct jz4740_mmc_host *host, int rate)
 
 	writew(div, host->base + JZ_REG_MMC_CLKRT);
 	return real_rate;
-}
-
-static void jz4740_mmc_read_response(struct jz4740_mmc_host *host,
-	struct mmc_command *cmd)
-{
-	int i;
-	uint16_t tmp;
-
-	if (cmd->flags & MMC_RSP_136) {
-		tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
-		for (i = 0; i < 4; ++i) {
-			cmd->resp[i] = tmp << 24;
-			cmd->resp[i] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) << 8;
-			tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
-			cmd->resp[i] |= tmp >> 8;
-		}
-	} else {
-		cmd->resp[0] = readw(host->base + JZ_REG_MMC_RESP_FIFO) << 24;
-		cmd->resp[0] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) << 8;
-		cmd->resp[0] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) & 0xff;
-	}
-}
-
-static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
-	struct mmc_command *cmd)
-{
-	uint32_t cmdat = host->cmdat;
-
-	host->cmdat &= ~JZ_MMC_CMDAT_INIT;
-	jz4740_mmc_clock_disable(host);
-
-	host->cmd = cmd;
-
-	if (cmd->flags & MMC_RSP_BUSY)
-		cmdat |= JZ_MMC_CMDAT_BUSY;
-
-	switch (mmc_resp_type(cmd)) {
-	case MMC_RSP_R1B:
-	case MMC_RSP_R1:
-		cmdat |= JZ_MMC_CMDAT_RSP_R1;
-		break;
-	case MMC_RSP_R2:
-		cmdat |= JZ_MMC_CMDAT_RSP_R2;
-		break;
-	case MMC_RSP_R3:
-		cmdat |= JZ_MMC_CMDAT_RSP_R3;
-		break;
-	default:
-		break;
-	}
-
-	if (cmd->data) {
-		cmdat |= JZ_MMC_CMDAT_DATA_EN;
-		if (cmd->data->flags & MMC_DATA_WRITE)
-			cmdat |= JZ_MMC_CMDAT_WRITE;
-		if (cmd->data->flags & MMC_DATA_STREAM)
-			cmdat |= JZ_MMC_CMDAT_STREAM;
-
-		writew(cmd->data->blksz, host->base + JZ_REG_MMC_BLKLEN);
-		writew(cmd->data->blocks, host->base + JZ_REG_MMC_NOB);
-	}
-
-	writeb(cmd->opcode, host->base + JZ_REG_MMC_CMD);
-	writel(cmd->arg, host->base + JZ_REG_MMC_ARG);
-	writel(cmdat, host->base + JZ_REG_MMC_CMDAT);
-
-	set_bit(0, &host->waiting);
-	jz4740_mmc_clock_enable(host, 1);
-	mod_timer(&host->timeout_timer, jiffies + 5*HZ);
-}
-
-static void jz4740_mmc_cmd_done(struct jz4740_mmc_host *host)
-{
-	uint32_t status;
-	struct mmc_command *cmd = host->req->cmd;
-	struct mmc_request *req = host->req;
-	unsigned int timeout = JZ4740_MMC_MAX_TIMEOUT;
-
-	if (cmd->flags & MMC_RSP_PRESENT)
-		jz4740_mmc_read_response(host, cmd);
-
-	if (cmd->data) {
-		if (cmd->data->flags & MMC_DATA_READ)
-			jz4740_mmc_read_data(host, cmd->data);
-		else
-			jz4740_mmc_write_data(host, cmd->data);
-	}
-
-	if (req->stop) {
-		jz4740_mmc_send_command(host, req->stop);
-		do {
-			status = readw(host->base + JZ_REG_MMC_IREG);
-		} while ((status & JZ_MMC_IRQ_PRG_DONE) == 0 && --timeout);
-		writew(JZ_MMC_IRQ_PRG_DONE, host->base + JZ_REG_MMC_IREG);
-	}
-
-	if (unlikely(timeout == 0))
-		req->stop->error = -ETIMEDOUT;
-
-	jz4740_mmc_request_done(host);
 }
 
 static void jz4740_mmc_request(struct mmc_host *mmc, struct mmc_request *req)
