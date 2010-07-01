@@ -295,7 +295,10 @@ static void jz_gpio_irq_demux_handler(unsigned int irq, struct irq_desc *desc)
 
 	flag = readl(chip->base + JZ_REG_GPIO_FLAG);
 
-	gpio_irq = ffs(flag) - 1;
+	if (!flag)
+		return;
+
+	gpio_irq = __fls(flag);
 
 	if (chip->edge_trigger_both & BIT(gpio_irq)) {
 		uint32_t value = readl(chip->base + JZ_REG_GPIO_PIN);
