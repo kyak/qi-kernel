@@ -316,31 +316,18 @@ static void sdram_set_pll(unsigned int pllin)
 	writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
 }
 
-static struct main_clk jz_clk_cpu;
+static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
+				     unsigned int mdiv, unsigned int pdiv,
+				     unsigned int ldiv);
 
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned int ctrl, plcr1;
-	unsigned int tmp = 0;
-	unsigned int wait =
-		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
-	int jz_clk_main_divs_inv[] = {
-		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
-		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
-		9
-	};
-	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
 	unsigned int feedback, in_div, out_div, pllout, pllout2;
 
 	jz_clk_pll_calc_dividers(rate, &in_div, &feedback, &out_div);
 
-	ctrl = JZ_CLOCK_CTRL_KO_ENABLE |
-		(jz_clk_main_divs_inv[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
-		(jz_clk_main_divs_inv[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
-		(jz_clk_main_divs_inv[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
-		(jz_clk_main_divs_inv[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
-		(jz_clk_main_divs_inv[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
-
+	ctrl = jz_clk_reg_read(JZ_REG_CLOCK_CTRL);
 	pllout = jz_clk_pll_calc_rate(in_div, feedback, out_div);
 	pllout2 = (ctrl & JZ_CLOCK_CTRL_PLL_HALF) ? pllout : (pllout / 2);
 
@@ -355,28 +342,12 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 
 	sdram_set_pll(pllout);
 
-	/* init PLL */
-	/* delay loops lifted from the old Ingenic cpufreq driver */
-	__asm__ __volatile__(
-		".set noreorder\n\t"
-		".align 5\n"
-		"sw %1,0(%0)\n\t"
-		"li %3,0\n\t"
-		"1:\n\t"
-		"bne %3,%2,1b\n\t"
-		"addi %3, 1\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		".set reorder\n\t"
-		:
-		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (ctrl),
-		  "r" (wait), "r" (tmp));
+	jz_clk_main_set_dividers(1, 3, 3, 3, 3);
 
 	/* LCD pixclock */
 	writel(pllout2 / 12000000 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
 
+	/* configure PLL */
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		".align 5\n"
@@ -396,6 +367,11 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 }
 
 static const int jz_clk_main_divs[] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
+static const int jz_clk_main_divs_inv[] = {
+	0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
+	7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+	9
+};
 
 static unsigned long jz_clk_main_round_rate(struct clk *clk, unsigned long rate)
 {
@@ -448,6 +424,42 @@ static int jz_clk_main_set_rate(struct clk *clk, unsigned long rate)
 				0xf << mclk->div_offset);
 
 	return 0;
+}
+
+static struct main_clk jz_clk_cpu;
+
+static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
+				     unsigned int mdiv, unsigned int pdiv,
+				     unsigned int ldiv)
+{
+	unsigned int ctrl = JZ_CLOCK_CTRL_KO_ENABLE |
+		(jz_clk_main_divs_inv[cdiv] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(jz_clk_main_divs_inv[hdiv] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(jz_clk_main_divs_inv[pdiv] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
+		(jz_clk_main_divs_inv[mdiv] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(jz_clk_main_divs_inv[ldiv] << JZ_CLOCK_CTRL_LDIV_OFFSET);
+	unsigned int tmp = 0;
+	unsigned int wait =
+		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
+
+	/* set dividers */
+	/* delay loops lifted from the old Ingenic cpufreq driver */
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".align 5\n"
+		"sw %1,0(%0)\n\t"
+		"li %3,0\n\t"
+		"1:\n\t"
+		"bne %3,%2,1b\n\t"
+		"addi %3, 1\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		".set reorder\n\t"
+		:
+		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (ctrl),
+		  "r" (wait), "r" (tmp));
 }
 
 static struct clk_ops jz_clk_static_ops = {
