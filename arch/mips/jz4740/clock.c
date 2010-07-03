@@ -320,11 +320,11 @@ static struct main_clk jz_clk_cpu;
 
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
-	unsigned int cfcr, plcr1;
+	unsigned int ctrl, plcr1;
 	unsigned int tmp = 0;
 	unsigned int wait =
 		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
-	int n2FR[33] = {
+	int jz_clk_main_divs_inv[] = {
 		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
 		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
 		9
@@ -334,15 +334,15 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 
 	jz_clk_pll_calc_dividers(rate, &in_div, &feedback, &out_div);
 
-	cfcr = JZ_CLOCK_CTRL_KO_ENABLE |
-		(n2FR[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
-		(n2FR[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
-		(n2FR[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
-		(n2FR[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
-		(n2FR[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
+	ctrl = JZ_CLOCK_CTRL_KO_ENABLE |
+		(jz_clk_main_divs_inv[div[0]] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(jz_clk_main_divs_inv[div[1]] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(jz_clk_main_divs_inv[div[2]] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
+		(jz_clk_main_divs_inv[div[3]] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(jz_clk_main_divs_inv[div[4]] << JZ_CLOCK_CTRL_LDIV_OFFSET);
 
 	pllout = jz_clk_pll_calc_rate(in_div, feedback, out_div);
-	pllout2 = (cfcr & JZ_CLOCK_CTRL_PLL_HALF) ? pllout : (pllout / 2);
+	pllout2 = (ctrl & JZ_CLOCK_CTRL_PLL_HALF) ? pllout : (pllout / 2);
 
 	/* Init UHC clock */
 	writel(pllout2 / 48000000 - 1, jz_clock_base + JZ_REG_CLOCK_UHC);
@@ -371,11 +371,11 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		"nop\n\t"
 		".set reorder\n\t"
 		:
-		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (cfcr),
+		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (ctrl),
 		  "r" (wait), "r" (tmp));
 
 	/* LCD pixclock */
-	writel(rate / 12000000 / 2 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
+	writel(pllout2 / 12000000 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
 
 	__asm__ __volatile__(
 		".set noreorder\n\t"
