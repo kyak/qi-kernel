@@ -317,8 +317,7 @@ static void sdram_set_pll(unsigned int pllin)
 }
 
 static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
-				     unsigned int mdiv, unsigned int pdiv,
-				     unsigned int ldiv);
+				     unsigned int mdiv, unsigned int pdiv);
 
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
@@ -342,7 +341,7 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 
 	sdram_set_pll(pllout);
 
-	jz_clk_main_set_dividers(1, 3, 3, 3, 3);
+	jz_clk_main_set_dividers(1, 3, 3, 3);
 
 	/* LCD pixclock */
 	writel(pllout2 / 12000000 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
@@ -429,18 +428,18 @@ static int jz_clk_main_set_rate(struct clk *clk, unsigned long rate)
 static struct main_clk jz_clk_cpu;
 
 static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
-				     unsigned int mdiv, unsigned int pdiv,
-				     unsigned int ldiv)
+				     unsigned int mdiv, unsigned int pdiv)
 {
-	unsigned int ctrl = JZ_CLOCK_CTRL_KO_ENABLE |
-		(jz_clk_main_divs_inv[cdiv] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
-		(jz_clk_main_divs_inv[hdiv] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
-		(jz_clk_main_divs_inv[pdiv] << JZ_CLOCK_CTRL_PDIV_OFFSET) |
-		(jz_clk_main_divs_inv[mdiv] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
-		(jz_clk_main_divs_inv[ldiv] << JZ_CLOCK_CTRL_LDIV_OFFSET);
 	unsigned int tmp = 0;
 	unsigned int wait =
 		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
+	unsigned int ctrl = jz_clk_reg_read(JZ_REG_CLOCK_CTRL);
+	ctrl &= ~(JZ_CLOCK_CTRL_CDIV_MASK | JZ_CLOCK_CTRL_HDIV_MASK |
+		  JZ_CLOCK_CTRL_MDIV_MASK | JZ_CLOCK_CTRL_PDIV_MASK);
+	ctrl |= (jz_clk_main_divs_inv[cdiv] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(jz_clk_main_divs_inv[hdiv] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(jz_clk_main_divs_inv[mdiv] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(jz_clk_main_divs_inv[pdiv] << JZ_CLOCK_CTRL_PDIV_OFFSET);
 
 	/* set dividers */
 	/* delay loops lifted from the old Ingenic cpufreq driver */
