@@ -3,8 +3,8 @@
  *
  * cpufreq driver for JZ4740
  *
- * Copyright (c) 2006-2007  Ingenic Semiconductor Inc.
  * Copyright (c) 2010       Ulrich Hecht <ulrich.hecht@gmail.com>
+ * Copyright (c) 2010       Maarten ter Huurne <maarten@treewalker.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -218,6 +218,7 @@ static void __exit jz4740_cpufreq_exit(void)
 module_init(jz4740_cpufreq_init);
 module_exit(jz4740_cpufreq_exit);
 
-MODULE_AUTHOR("Ulrich Hecht <ulrich.hecht@gmail.com>");
+MODULE_AUTHOR("Ulrich Hecht <ulrich.hecht@gmail.com>, "
+	      "Maarten ter Huurne <maarten@treewalker.org>");
 MODULE_DESCRIPTION("cpufreq driver for Jz4740");
 MODULE_LICENSE("GPL");
