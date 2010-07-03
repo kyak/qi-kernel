@@ -304,14 +304,16 @@ static unsigned long jz_clk_pll_half_get_rate(struct clk *clk)
 
 #define SDRAM_TREF 15625   /* Refresh period: 4096 refresh cycles/64ms */
 
-static unsigned int sdram_convert(unsigned int pllin)
+static void sdram_set_pll(unsigned int pllin)
 {
-	unsigned int ns, ret;
+	unsigned int ns, sdramclock;
 
 	ns = 1000000000 / pllin;
-	ret = (SDRAM_TREF / ns) / 64 + 1;
-	if (ret > 0xff) ret = 0xff;
-	return ret;
+	sdramclock = (SDRAM_TREF / ns) / 64 + 1;
+	if (sdramclock > 0xff) sdramclock = 0xff;
+	/* Set refresh registers */
+	writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCOR);
+	writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
 }
 
 static struct main_clk jz_clk_cpu;
@@ -319,7 +321,6 @@ static struct main_clk jz_clk_cpu;
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned int cfcr, plcr1;
-	unsigned int sdramclock;
 	unsigned int tmp = 0;
 	unsigned int wait =
 		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
@@ -352,14 +353,7 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		(0x20 << JZ_CLOCK_PLL_STABILIZE_OFFSET) |
 		JZ_CLOCK_PLL_ENABLED;
 
-	sdramclock = sdram_convert(rate);
-	if (sdramclock > 0) {
-		/* Set refresh registers */
-		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCOR);
-		writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
-	} else {
-		BUG();
-	}
+	sdram_set_pll(pllout);
 
 	/* init PLL */
 	/* delay loops lifted from the old Ingenic cpufreq driver */
