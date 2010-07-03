@@ -316,9 +316,6 @@ static void sdram_set_pll(unsigned int pllin)
 	writew(sdramclock, jz_emc_base + JZ_REG_EMC_RTCNT);
 }
 
-static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
-				     unsigned int mdiv, unsigned int pdiv);
-
 static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned int ctrl, plcr1;
@@ -341,7 +338,7 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 
 	sdram_set_pll(pllout);
 
-	jz_clk_main_set_dividers(1, 3, 3, 3);
+	clk_main_set_dividers(false, 1, 3, 3, 3);
 
 	/* LCD pixclock */
 	writel(pllout2 / 12000000 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
@@ -427,15 +424,17 @@ static int jz_clk_main_set_rate(struct clk *clk, unsigned long rate)
 
 static struct main_clk jz_clk_cpu;
 
-static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
-				     unsigned int mdiv, unsigned int pdiv)
+void clk_main_set_dividers(bool immediate, unsigned int cdiv, unsigned int hdiv,
+			   unsigned int mdiv, unsigned int pdiv)
 {
 	unsigned int tmp = 0;
 	unsigned int wait =
 		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
 	unsigned int ctrl = jz_clk_reg_read(JZ_REG_CLOCK_CTRL);
-	ctrl &= ~(JZ_CLOCK_CTRL_CDIV_MASK | JZ_CLOCK_CTRL_HDIV_MASK |
+	ctrl &= ~(JZ_CLOCK_CTRL_CHANGE_ENABLE |
+		  JZ_CLOCK_CTRL_CDIV_MASK | JZ_CLOCK_CTRL_HDIV_MASK |
 		  JZ_CLOCK_CTRL_MDIV_MASK | JZ_CLOCK_CTRL_PDIV_MASK);
+	if (immediate) ctrl |= JZ_CLOCK_CTRL_CHANGE_ENABLE;
 	ctrl |= (jz_clk_main_divs_inv[cdiv] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
 		(jz_clk_main_divs_inv[hdiv] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
 		(jz_clk_main_divs_inv[mdiv] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
@@ -460,6 +459,7 @@ static void jz_clk_main_set_dividers(unsigned int cdiv, unsigned int hdiv,
 		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (ctrl),
 		  "r" (wait), "r" (tmp));
 }
+EXPORT_SYMBOL_GPL(clk_main_set_dividers);
 
 static struct clk_ops jz_clk_static_ops = {
 	.get_rate = jz_clk_static_get_rate,
