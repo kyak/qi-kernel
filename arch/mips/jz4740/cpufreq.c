@@ -31,8 +31,18 @@
 #define dprintk(X...) do { } while(0)
 #endif
 
+#define HCLK_MIN 30000
+/* TODO: The maximum MCLK most likely depends on the SDRAM chips used,
+         so it is board-specific. */
+#define MCLK_MAX 140000
+
+/* Same as jz_clk_main_divs, but with 24 and 32 removed because the hardware
+   spec states those dividers must not be used for CCLK or HCLK. */
+static const int jz4740_freq_cpu_divs[] = {1, 2, 3, 4, 6, 8, 12, 16};
+
 struct jz4740_freq_percpu_info {
-	struct cpufreq_frequency_table table[12];
+	struct cpufreq_frequency_table table[
+		ARRAY_SIZE(jz4740_freq_cpu_divs) + 1];
 };
 
 static struct clk *pll;
@@ -41,6 +51,39 @@ static struct clk *cclk;
 static struct jz4740_freq_percpu_info jz4740_freq_table;
 
 static struct cpufreq_driver cpufreq_jz4740_driver;
+
+static void jz4740_freq_fill_table(struct cpufreq_policy *policy,
+				   unsigned int pll_rate)
+{
+	struct cpufreq_frequency_table *table = &jz4740_freq_table.table[0];
+	int i;
+
+#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+	/* for showing /sys/devices/system/cpu/cpuX/cpufreq/stats/ */
+	// TODO: Stats are not reset when the table is refilled.
+	static bool init = false;
+	if (init)
+		cpufreq_frequency_table_put_attr(policy->cpu);
+	else
+		init = true;
+#endif
+
+	for (i = 0; i < ARRAY_SIZE(jz4740_freq_cpu_divs); i++) {
+		unsigned int freq = pll_rate / jz4740_freq_cpu_divs[i];
+		if (freq < HCLK_MIN) break;
+		table[i].index = i;
+		table[i].frequency = freq;
+	}
+	table[i].index = i;
+	table[i].frequency = CPUFREQ_TABLE_END;
+
+	policy->min = table[i - 1].frequency;
+	policy->max = table[0].frequency;
+
+#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+	cpufreq_frequency_table_get_attr(table, policy->cpu);
+#endif
+}
 
 static unsigned int jz4740_freq_get(unsigned int cpu)
 {
@@ -51,50 +94,70 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 			  unsigned int target_freq,
 			  unsigned int relation)
 {
-	struct cpufreq_frequency_table *table =	&jz4740_freq_table.table[0];
+	struct cpufreq_frequency_table *table = &jz4740_freq_table.table[0];
 	struct cpufreq_freqs freqs;
 	unsigned int new_index = 0;
-	int ret;
+	unsigned int old_pll, new_pll;
+	int ret = 0;
 
-	if (cpufreq_frequency_table_target(policy,
-					   &jz4740_freq_table.table[0],
+	old_pll = clk_get_rate(pll) / 1000;
+	new_pll = clk_round_rate(pll, policy->max * 1000) / 1000;
+	if (new_pll != old_pll) {
+		jz4740_freq_fill_table(policy, new_pll);
+	}
+
+	if (cpufreq_frequency_table_target(policy, table,
 					   target_freq, relation, &new_index))
 		return -EINVAL;
-
-	dprintk(KERN_INFO "%s: target_freq %d new_index %d\n", __FUNCTION__,
-	        target_freq, new_index);
-
 	freqs = (struct cpufreq_freqs) {
 		.old = jz4740_freq_get(policy->cpu),
 		.new = table[new_index].frequency,
 		.cpu = policy->cpu,
 		.flags = cpufreq_jz4740_driver.flags,
 	};
-
-	/* Is there anything to do anyway? */
-	if (freqs.new == freqs.old)
-		return 0;
-
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	dprintk(KERN_INFO "%s: cclk %p, setting from %d to %d\n",
-		__FUNCTION__, cclk, freqs.old, freqs.new);
-	ret = clk_set_rate(pll, freqs.new * 1000);
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	if (freqs.new != freqs.old || new_pll != old_pll) {
+		int cdiv, hdiv, mdiv, pdiv;
+		cdiv = jz4740_freq_cpu_divs[new_index];
+		hdiv = cdiv * 3;
+		while (new_pll < HCLK_MIN * hdiv)
+			hdiv -= cdiv;
+		mdiv = hdiv;
+		if (new_pll > MCLK_MAX * mdiv) {
+			/* 4,4 performs better than 3,6 */
+			if (new_pll > MCLK_MAX * 4)
+				mdiv *= 2;
+			else
+				hdiv = mdiv = cdiv * 4;
+		}
+		pdiv = mdiv;
+		dprintk(KERN_INFO "%s: cclk %p, setting from %d to %d, "
+			"dividers %d, %d, %d, %d\n",
+			__FUNCTION__, cclk, freqs.old, freqs.new,
+			cdiv, hdiv, mdiv, pdiv);
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+		clk_main_set_dividers(new_pll == old_pll,
+				      cdiv, hdiv, mdiv, pdiv);
+		if (new_pll != old_pll) {
+			dprintk(KERN_INFO "%s: pll %p, setting from %d to %d\n",
+				__FUNCTION__, pll, old_pll, new_pll);
+			ret = clk_set_rate(pll, new_pll * 1000);
+		}
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	}
 
 	return ret;
 }
 
 static int jz4740_freq_verify(struct cpufreq_policy *policy)
 {
-	return cpufreq_frequency_table_verify(policy,
-					      &jz4740_freq_table.table[0]);
+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+				     policy->cpuinfo.max_freq);
+	return 0;
 }
 
 static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 {
-	struct cpufreq_frequency_table *table =	&jz4740_freq_table.table[0];
 	int ret;
-	int i;
 
 	dprintk(KERN_INFO "Jz4740 cpufreq driver\n");
 
@@ -113,28 +176,16 @@ static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 		goto err_clk_put_pll;
 	}
 
-	/* FIXME: These hardcoded numbers should be board-specific, I guess. */
-	policy->cur = 336000; /* in kHz */
-	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
-
-	policy->cpuinfo.min_freq = 192000;
+	policy->cpuinfo.min_freq = HCLK_MIN;
+	policy->cpuinfo.max_freq = 500000;
 	policy->cpuinfo.transition_latency = 100000; /* in nanoseconds */
+	policy->cur = jz4740_freq_get(policy->cpu);
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+	/* min and max are set by jz4740_freq_fill_table() */
 
-	/* 11 steps for a maximum of 432 MHz */
-	for (i = 0; i < 11; i++) {
-		table[i].index = i;
-		table[i].frequency = policy->cpuinfo.min_freq + i * 24000;
-	}
-	policy->cpuinfo.max_freq = table[i-1].frequency;
-	table[i].index = i;
-	table[i].frequency = CPUFREQ_TABLE_END;
+	jz4740_freq_fill_table(policy, clk_get_rate(pll) / 1000 /* in kHz */);
 
-#ifdef CONFIG_CPU_FREQ_STAT_DETAILS
-	/* for showing /sys/devices/system/cpu/cpuX/cpufreq/stats/ */
-	cpufreq_frequency_table_get_attr(table, policy->cpu);
-#endif
-
-	return cpufreq_frequency_table_cpuinfo(policy, table);
+	return 0;
 
 err_clk_put_pll:
 	clk_put(pll);

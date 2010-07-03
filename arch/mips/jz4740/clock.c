@@ -338,8 +338,6 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 
 	sdram_set_pll(pllout);
 
-	clk_main_set_dividers(false, 1, 3, 3, 3);
-
 	/* LCD pixclock */
 	writel(pllout2 / 12000000 - 1, jz_clock_base + JZ_REG_CLOCK_LCD);
 
