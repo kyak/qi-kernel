@@ -41,6 +41,7 @@
 static const int jz4740_freq_cpu_divs[] = {1, 2, 3, 4, 6, 8, 12, 16};
 
 struct jz4740_freq_percpu_info {
+	unsigned int pll_rate;
 	struct cpufreq_frequency_table table[
 		ARRAY_SIZE(jz4740_freq_cpu_divs) + 1];
 };
@@ -48,25 +49,26 @@ struct jz4740_freq_percpu_info {
 static struct clk *pll;
 static struct clk *cclk;
 
-static struct jz4740_freq_percpu_info jz4740_freq_table;
+static struct jz4740_freq_percpu_info jz4740_freq_info;
 
 static struct cpufreq_driver cpufreq_jz4740_driver;
 
 static void jz4740_freq_fill_table(struct cpufreq_policy *policy,
 				   unsigned int pll_rate)
 {
-	struct cpufreq_frequency_table *table = &jz4740_freq_table.table[0];
+	struct cpufreq_frequency_table *table = &jz4740_freq_info.table[0];
 	int i;
 
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	/* for showing /sys/devices/system/cpu/cpuX/cpufreq/stats/ */
-	// TODO: Stats are not reset when the table is refilled.
 	static bool init = false;
 	if (init)
 		cpufreq_frequency_table_put_attr(policy->cpu);
 	else
 		init = true;
 #endif
+
+	jz4740_freq_info.pll_rate = pll_rate;
 
 	for (i = 0; i < ARRAY_SIZE(jz4740_freq_cpu_divs); i++) {
 		unsigned int freq = pll_rate / jz4740_freq_cpu_divs[i];
@@ -90,21 +92,30 @@ static unsigned int jz4740_freq_get(unsigned int cpu)
 	return clk_get_rate(cclk) / 1000;
 }
 
+static int jz4740_freq_verify(struct cpufreq_policy *policy)
+{
+	unsigned int new_pll;
+
+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+				     policy->cpuinfo.max_freq);
+
+	new_pll = clk_round_rate(pll, policy->max * 1000) / 1000;
+	if (jz4740_freq_info.pll_rate != new_pll)
+		jz4740_freq_fill_table(policy, new_pll);
+
+	return 0;
+}
+
 static int jz4740_freq_target(struct cpufreq_policy *policy,
 			  unsigned int target_freq,
 			  unsigned int relation)
 {
-	struct cpufreq_frequency_table *table = &jz4740_freq_table.table[0];
+	struct cpufreq_frequency_table *table = &jz4740_freq_info.table[0];
 	struct cpufreq_freqs freqs;
 	unsigned int new_index = 0;
-	unsigned int old_pll, new_pll;
+	unsigned int old_pll = clk_get_rate(pll) / 1000;
+	unsigned int new_pll = jz4740_freq_info.pll_rate;
 	int ret = 0;
-
-	old_pll = clk_get_rate(pll) / 1000;
-	new_pll = clk_round_rate(pll, policy->max * 1000) / 1000;
-	if (new_pll != old_pll) {
-		jz4740_freq_fill_table(policy, new_pll);
-	}
 
 	if (cpufreq_frequency_table_target(policy, table,
 					   target_freq, relation, &new_index))
@@ -146,13 +157,6 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 	}
 
 	return ret;
-}
-
-static int jz4740_freq_verify(struct cpufreq_policy *policy)
-{
-	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-				     policy->cpuinfo.max_freq);
-	return 0;
 }
 
 static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
