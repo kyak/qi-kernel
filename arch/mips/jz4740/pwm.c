@@ -178,4 +178,4 @@ static int __init jz4740_pwm_init(void)
 
 	return ret;
 }
-arch_initcall(jz4740_pwm_init);
+subsys_initcall(jz4740_pwm_init);
