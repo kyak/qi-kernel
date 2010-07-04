@@ -237,14 +237,14 @@ static void jz_clk_pll_calc_dividers(unsigned long rate,
 		*in_div = 33;
 
 	/* The frequency before the output divider must be between 100 and
-	   500 MHz. The highest divider yields the best resolution. */
+	   500 MHz. The lowest target rate is more energy efficient. */
 	if (rate < 25000000) {
 		*out_div = 4;
 		target = 25000000 * 4;
-	} else if (rate <= 125000000) {
+	} else if (rate <= 50000000) {
 		*out_div = 4;
 		target = rate * 4;
-	} else if (rate <= 250000000) {
+	} else if (rate <= 100000000) {
 		*out_div = 2;
 		target = rate * 2;
 	} else if (rate <= 500000000) {
