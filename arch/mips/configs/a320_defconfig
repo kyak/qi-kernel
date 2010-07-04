@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Sun Jul  4 03:26:42 2010
+# Sun Jul  4 12:51:11 2010
 #
 CONFIG_MIPS=y
 
@@ -565,6 +565,7 @@ CONFIG_INPUT_MISC=y
 # CONFIG_INPUT_CM109 is not set
 CONFIG_INPUT_UINPUT=y
 # CONFIG_INPUT_GPIO_ROTARY_ENCODER is not set
+# CONFIG_INPUT_PWM_BEEPER is not set
 
 #
 # Hardware I/O ports
