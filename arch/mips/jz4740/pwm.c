@@ -48,16 +48,8 @@ struct pwm_device *pwm_request(int id, const char *label)
 	int ret = 0;
 	struct pwm_device *pwm;
 
-	if (!jz4740_pwm_clk) {
-		jz4740_pwm_clk = clk_get(NULL, "ext");
-
-		if (IS_ERR(jz4740_pwm_clk))
-			return ERR_PTR(PTR_ERR(jz4740_pwm_clk));
-	}
-
-	if (id < 2 || id > 7) {
+	if (id < 2 || id > 7 || !jz4740_pwm_clk)
 		return ERR_PTR(-ENOENT);
-	}
 
 	mutex_lock(&jz4740_pwm_mutex);
 
@@ -175,3 +167,18 @@ void pwm_disable(struct pwm_device *pwm)
 	jz4740_timer_disable(pwm->id);
 	jz4740_timer_set_ctrl(pwm->id, ctrl);
 }
+
+static int __init jz4740_pwm_init(void)
+{
+	int ret = 0;
+
+	jz4740_pwm_clk = clk_get(NULL, "ext");
+
+	if (IS_ERR(jz4740_pwm_clk)) {
+		ret = PTR_ERR(jz4740_pwm_clk);
+		jz4740_pwm_clk = NULL;
+	}
+
+	return ret;
+}
+arch_initcall(jz4740_pwm_init);
