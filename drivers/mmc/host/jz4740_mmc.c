@@ -269,7 +269,7 @@ static void jz4740_mmc_write_data(struct jz4740_mmc_host *host,
 		return;
 	}
 
-	timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_TXFIFO_WR_REQ);
+	timeout = jz4740_mmc_wait_irq(host, JZ_MMC_IRQ_DATA_TRAN_DONE);
 	if (unlikely(timeout == 0))
 		goto err_timeout;
 
