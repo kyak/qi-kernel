@@ -373,24 +373,13 @@ static struct platform_device avt2_usb_regulator_device = {
 	}
 };
 
-static struct led_pwm qi_lb60_pizo_led = {
-	.name = "nanonote::pizo",
-	.pwm_id = 4,
-	.max_brightness = 255,
-	.pwm_period_ns = 1000000,
-};
-
-static struct led_pwm_platform_data qi_lb60_pizo_data = {
-	.num_leds = 1,
-	.leds = &qi_lb60_pizo_led,
-};
-
-static struct platform_device qi_lb60_pizo_device = {
-	.name = "leds_pwm",
+/* beeper */
+static struct platform_device qi_lb60_pwm_beeper = {
+	.name = "pwm-beeper",
 	.id = -1,
 	.dev = {
-		.platform_data = &qi_lb60_pizo_data,
-	}
+		.platform_data = (void*)4,
+	},
 };
 
 static struct platform_device *jz_platform_devices[] __initdata = {
@@ -407,7 +396,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_battery_device,
 	&qi_lb60_gpio_keys,
 	&qi_lb60_charger_device,
-	&qi_lb60_pizo_device,
+	&qi_lb60_pwm_beeper,
 };
 
 static void __init board_gpio_setup(void)
