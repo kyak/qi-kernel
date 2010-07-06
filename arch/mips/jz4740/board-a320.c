@@ -5,9 +5,7 @@
  *
  *  Copyright (c) 2006-2007  Ingenic Semiconductor Inc.
  *  Copyright (c) 2009       Ignacio Garcia Perez <iggarpe@gmail.com>
- *
- *  Author:   <lhhuang@ingenic.cn>
- *  Modified: <iggarpe@gmail.com>
+ *  Copyright (c) 2010       Maarten ter Huurne <maarten@treewalker.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -78,39 +76,80 @@ static struct platform_device a320_i2c_device = {
 #endif
 
 /* NAND */
-static struct nand_ecclayout a320_ecclayout_4gb = {
-	.oobfree = {
-		{.offset = 42,
-		 .length = 22}}
-};
+#define A320_NAND_PAGE_SIZE (4096ull)
+#define A320_NAND_ERASE_BLOCK_SIZE (128 * A320_NAND_PAGE_SIZE)
 
-static struct mtd_partition a320_partitions_4gb[] = {
-	{ .name = "NAND SPL partition",
-	  .offset = 0 * 0x10000,
-	  .size = 4 * 0x10000,
-	/* TODO(MtH): These fields were added in the old Ingenic patches,
-	              but are not in the openwrt-xburst tree.
-	              I have not been able to find an equivalent yet.
-	  .use_planes = 0,
-	  .mtdblock_jz_invalid = 1
-	*/
-	  .mask_flags = MTD_WRITEABLE, /* MtH: Read-only until we can trust it. */
+static struct mtd_partition a320_nand_partitions[] = {
+	{ .name = "SPL",
+	  .offset = 0 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .size = 1 * A320_NAND_ERASE_BLOCK_SIZE,
+	  /* MtH: Read-only until we can trust it. */
+	  .mask_flags = MTD_WRITEABLE,
+	},
+	{ .name = "uC/OS-II loader",
+	  .offset = 1 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .size = 2 * A320_NAND_ERASE_BLOCK_SIZE,
+	  /* MtH: Read-only until we can trust it. */
+	  .mask_flags = MTD_WRITEABLE,
+	},
+	/* erase block 3 is empty (maybe alternative location for bbt?) */
+	/* erase block 4 contains the bad block table */
+	{ .name = "uC/OS-II Z:",
+	  .offset = 5 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .size = 127 * A320_NAND_ERASE_BLOCK_SIZE,
+	  /* MtH: Read-only until we can trust it. */
+	  .mask_flags = MTD_WRITEABLE,
+	},
+	{ .name = "uC/OS-II A:",
+	  .offset = 132 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .size = (8192 - 132) * A320_NAND_ERASE_BLOCK_SIZE,
+	  /* MtH: Read-only until we can trust it. */
+	  .mask_flags = MTD_WRITEABLE,
 	},
 };
 
+static uint8_t a320_nand_bbt_pattern[] = {'b', 'b', 't', '8' };
+
+static struct nand_bbt_descr a320_nand_bbt_main_descr = {
+	/* TODO(MtH): 1 bit per block is just a guess.
+	              On my Dingoo the entire page is filled with 0xFF;
+	              I guess that means it has no bad blocks. */
+	.options = NAND_BBT_ABSPAGE | NAND_BBT_1BIT,
+	/* TODO(MtH): Maybe useful flags for the future:
+	NAND_BBT_CREATE | NAND_BBT_WRITE | NAND_BBT_VERSION | NAND_BBT_PERCHIP
+	*/
+	.pages = { 4 * A320_NAND_ERASE_BLOCK_SIZE / A320_NAND_PAGE_SIZE },
+	.maxblocks = 1,
+	.pattern = a320_nand_bbt_pattern,
+	.len = ARRAY_SIZE(a320_nand_bbt_pattern),
+	.offs =	128 - ARRAY_SIZE(a320_nand_bbt_pattern),
+};
+
+static struct nand_ecclayout a320_nand_ecc_layout = {
+	.eccpos = { 4 },
+	.oobfree = {
+		{ .offset = 100, .length = 22 },
+		}
+};
+
 static void a320_nand_ident(struct platform_device *pdev,
-				struct nand_chip *chip,
-				struct mtd_partition **partitions,
-				int *num_partitions)
+			    struct nand_chip *chip,
+			    struct mtd_partition **partitions,
+			    int *num_partitions)
 {
-	chip->ecc.layout = &a320_ecclayout_4gb;
-	*partitions = a320_partitions_4gb;
-	*num_partitions = ARRAY_SIZE(a320_partitions_4gb);
+	chip->options |= NAND_USE_FLASH_BBT;
+	chip->ecc.bytes = 12; /* 9 bytes ECC + 3 bytes zero padding */
+	chip->bbt_td = &a320_nand_bbt_main_descr;
+	/* MtH: I did not find a mirror bbt yet, but it might exist. */
+	chip->bbt_md = NULL;
 }
 
 static struct jz_nand_platform_data a320_nand_pdata = {
-	.ident_callback = a320_nand_ident,
-	.busy_gpio = 94,
+	.num_partitions		= ARRAY_SIZE(a320_nand_partitions),
+	.partitions		= a320_nand_partitions,
+	.ecc_layout		= &a320_nand_ecc_layout,
+	.busy_gpio		= JZ_GPIO_PORTC(30),
+	.ident_callback		= a320_nand_ident,
 };
 
 /* Display */
