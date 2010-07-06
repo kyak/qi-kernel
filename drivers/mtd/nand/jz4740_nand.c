@@ -251,7 +251,7 @@ static int jz_nand_read_page_hwecc_oob_first(struct mtd_info *mtd,
 	int eccbytes = chip->ecc.bytes;
 	int eccsteps = chip->ecc.steps;
 	uint8_t *p = buf;
-	unsigned int ecc_offset = chip->page_shift;
+	unsigned int ecc_offset = chip->ecc.layout->eccpos[0];
 
 	/* Read the OOB area first */
 	chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
@@ -281,7 +281,7 @@ static void jz_nand_write_page_hwecc(struct mtd_info *mtd,
 	int eccbytes = chip->ecc.bytes;
 	int eccsteps = chip->ecc.steps;
 	const uint8_t *p = buf;
-	unsigned int ecc_offset = chip->page_shift;
+	unsigned int ecc_offset = chip->ecc.layout->eccpos[0];
 
 	for (i = ecc_offset; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
@@ -387,6 +387,9 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 		pdata->ident_callback(pdev, chip, &pdata->partitions,
 					&pdata->num_partitions);
 	}
+
+	if (chip->ecc.layout->eccpos[0] == 0)
+		chip->ecc.layout->eccpos[0] = chip->page_shift;
 
 	ret = nand_scan_tail(mtd);
 	if (ret) {
