@@ -49,7 +49,7 @@ struct pwm_device *pwm_request(int id, const char *label)
 	struct pwm_device *pwm;
 
 	if (id < 2 || id > 7 || !jz4740_pwm_clk)
-		return ERR_PTR(-ENOENT);
+		return ERR_PTR(-ENODEV);
 
 	mutex_lock(&jz4740_pwm_mutex);
 
