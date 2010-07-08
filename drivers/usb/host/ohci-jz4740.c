@@ -144,7 +144,7 @@ static __devinit int jz4740_ohci_probe(struct platform_device *pdev)
 
 	if (!res) {
 		dev_err(&pdev->dev, "Failed to get platform resource\n");
-		return -ENOENT;
+		return -ENXIO;
 	}
 
 	irq = platform_get_irq(pdev, 0);
