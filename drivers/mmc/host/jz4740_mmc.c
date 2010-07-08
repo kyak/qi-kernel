@@ -762,15 +762,15 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 	}
 
 	host->clk = clk_get(&pdev->dev, "mmc");
-	if (!host->clk) {
-		ret = -ENOENT;
-		dev_err(&pdev->dev, "Failed to get mmc clock\n");
+	if (IS_ERR(host->clk)) {
+		ret = PTR_ERR(host->clock);
+		dev_err(&pdev->dev, "Failed to get mmc clock: %d\n", ret);
 		goto err_free_host;
 	}
 
 	host->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!host->mem) {
-		ret = -ENOENT;
+		ret = -ENXIO;
 		dev_err(&pdev->dev, "Failed to get base platform memory\n");
 		goto err_clk_put;
 	}
