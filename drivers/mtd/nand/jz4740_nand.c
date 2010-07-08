@@ -317,7 +317,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	nand->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!nand->mem) {
 		dev_err(&pdev->dev, "Failed to get platform mmio memory\n");
-		ret = -ENOENT;
+		ret = -ENXIO;
 		goto err_free;
 	}
 
