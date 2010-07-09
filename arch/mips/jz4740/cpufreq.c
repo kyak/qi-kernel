@@ -129,7 +129,7 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 	if (freqs.new != freqs.old || new_pll != old_pll) {
 		unsigned int cdiv, hdiv, mdiv, pdiv;
 		cdiv = jz4740_freq_cpu_divs[new_index];
-		hdiv = cdiv * 3;
+		hdiv = (cdiv == 3 || cdiv == 6) ? cdiv * 2 : cdiv * 3;
 		while (new_pll < HCLK_MIN * hdiv)
 			hdiv -= cdiv;
 		mdiv = hdiv;
