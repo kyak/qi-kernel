@@ -360,11 +360,13 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 	return 0;
 }
 
-static const int jz_clk_main_divs[] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
-static const int jz_clk_main_divs_inv[] = {
-	0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
-	7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
-	9
+static const unsigned int jz_clk_main_divs[] = {
+	1, 2, 3, 4, 6, 8, 12, 16, 24, 32
+};
+static const unsigned int jz_clk_main_divs_inv[] = {
+	-1,  0,  1,  2,  3, -1,  4, -1,  5, -1, -1, -1,  6, -1, -1, -1,
+	 7, -1, -1, -1, -1, -1, -1, -1,  8, -1, -1, -1, -1, -1, -1, -1,
+	 9
 };
 
 static unsigned long jz_clk_main_round_rate(struct clk *clk, unsigned long rate)
@@ -422,40 +424,59 @@ static int jz_clk_main_set_rate(struct clk *clk, unsigned long rate)
 
 static struct main_clk jz_clk_cpu;
 
-void clk_main_set_dividers(bool immediate, unsigned int cdiv, unsigned int hdiv,
-			   unsigned int mdiv, unsigned int pdiv)
+int clk_main_set_dividers(bool immediate, unsigned int cdiv, unsigned int hdiv,
+			  unsigned int mdiv, unsigned int pdiv)
 {
-	unsigned int tmp = 0;
-	unsigned int wait =
-		((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
-	unsigned int ctrl = jz_clk_reg_read(JZ_REG_CLOCK_CTRL);
+	unsigned int cdiv_enc, hdiv_enc, mdiv_enc, pdiv_enc;
+	unsigned int ctrl;
+	unsigned int tmp, wait;
+
+	if (cdiv >= ARRAY_SIZE(jz_clk_main_divs_inv) ||
+	    hdiv >= ARRAY_SIZE(jz_clk_main_divs_inv) ||
+	    mdiv >= ARRAY_SIZE(jz_clk_main_divs_inv) ||
+	    pdiv >= ARRAY_SIZE(jz_clk_main_divs_inv))
+		return -EINVAL;
+	cdiv_enc = jz_clk_main_divs_inv[cdiv];
+	hdiv_enc = jz_clk_main_divs_inv[hdiv];
+	mdiv_enc = jz_clk_main_divs_inv[mdiv];
+	pdiv_enc = jz_clk_main_divs_inv[pdiv];
+	if (cdiv_enc == (unsigned int)-1 ||
+	    hdiv_enc == (unsigned int)-1 ||
+	    mdiv_enc == (unsigned int)-1 ||
+	    pdiv_enc == (unsigned int)-1)
+		return -EINVAL;
+
+	ctrl = jz_clk_reg_read(JZ_REG_CLOCK_CTRL);
 	ctrl &= ~(JZ_CLOCK_CTRL_CHANGE_ENABLE |
 		  JZ_CLOCK_CTRL_CDIV_MASK | JZ_CLOCK_CTRL_HDIV_MASK |
 		  JZ_CLOCK_CTRL_MDIV_MASK | JZ_CLOCK_CTRL_PDIV_MASK);
 	if (immediate) ctrl |= JZ_CLOCK_CTRL_CHANGE_ENABLE;
-	ctrl |= (jz_clk_main_divs_inv[cdiv] << JZ_CLOCK_CTRL_CDIV_OFFSET) |
-		(jz_clk_main_divs_inv[hdiv] << JZ_CLOCK_CTRL_HDIV_OFFSET) |
-		(jz_clk_main_divs_inv[mdiv] << JZ_CLOCK_CTRL_MDIV_OFFSET) |
-		(jz_clk_main_divs_inv[pdiv] << JZ_CLOCK_CTRL_PDIV_OFFSET);
+	ctrl |= (cdiv_enc << JZ_CLOCK_CTRL_CDIV_OFFSET) |
+		(hdiv_enc << JZ_CLOCK_CTRL_HDIV_OFFSET) |
+		(mdiv_enc << JZ_CLOCK_CTRL_MDIV_OFFSET) |
+		(pdiv_enc << JZ_CLOCK_CTRL_PDIV_OFFSET);
 
 	/* set dividers */
 	/* delay loops lifted from the old Ingenic cpufreq driver */
+	wait = ((clk_get_rate(&jz_clk_cpu.clk) / 1000000) * 500) / 1000;
 	__asm__ __volatile__(
 		".set noreorder\n\t"
 		".align 5\n"
-		"sw %1,0(%0)\n\t"
-		"li %3,0\n\t"
+		"sw %2,0(%1)\n\t"
+		"li %0,0\n\t"
 		"1:\n\t"
-		"bne %3,%2,1b\n\t"
-		"addi %3, 1\n\t"
+		"bne %0,%3,1b\n\t"
+		"addi %0, 1\n\t"
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
 		"nop\n\t"
 		".set reorder\n\t"
-		:
+		: "=r" (tmp)
 		: "r" (jz_clock_base + JZ_REG_CLOCK_CTRL), "r" (ctrl),
-		  "r" (wait), "r" (tmp));
+		  "r" (wait));
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(clk_main_set_dividers);
 

@@ -38,7 +38,7 @@
 
 /* Same as jz_clk_main_divs, but with 24 and 32 removed because the hardware
    spec states those dividers must not be used for CCLK or HCLK. */
-static const int jz4740_freq_cpu_divs[] = {1, 2, 3, 4, 6, 8, 12, 16};
+static const unsigned int jz4740_freq_cpu_divs[] = {1, 2, 3, 4, 6, 8, 12, 16};
 
 struct jz4740_freq_percpu_info {
 	unsigned int pll_rate;
@@ -127,7 +127,7 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 		.flags = cpufreq_jz4740_driver.flags,
 	};
 	if (freqs.new != freqs.old || new_pll != old_pll) {
-		int cdiv, hdiv, mdiv, pdiv;
+		unsigned int cdiv, hdiv, mdiv, pdiv;
 		cdiv = jz4740_freq_cpu_divs[new_index];
 		hdiv = cdiv * 3;
 		while (new_pll < HCLK_MIN * hdiv)
@@ -146,9 +146,11 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 			__FUNCTION__, cclk, freqs.old, freqs.new,
 			cdiv, hdiv, mdiv, pdiv);
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-		clk_main_set_dividers(new_pll == old_pll,
-				      cdiv, hdiv, mdiv, pdiv);
-		if (new_pll != old_pll) {
+		ret = clk_main_set_dividers(new_pll == old_pll,
+					    cdiv, hdiv, mdiv, pdiv);
+		if (ret) {
+			dprintk(KERN_INFO "failed to set dividers\n");
+		} else if (new_pll != old_pll) {
 			dprintk(KERN_INFO "%s: pll %p, setting from %d to %d\n",
 				__FUNCTION__, pll, old_pll, new_pll);
 			ret = clk_set_rate(pll, new_pll * 1000);

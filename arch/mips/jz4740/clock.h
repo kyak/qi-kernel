@@ -65,8 +65,8 @@ struct clk {
 
 int clk_is_enabled(struct clk *clk);
 
-void clk_main_set_dividers(bool immediate, unsigned int cdiv, unsigned int hdiv,
-			   unsigned int mdiv, unsigned int pdiv);
+int clk_main_set_dividers(bool immediate, unsigned int cdiv, unsigned int hdiv,
+			  unsigned int mdiv, unsigned int pdiv);
 
 #ifdef CONFIG_DEBUG_FS
 void jz4740_clock_debugfs_init(void);
