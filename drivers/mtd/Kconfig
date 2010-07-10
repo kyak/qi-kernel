@@ -304,6 +304,14 @@ config SSFDC
 	  This enables read only access to SmartMedia formatted NAND
 	  flash. You can mount it with FAT file system.
 
+config CC_FTL
+        tristate "China Chip Flash Translation Layer support"
+	depends on BLOCK
+	select MTD_BLKDEVS
+	---help---
+	  This provides support for the flash translation layer used by
+	  media players that run firmware from China Chip.
+
 config MTD_OOPS
 	tristate "Log panic/oops to an MTD buffer"
 	depends on MTD
