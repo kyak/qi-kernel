@@ -127,9 +127,16 @@ static void mtd_blktrans_request(struct request_queue *rq)
 	wake_up_process(tr->blkcore_priv->thread);
 }
 
+/* Note(MtH): There is a potential deadlock in blktrans_open(), where
+ *            get_mtd_device() will try to lock a mutex that is already held
+ *            by the same thread. This is fixed in 2.6.35, but the fix is part
+ *            of a big change set that I don't want to pull in.
+ */
 
 static int blktrans_open(struct block_device *bdev, fmode_t mode)
 {
+	return 0;
+#if 0
 	struct mtd_blktrans_dev *dev = bdev->bd_disk->private_data;
 	struct mtd_blktrans_ops *tr = dev->tr;
 	int ret = -ENODEV;
@@ -154,10 +161,13 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	}
  out:
 	return ret;
+#endif
 }
 
 static int blktrans_release(struct gendisk *disk, fmode_t mode)
 {
+	return 0;
+#if 0
 	struct mtd_blktrans_dev *dev = disk->private_data;
 	struct mtd_blktrans_ops *tr = dev->tr;
 	int ret = 0;
@@ -172,6 +182,7 @@ static int blktrans_release(struct gendisk *disk, fmode_t mode)
 	}
 
 	return ret;
+#endif
 }
 
 static int blktrans_getgeo(struct block_device *bdev, struct hd_geometry *geo)
