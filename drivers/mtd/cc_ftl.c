@@ -45,10 +45,10 @@ static int cc_ftl_readsect(struct mtd_blktrans_dev *dev, unsigned long block,
 	size_t retlen;
 	int ret;
 
-	log_offs = ((uint64_t)block) * SECTOR_SIZE;
-	if (log_offs + SECTOR_SIZE > dev->size)
+	/* Find physical location. */
+	if (block >= dev->size)
 		return -EIO;
-
+	log_offs = ((uint64_t)block) * SECTOR_SIZE;
 	log_blk = mtd_div_by_eb(log_offs, mtd);
 	phy_blk = partition->map[log_blk];
 	if (phy_blk == (uint32_t)-1)
@@ -56,6 +56,7 @@ static int cc_ftl_readsect(struct mtd_blktrans_dev *dev, unsigned long block,
 	phy_offs = (uint64_t)phy_blk * mtd->erasesize;
 	phy_offs += mtd_mod_by_eb(log_offs, mtd);
 
+	/* Read data. */
 	ret = mtd->read(mtd, phy_offs, SECTOR_SIZE, &retlen, buffer);
 	if (ret)
 		return ret;
