@@ -58,6 +58,8 @@ static int cc_ftl_readsect(struct mtd_blktrans_dev *dev, unsigned long block,
 
 	/* Read data. */
 	ret = mtd->read(mtd, phy_offs, SECTOR_SIZE, &retlen, buffer);
+	if (ret == -EUCLEAN) /* sector contains correctable errors */
+		ret = 0;
 	if (ret)
 		return ret;
 	if (retlen != SECTOR_SIZE)
