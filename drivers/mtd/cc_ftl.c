@@ -223,7 +223,7 @@ static void cc_ftl_remove_dev(struct mtd_blktrans_dev *dev)
 static struct mtd_blktrans_ops cc_ftl_tr = {
 	.name		= "ccnand",
 	.major		= 242,	/* TODO: Register an official major number. */
-	.part_bits	= 0,	/* One disk partition per NAND partition. */
+	.part_bits	= 4,
 	.blksize 	= SECTOR_SIZE,
 
 	.readsect	= cc_ftl_readsect,
