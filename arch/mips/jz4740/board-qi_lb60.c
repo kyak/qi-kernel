@@ -29,7 +29,8 @@
 #include <linux/power_supply.h>
 #include <linux/power/jz4740-battery.h>
 #include <linux/power/gpio-charger.h>
-#include <linux/mmc/jz4740_mmc.h>
+
+#include <asm/mach-jz4740/jz4740_mmc.h>
 
 #include <linux/regulator/fixed.h>
 #include <linux/regulator/machine.h>
