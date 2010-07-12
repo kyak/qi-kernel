@@ -384,7 +384,8 @@ static void jz4740_mmc_read_response(struct jz4740_mmc_host *host,
 		tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
 		for (i = 0; i < 4; ++i) {
 			cmd->resp[i] = tmp << 24;
-			cmd->resp[i] |= readw(host->base + JZ_REG_MMC_RESP_FIFO) << 8;
+			tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
+			cmd->resp[i] |= tmp << 8;
 			tmp = readw(host->base + JZ_REG_MMC_RESP_FIFO);
 			cmd->resp[i] |= tmp >> 8;
 		}
@@ -664,7 +665,7 @@ static irqreturn_t jz4740_mmc_card_detect_irq(int irq, void *devid)
 {
 	struct jz4740_mmc_host *host = devid;
 
-	mmc_detect_change(host->mmc, HZ / 3);
+	mmc_detect_change(host->mmc, HZ / 2);
 
 	return IRQ_HANDLED;
 }
@@ -692,6 +693,28 @@ static const struct jz_gpio_bulk_request jz4740_mmc_pins[] = {
 	JZ_GPIO_BULK_PIN(MSC_DATA3),
 };
 
+static int __devinit jz4740_mmc_request_gpio(struct device *dev, int gpio,
+	const char *name, bool output, int value)
+{
+	int ret;
+
+	if (!gpio_is_valid(gpio))
+		return 0;
+
+	ret = gpio_request(gpio, name);
+	if (ret) {
+		dev_err(dev, "Failed to request %s gpio: %d\n", name, ret);
+		return ret;
+	}
+
+	if (output)
+		gpio_direction_output(gpio, value);
+	else
+		gpio_direction_input(gpio);
+
+	return 0;
+}
+
 static int __devinit jz4740_mmc_request_gpios(struct platform_device *pdev)
 {
 	int ret;
@@ -700,32 +723,20 @@ static int __devinit jz4740_mmc_request_gpios(struct platform_device *pdev)
 	if (!pdata)
 		return 0;
 
-	if (gpio_is_valid(pdata->gpio_card_detect)) {
-		ret = gpio_request(pdata->gpio_card_detect, "MMC detect change");
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to request detect change gpio\n");
-			goto err;
-		}
-		gpio_direction_input(pdata->gpio_card_detect);
-	}
+	ret = jz4740_mmc_request_gpio(&pdev->dev, pdata->gpio_card_detect,
+			"MMC detect change", false, 0);
+	if (ret)
+		goto err;
 
-	if (gpio_is_valid(pdata->gpio_read_only)) {
-		ret = gpio_request(pdata->gpio_read_only, "MMC read only");
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to request read only gpio: %d\n", ret);
-			goto err_free_gpio_card_detect;
-		}
-		gpio_direction_input(pdata->gpio_read_only);
-	}
+	ret = jz4740_mmc_request_gpio(&pdev->dev, pdata->gpio_read_only,
+			"MMC read only", false, 0);
+	if (ret)
+		goto err_free_gpio_card_detect;
 
-	if (gpio_is_valid(pdata->gpio_power)) {
-		ret = gpio_request(pdata->gpio_power, "MMC power");
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to request power gpio: %d\n", ret);
-			goto err_free_gpio_read_only;
-		}
-		gpio_direction_output(pdata->gpio_power, pdata->power_active_low);
-	}
+	ret = jz4740_mmc_request_gpio(&pdev->dev, pdata->gpio_power,
+			"MMC read only", true, pdata->power_active_low);
+	if (ret)
+		goto err_free_gpio_read_only;
 
 	return 0;
 
@@ -736,6 +747,29 @@ err_free_gpio_card_detect:
 	if (gpio_is_valid(pdata->gpio_card_detect))
 		gpio_free(pdata->gpio_card_detect);
 err:
+	return ret;
+}
+
+static int __devinit jz4740_mmc_request_cd_irq(struct platform_device *pdev,
+	struct jz4740_mmc_host *host)
+{
+	int ret;
+	struct jz4740_mmc_platform_data *pdata = pdev->dev.platform_data;
+
+	if (gpio_is_valid(pdata->gpio_card_detect))
+		return 0;
+
+	host->card_detect_irq = gpio_to_irq(pdata->gpio_card_detect);
+
+	if (host->card_detect_irq < 0) {
+		dev_warn(&pdev->dev, "Failed to get card detect irq\n");
+		return 0;
+	}
+	return request_irq(host->card_detect_irq, jz4740_mmc_card_detect_irq,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			"MMC card detect", host);
+
+
 	return ret;
 }
 
@@ -848,20 +882,10 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 	spin_lock_init(&host->lock);
 	host->irq_mask = 0xffff;
 
-	host->card_detect_irq = gpio_to_irq(pdata->gpio_card_detect);
-
-	if (host->card_detect_irq < 0) {
-		dev_warn(&pdev->dev, "Failed to get irq for card detect gpio\n");
-	} else {
-		ret = request_irq(host->card_detect_irq,
-			jz4740_mmc_card_detect_irq,
-			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-			"MMC card detect", host);
-
-		if (ret) {
-			dev_err(&pdev->dev, "Failed to request card detect irq");
-			goto err_free_gpios;
-		}
+	ret = jz4740_mmc_request_cd_irq(pdev, host);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to request card detect irq\n");
+		goto err_free_gpios;
 	}
 
 	ret = request_threaded_irq(host->irq, jz_mmc_irq, jz_mmc_irq_worker,
@@ -875,7 +899,7 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 	jz4740_mmc_clock_disable(host);
 	setup_timer(&host->timeout_timer, jz4740_mmc_timeout,
 			(unsigned long)host);
-	/* It is not that important when it times out, it just needs to timeout. */
+	/* It is not important when it times out, it just needs to timeout. */
 	set_timer_slack(&host->timeout_timer, HZ);
 
 	platform_set_drvdata(pdev, host);
