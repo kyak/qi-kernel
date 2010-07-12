@@ -126,7 +126,6 @@ struct jz4740_mmc_host {
 
 	unsigned long waiting;
 
-	int max_clock;
 	uint32_t cmdat;
 
 	uint16_t irq_mask;
@@ -878,7 +877,6 @@ static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
 
 	host->mmc = mmc;
 	host->pdev = pdev;
-	host->max_clock = JZ_MMC_CLK_RATE;
 	spin_lock_init(&host->lock);
 	host->irq_mask = 0xffff;
 
