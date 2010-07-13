@@ -46,7 +46,7 @@ static struct fb_fix_screeninfo jzfb_fix __devinitdata = {
 	.type =		FB_TYPE_PACKED_PIXELS,
 	.visual =	FB_VISUAL_TRUECOLOR,
 	.xpanstep =	0,
-	.ypanstep =	0,
+	.ypanstep =	1,
 	.ywrapstep =	0,
 	.accel =	FB_ACCEL_NONE,
 };
@@ -169,6 +169,9 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 
 	fb_videomode_to_var(var, mode);
 
+	/* Reserve space for double buffering. */
+	var->yres_virtual = var->yres * 2;
+
 	switch (jzfb->pdata->bpp) {
 	case 8:
 		break;
@@ -235,13 +238,15 @@ static struct jz4740_dma_config jzfb_slcd_dma_config = {
 
 static void jzfb_upload_frame_dma(struct jzfb *jzfb)
 {
-	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys);
+	struct fb_info *fb = jzfb->fb;
+	struct fb_videomode *mode = fb->mode;
+	__u32 bytes_per_line = fb->fix.line_length;
+
+	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys +
+					   bytes_per_line * fb->var.yoffset);
 	jz4740_dma_set_dst_addr(jzfb->dma,
-		CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
-	jz4740_dma_set_transfer_count(jzfb->dma,
-		jzfb->fb->mode->xres * jzfb->fb->mode->yres *
-			(jzfb_get_controller_bpp(jzfb) >> 3)
-		);
+				CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
+	jz4740_dma_set_transfer_count(jzfb->dma, bytes_per_line * mode->yres);
 
 	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
 	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
@@ -484,6 +489,12 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 	return 0;
 }
 
+static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	info->var.yoffset = var->yoffset;
+	return 0;
+}
+
 static int jzfb_alloc_devmem(struct jzfb *jzfb)
 {
 	int max_videosize = 0;
@@ -497,6 +508,7 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 	}
 
 	max_videosize *= jzfb_get_controller_bpp(jzfb) >> 3;
+	max_videosize *= 2; /* allow double buffering */
 
 	jzfb->framedesc = dma_alloc_coherent(&jzfb->pdev->dev,
 				    sizeof(*jzfb->framedesc),
@@ -551,7 +563,7 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
 	printk("A320 TV out: %d\n", mode);
-	
+
 	if (mode != FB_A320TV_OFF) {
 		cancel_delayed_work(&jzfb->refresh_work);
 		/* Abort any DMA transfer that might be in progress and
@@ -560,14 +572,14 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		jzfb->panel->disable(jzfb);
 
 		/* set up LCD controller for TV output */
-		
+
 		writel(JZ_LCD_CFG_HSYNC_ACTIVE_LOW |
 		       JZ_LCD_CFG_VSYNC_ACTIVE_LOW,
 		       jzfb->base + JZ_REG_LCD_CFG);
-		
+
 		/* V-Sync pulse end position */
 		writel(10, jzfb->base + JZ_REG_LCD_VSYNC);
-		
+
 		if (mode == FB_A320TV_PAL) {
 			/* PAL */
 			/* H-Sync pulse start position */
@@ -592,7 +604,7 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		writel(0, jzfb->base + JZ_REG_LCD_REV);
 		/* reset status register */
 		writel(0, jzfb->base + JZ_REG_LCD_STATE);
-		
+
 		/* tell LCDC about the frame descriptor address */
 		writel(jzfb->framedesc_phys, jzfb->base + JZ_REG_LCD_DA0);
 
@@ -627,6 +639,7 @@ static struct fb_ops jzfb_ops = {
 	.fb_set_par 		= jzfb_set_par,
 	.fb_setcolreg		= jzfb_setcolreg,
 	.fb_blank		= jzfb_blank,
+	.fb_pan_display		= jzfb_pan_display,
 	.fb_fillrect		= sys_fillrect,
 	.fb_copyarea		= sys_copyarea,
 	.fb_imageblit		= sys_imageblit,
@@ -728,7 +741,7 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	fb->fix.mmio_start = mem->start;
 	fb->fix.mmio_len = resource_size(mem);
 	fb->fix.smem_start = jzfb->vidmem_phys;
-	fb->fix.smem_len =  fb->fix.line_length * fb->var.yres;
+	fb->fix.smem_len =  fb->fix.line_length * fb->var.yres_virtual;
 	fb->screen_base = jzfb->vidmem;
 	fb->pseudo_palette = jzfb->pseudo_palette;
 
