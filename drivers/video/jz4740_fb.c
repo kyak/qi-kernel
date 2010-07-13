@@ -523,13 +523,13 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "Missing platform data\n");
-		return -ENOENT;
+		return -ENXIO;
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		dev_err(&pdev->dev, "Failed to get register memory resource\n");
-		return -ENOENT;
+		return -ENXIO;
 	}
 
 	mem = request_mem_region(mem->start, resource_size(mem), pdev->name);

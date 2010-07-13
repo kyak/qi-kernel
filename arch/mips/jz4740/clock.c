@@ -997,7 +997,7 @@ struct clk *clk_get(struct device *dev, const char *name)
 		if (strcmp(clk->name, name) == 0)
 			return clk;
 	}
-	return ERR_PTR(-ENOENT);
+	return ERR_PTR(-ENXIO);
 }
 EXPORT_SYMBOL_GPL(clk_get);
 

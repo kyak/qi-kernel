@@ -227,14 +227,14 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 
 	rtc->irq = platform_get_irq(pdev, 0);
 	if (rtc->irq < 0) {
-		ret = -ENOENT;
-		dev_err(&pdev->dev, "Failed to get platform irq\n");
+		ret = rtc->irq;
+		dev_err(&pdev->dev, "Failed to get platform irq: %d\n", ret);
 		goto err_free;
 	}
 
 	rtc->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!rtc->mem) {
-		ret = -ENOENT;
+		ret = -ENXIO;
 		dev_err(&pdev->dev, "Failed to get platform mmio memory\n");
 		goto err_free;
 	}
