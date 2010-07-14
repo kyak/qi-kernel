@@ -34,7 +34,7 @@
 #define JZ_REG_NAND_PAR2	0x110
 #define JZ_REG_NAND_IRQ_STAT	0x114
 #define JZ_REG_NAND_IRQ_CTRL	0x118
-#define JZ_REG_NAND_ERR(x)	(0x11C + (x << 2))
+#define JZ_REG_NAND_ERR(x)	(0x11C + ((x) << 2))
 
 #define JZ_NAND_ECC_CTRL_PAR_READY	BIT(4)
 #define JZ_NAND_ECC_CTRL_ENCODING	BIT(3)
@@ -49,8 +49,8 @@
 #define JZ_NAND_STATUS_UNCOR_ERROR	BIT(1)
 #define JZ_NAND_STATUS_ERROR		BIT(0)
 
-#define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT(x << 1)
-#define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT((x << 1) + 1)
+#define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT((x) << 1)
+#define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT(((x) << 1) + 1)
 
 struct jz_nand {
 	struct mtd_info mtd;
