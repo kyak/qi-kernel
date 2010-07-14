@@ -402,6 +402,8 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	nand->pdata = pdata;
 	platform_set_drvdata(pdev, nand);
 
+	writel(JZ_NAND_CTRL_ENABLE_CHIP(0), nand->base + JZ_REG_NAND_CTRL);
+
 	ret = nand_scan_ident(mtd, 1);
 	if (ret) {
 		dev_err(&pdev->dev,  "Failed to scan nand\n");
@@ -463,6 +465,9 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
 	struct jz_nand *nand = platform_get_drvdata(pdev);
 
 	nand_release(&nand->mtd);
+
+	/* Deassert and disable all chips */
+	writel(0, nand->base + JZ_REG_NAND_CTRL);
 
 	iounmap(nand->bank_base);
 	release_mem_region(nand->bank_mem->start, resource_size(nand->bank_mem));
