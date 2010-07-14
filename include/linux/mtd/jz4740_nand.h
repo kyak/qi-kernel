@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
- *      JZ4720/JZ4740 SoC NAND controller driver
+ *  JZ4740 SoC NAND controller driver
  *
  *  This program is free software; you can redistribute	 it and/or modify it
  *  under  the terms of	 the GNU General  Public License as published by the
@@ -26,6 +26,8 @@ struct jz_nand_platform_data {
 	struct nand_ecclayout	*ecc_layout;
 
 	unsigned int busy_gpio;
+
+	unsigned char banks[4];
 
 	void (*ident_callback)(struct platform_device *, struct nand_chip *,
 				struct mtd_partition **, int *num_partitions);
