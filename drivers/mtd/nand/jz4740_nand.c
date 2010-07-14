@@ -52,6 +52,9 @@
 #define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT((x) << 1)
 #define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT(((x) << 1) + 1)
 
+#define JZ_NAND_MEM_ADDR_OFFSET 0x10000
+#define JZ_NAND_MEM_CMD_OFFSET 0x08000
+
 struct jz_nand {
 	struct mtd_info mtd;
 	struct nand_chip chip;
@@ -69,9 +72,6 @@ static inline struct jz_nand *mtd_to_jz_nand(struct mtd_info *mtd)
 {
 	return container_of(mtd, struct jz_nand, mtd);
 }
-
-#define JZ_NAND_MEM_ADDR_OFFSET 0x10000
-#define JZ_NAND_MEM_CMD_OFFSET 0x08000
 
 static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 {
