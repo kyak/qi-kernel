@@ -52,15 +52,14 @@
 #define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT(x << 1)
 #define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT((x << 1) + 1)
 
-#define JZ_NAND_DATA_ADDR ((void __iomem *)0xB8000000)
-#define JZ_NAND_CMD_ADDR (JZ_NAND_DATA_ADDR + 0x8000)
-#define JZ_NAND_ADDR_ADDR (JZ_NAND_DATA_ADDR + 0x10000)
-
 struct jz_nand {
 	struct mtd_info mtd;
 	struct nand_chip chip;
 	void __iomem *base;
 	struct resource *mem;
+
+	void __iomem *bank_base;
+	struct resource *bank_mem;
 
 	struct jz_nand_platform_data *pdata;
 	bool is_reading;
@@ -71,6 +70,9 @@ static inline struct jz_nand *mtd_to_jz_nand(struct mtd_info *mtd)
 	return container_of(mtd, struct jz_nand, mtd);
 }
 
+#define JZ_NAND_MEM_ADDR_OFFSET 0x10000
+#define JZ_NAND_MEM_CMD_OFFSET 0x08000
+
 static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 {
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
@@ -80,11 +82,11 @@ static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 	if (ctrl & NAND_CTRL_CHANGE) {
 		BUG_ON((ctrl & NAND_ALE) && (ctrl & NAND_CLE));
 		if (ctrl & NAND_ALE)
-			chip->IO_ADDR_W = JZ_NAND_ADDR_ADDR;
+			chip->IO_ADDR_W = nand->bank_base + JZ_NAND_MEM_ADDR_OFFSET;
 		else if (ctrl & NAND_CLE)
-			chip->IO_ADDR_W = JZ_NAND_CMD_ADDR;
+			chip->IO_ADDR_W = nand->bank_base + JZ_NAND_MEM_CMD_OFFSET;
 		else
-			chip->IO_ADDR_W = JZ_NAND_DATA_ADDR;
+			chip->IO_ADDR_W = nand->bank_base;
 
 		reg = readl(nand->base + JZ_REG_NAND_CTRL);
 		if (ctrl & NAND_NCE)
@@ -296,6 +298,43 @@ static void jz_nand_write_page_hwecc(struct mtd_info *mtd,
 static const char *part_probes[] = {"cmdline", NULL};
 #endif
 
+static int jz_nand_ioremap_resource(struct platform_device *pdev,
+	const char *name, struct resource **res, void __iomem **base)
+{
+	int ret;
+
+	*res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
+	if (!*res) {
+		dev_err(&pdev->dev, "Failed to get platform %s memory\n", name);
+		ret = -ENXIO;
+		goto err;
+	}
+
+	*res = request_mem_region((*res)->start, resource_size(*res),
+				pdev->name);
+	if (!*res) {
+		dev_err(&pdev->dev, "Failed to request %s memory region\n", name);
+		ret = -EBUSY;
+		goto err;
+	}
+
+	*base = ioremap((*res)->start, resource_size(*res));
+	if (!*base) {
+		dev_err(&pdev->dev, "Failed to ioremap %s memory region\n", name);
+		ret = -EBUSY;
+		goto err_release_mem;
+	}
+
+	return 0;
+
+err_release_mem:
+	release_mem_region((*res)->start, resource_size(*res));
+err:
+	*res = NULL;
+	*base = NULL;
+	return ret;
+}
+
 static int __devinit jz_nand_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -314,27 +353,13 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	nand->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!nand->mem) {
-		dev_err(&pdev->dev, "Failed to get platform mmio memory\n");
-		ret = -ENXIO;
+	ret = jz_nand_ioremap_resource(pdev, "mmio", &nand->mem, &nand->base);
+	if (ret)
 		goto err_free;
-	}
-
-	nand->mem = request_mem_region(nand->mem->start,
-					resource_size(nand->mem), pdev->name);
-	if (!nand->mem) {
-		dev_err(&pdev->dev, "Failed to request mmio memory region\n");
-		ret = -EBUSY;
-		goto err_free;
-	}
-
-	nand->base = ioremap(nand->mem->start, resource_size(nand->mem));
-	if (!nand->base) {
-		dev_err(&pdev->dev, "Failed to ioremap mmio memory region\n");
-		ret = -EBUSY;
-		goto err_release_mem;
-	}
+	ret = jz_nand_ioremap_resource(pdev, "bank", &nand->bank_mem,
+			&nand->bank_base);
+	if (ret)
+		goto err_iounmap_mmio;
 
 	if (pdata && gpio_is_valid(pdata->busy_gpio)) {
 		ret = gpio_request(pdata->busy_gpio, "NAND busy pin");
@@ -342,7 +367,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 				"Failed to request busy gpio %d: %d\n",
 				pdata->busy_gpio, ret);
-			goto err_iounmap;
+			goto err_iounmap_mem;
 		}
 	}
 
@@ -371,8 +396,8 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	if (pdata && gpio_is_valid(pdata->busy_gpio))
 		chip->dev_ready = jz_nand_dev_ready;
 
-	chip->IO_ADDR_R = JZ_NAND_DATA_ADDR;
-	chip->IO_ADDR_W = JZ_NAND_DATA_ADDR;
+	chip->IO_ADDR_R = nand->bank_base;
+	chip->IO_ADDR_W = nand->bank_base;
 
 	nand->pdata = pdata;
 	platform_set_drvdata(pdev, nand);
@@ -418,15 +443,16 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Successfully registered JZ4740 NAND driver\n");
 
 	return 0;
+
 err_nand_release:
 	nand_release(&nand->mtd);
 err_gpio_free:
 	platform_set_drvdata(pdev, NULL);
 	gpio_free(pdata->busy_gpio);
-err_iounmap:
+err_iounmap_mem:
+	iounmap(nand->bank_base);
+err_iounmap_mmio:
 	iounmap(nand->base);
-err_release_mem:
-	release_mem_region(nand->mem->start, resource_size(nand->mem));
 err_free:
 	kfree(nand);
 	return ret;
@@ -438,6 +464,8 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
 
 	nand_release(&nand->mtd);
 
+	iounmap(nand->bank_base);
+	release_mem_region(nand->bank_mem->start, resource_size(nand->bank_mem));
 	iounmap(nand->base);
 	release_mem_region(nand->mem->start, resource_size(nand->mem));
 
