@@ -161,10 +161,35 @@ struct platform_device jz4740_i2c_device = {
 };
 
 static struct resource jz4740_nand_resources[] = {
-	[0] = {
+	{
+		.name	= "mmio",
 		.start	= CPHYSADDR(JZ4740_EMC_BASE_ADDR),
-		.end	= CPHYSADDR(JZ4740_EMC_BASE_ADDR) + 0x10000 - 1,
+		.end	= CPHYSADDR(JZ4740_EMC_BASE_ADDR) + 0x1000 - 1,
 		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "bank1",
+		.start	= 0x18000000,
+		.end	= 0x180C0000 - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name	= "bank2",
+		.start	= 0x14000000,
+		.end	= 0x140C0000 - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name	= "bank3",
+		.start	= 0x0C000000,
+		.end	= 0x0C0C0000 - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name	= "bank4",
+		.start	= 0x08000000,
+		.end	= 0x080C0000 - 1,
+		.flags = IORESOURCE_MEM,
 	},
 };
 
