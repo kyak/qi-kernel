@@ -164,6 +164,7 @@ static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	uint32_t reg, status;
 	int i;
+	unsigned int timeout = 1000;
 	static uint8_t empty_block_ecc[] = {0xcd, 0x9d, 0x90, 0x58, 0xf4,
 						0x8b, 0xff, 0xb7, 0x6f};
 
@@ -172,7 +173,10 @@ static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
 
 	do {
 		status = readl(nand->base + JZ_REG_NAND_IRQ_STAT);
-	} while (!(status & JZ_NAND_STATUS_ENC_FINISH));
+	} while (!(status & JZ_NAND_STATUS_ENC_FINISH) && --timeout);
+
+	if (timeout == 0)
+	    return -1;
 
 	reg = readl(nand->base + JZ_REG_NAND_ECC_CTRL);
 	reg &= ~JZ_NAND_ECC_CTRL_ENABLE;
@@ -189,7 +193,7 @@ static int jz_nand_calculate_ecc_rs(struct mtd_info *mtd, const uint8_t *dat,
 	return 0;
 }
 
-static void correct_data(uint8_t *dat, int index, int mask)
+static void jz_nand_correct_data(uint8_t *dat, int index, int mask)
 {
 	int offset = index & 0x7;
 	uint16_t data;
@@ -214,6 +218,7 @@ static int jz_nand_correct_ecc_rs(struct mtd_info *mtd, uint8_t *dat,
 	int i, error_count, index;
 	uint32_t reg, status, error;
 	uint32_t t;
+	unsigned int timeout = 1000;
 
 	t = read_ecc[0];
 
@@ -242,7 +247,10 @@ static int jz_nand_correct_ecc_rs(struct mtd_info *mtd, uint8_t *dat,
 
 	do {
 		status = readl(nand->base + JZ_REG_NAND_IRQ_STAT);
-	} while (!(status & JZ_NAND_STATUS_DEC_FINISH));
+	} while (!(status & JZ_NAND_STATUS_DEC_FINISH) && --timeout);
+
+	if (timeout == 0)
+	    return -1;
 
 	reg = readl(nand->base + JZ_REG_NAND_ECC_CTRL);
 	reg &= ~JZ_NAND_ECC_CTRL_ENABLE;
@@ -258,7 +266,7 @@ static int jz_nand_correct_ecc_rs(struct mtd_info *mtd, uint8_t *dat,
 			error = readl(nand->base + JZ_REG_NAND_ERR(i));
 			index = ((error >> 16) & 0x1ff) - 1;
 			if (index >= 0 && index < 512)
-				correct_data(dat, index, error & 0x1ff);
+				jz_nand_correct_data(dat, index, error & 0x1ff);
 		}
 
 		return error_count;
