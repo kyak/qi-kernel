@@ -23,8 +23,9 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 
-#include <linux/mtd/jz4740_nand.h>
 #include <linux/gpio.h>
+
+#include <asm/mach-jz4740/jz4740_nand.h>
 
 #define JZ_REG_NAND_CTRL	0x50
 #define JZ_REG_NAND_ECC_CTRL	0x100
