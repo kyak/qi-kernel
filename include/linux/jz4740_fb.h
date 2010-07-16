@@ -32,6 +32,8 @@ enum jz4740_fb_lcd_type {
 	JZ_LCD_TYPE_8BIT_SERIAL = 12,
 };
 
+#define JZ4740_FB_SPECIAL_TFT_CONFIG(start, stop) (((start) << 16) | (stop))
+
 /*
 * width: width of the lcd display in mm
 * height: height of the lcd display in mm
@@ -50,6 +52,13 @@ struct jz4740_fb_platform_data {
 
 	unsigned int bpp;
 	enum jz4740_fb_lcd_type lcd_type;
+
+	struct {
+		uint32_t spl;
+		uint32_t cls;
+		uint32_t ps;
+		uint32_t rev;
+	} special_tft_config;
 
 	unsigned pixclk_falling_edge:1;
 	unsigned date_enable_active_low:1;
