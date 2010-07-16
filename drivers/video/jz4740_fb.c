@@ -26,7 +26,7 @@
 
 #include <linux/dma-mapping.h>
 
-#include <linux/jz4740_fb.h>
+#include <asm/mach-jz4740/jz4740_fb.h>
 #include <asm/mach-jz4740/gpio.h>
 
 #define JZ_REG_LCD_CFG		0x00
