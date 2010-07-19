@@ -22,8 +22,6 @@
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
-#include <linux/jz4740_fb.h>
-#include <linux/mtd/jz4740_nand.h>
 #include <linux/power_supply.h>
 #include <linux/power/gpio-charger.h>
 #include <linux/power/jz4740-battery.h>
@@ -37,8 +35,10 @@
 #include <asm/mipsregs.h>
 #include <asm/reboot.h>
 
-#include <asm/mach-jz4740/jz4740_mmc.h>
 #include <asm/mach-jz4740/gpio.h>
+#include <asm/mach-jz4740/jz4740_fb.h>
+#include <asm/mach-jz4740/jz4740_mmc.h>
+#include <asm/mach-jz4740/jz4740_nand.h>
 #include <asm/mach-jz4740/platform.h>
 
 #include "clock.h"

@@ -27,9 +27,9 @@
 
 #include <linux/dma-mapping.h>
 
-#include <linux/jz4740_fb.h>
 #include <asm/mach-jz4740/dma.h>
 #include <asm/mach-jz4740/gpio.h>
+#include <asm/mach-jz4740/jz4740_fb.h>
 
 #include "jz4740_lcd.h"
 #include "jz4740_slcd.h"

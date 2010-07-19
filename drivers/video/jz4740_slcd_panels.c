@@ -14,9 +14,9 @@
 
 #include <asm/io.h>
 #include <asm/mach-jz4740/gpio.h>
+#include <asm/mach-jz4740/jz4740_fb.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
-#include <linux/jz4740_fb.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 
