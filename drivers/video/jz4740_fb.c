@@ -26,7 +26,7 @@
 
 #include <linux/dma-mapping.h>
 
-#include <linux/jz4740_fb.h>
+#include <asm/mach-jz4740/jz4740_fb.h>
 #include <asm/mach-jz4740/gpio.h>
 
 #include "jz4740_lcd.h"
@@ -77,6 +77,8 @@ static const struct jz_gpio_bulk_request jz_lcd_ctrl_pins[] = {
 	JZ_GPIO_BULK_PIN(LCD_DE),
 	JZ_GPIO_BULK_PIN(LCD_PS),
 	JZ_GPIO_BULK_PIN(LCD_REV),
+	JZ_GPIO_BULK_PIN(LCD_CLS),
+	JZ_GPIO_BULK_PIN(LCD_SPL),
 };
 
 static const struct jz_gpio_bulk_request jz_lcd_data_pins[] = {
@@ -114,6 +116,11 @@ static unsigned int jzfb_num_ctrl_pins(struct jzfb *jzfb)
 	case JZ_LCD_TYPE_8BIT_SERIAL:
 		num = 3;
 		break;
+	case JZ_LCD_TYPE_SPECIAL_TFT_1:
+	case JZ_LCD_TYPE_SPECIAL_TFT_2:
+	case JZ_LCD_TYPE_SPECIAL_TFT_3:
+		num = 8;
+		break;
 	default:
 		num = 0;
 		break;
@@ -134,6 +141,14 @@ static unsigned int jzfb_num_data_pins(struct jzfb *jzfb)
 		break;
 	case JZ_LCD_TYPE_8BIT_SERIAL:
 		num = 8;
+		break;
+	case JZ_LCD_TYPE_SPECIAL_TFT_1:
+	case JZ_LCD_TYPE_SPECIAL_TFT_2:
+	case JZ_LCD_TYPE_SPECIAL_TFT_3:
+		if (jzfb->pdata->bpp == 18)
+			num = 18;
+		else
+			num = 16;
 		break;
 	default:
 		num = 0;
@@ -259,6 +274,7 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 static int jzfb_set_par(struct fb_info *info)
 {
 	struct jzfb *jzfb = info->par;
+	struct jz4740_fb_platform_data *pdata = jzfb->pdata;
 	struct fb_var_screeninfo *var = &info->var;
 	struct fb_videomode *mode;
 	uint16_t hds, vds;
@@ -287,7 +303,7 @@ static int jzfb_set_par(struct fb_info *info)
 
 	ctrl = JZ_LCD_CTRL_OFUP | JZ_LCD_CTRL_BURST_16;
 
-	switch (jzfb->pdata->bpp) {
+	switch (pdata->bpp) {
 	case 1:
 		ctrl |= JZ_LCD_CTRL_BPP_1;
 		break;
@@ -314,8 +330,7 @@ static int jzfb_set_par(struct fb_info *info)
 		break;
 	}
 
-	cfg = JZ_LCD_CFG_PS_DISABLE | JZ_LCD_CFG_CLS_DISABLE |
-		JZ_LCD_CFG_SPL_DISABLE | JZ_LCD_CFG_REV_DISABLE;
+	cfg = pdata->lcd_type & 0xf;
 
 	if (!(mode->sync & FB_SYNC_HOR_HIGH_ACT))
 		cfg |= JZ_LCD_CFG_HSYNC_ACTIVE_LOW;
@@ -323,22 +338,20 @@ static int jzfb_set_par(struct fb_info *info)
 	if (!(mode->sync & FB_SYNC_VERT_HIGH_ACT))
 		cfg |= JZ_LCD_CFG_VSYNC_ACTIVE_LOW;
 
-	if (jzfb->pdata->pixclk_falling_edge)
+	if (pdata->pixclk_falling_edge)
 		cfg |= JZ_LCD_CFG_PCLK_FALLING_EDGE;
 
-	if (jzfb->pdata->date_enable_active_low)
+	if (pdata->date_enable_active_low)
 		cfg |= JZ_LCD_CFG_DE_ACTIVE_LOW;
 
-	if (jzfb->pdata->lcd_type == JZ_LCD_TYPE_GENERIC_18_BIT)
+	if (pdata->lcd_type == JZ_LCD_TYPE_GENERIC_18_BIT)
 		cfg |= JZ_LCD_CFG_18_BIT;
-
-	cfg |= jzfb->pdata->lcd_type & 0xf;
 
 	if (mode->pixclock) {
 		rate = PICOS2KHZ(mode->pixclock) * 1000;
 		mode->refresh = rate / vt / ht;
 	} else {
-		if (jzfb->pdata->lcd_type == JZ_LCD_TYPE_8BIT_SERIAL)
+		if (pdata->lcd_type == JZ_LCD_TYPE_8BIT_SERIAL)
 			rate = mode->refresh * (vt + 2 * mode->xres) * ht;
 		else
 			rate = mode->refresh * vt * ht;
@@ -351,6 +364,23 @@ static int jzfb_set_par(struct fb_info *info)
 		clk_enable(jzfb->ldclk);
 	else
 		ctrl |= JZ_LCD_CTRL_ENABLE;
+
+	switch (pdata->lcd_type) {
+	case JZ_LCD_TYPE_SPECIAL_TFT_1:
+	case JZ_LCD_TYPE_SPECIAL_TFT_2:
+	case JZ_LCD_TYPE_SPECIAL_TFT_3:
+		writel(pdata->special_tft_config.spl, jzfb->base + JZ_REG_LCD_SPL);
+		writel(pdata->special_tft_config.cls, jzfb->base + JZ_REG_LCD_CLS);
+		writel(pdata->special_tft_config.ps, jzfb->base + JZ_REG_LCD_PS);
+		writel(pdata->special_tft_config.ps, jzfb->base + JZ_REG_LCD_REV);
+		break;
+	default:
+		cfg |= JZ_LCD_CFG_PS_DISABLE;
+		cfg |= JZ_LCD_CFG_CLS_DISABLE;
+		cfg |= JZ_LCD_CFG_SPL_DISABLE;
+		cfg |= JZ_LCD_CFG_REV_DISABLE;
+		break;
+	}
 
 	writel(mode->hsync_len, jzfb->base + JZ_REG_LCD_HSYNC);
 	writel(mode->vsync_len, jzfb->base + JZ_REG_LCD_VSYNC);

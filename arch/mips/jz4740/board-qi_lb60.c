@@ -20,17 +20,16 @@
 
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
-#include <linux/mtd/jz4740_nand.h>
-#include <linux/jz4740_fb.h>
 #include <linux/input/matrix_keypad.h>
-#include <linux/mtd/jz4740_nand.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_gpio.h>
 #include <linux/power_supply.h>
 #include <linux/power/jz4740-battery.h>
 #include <linux/power/gpio-charger.h>
 
+#include <asm/mach-jz4740/jz4740_fb.h>
 #include <asm/mach-jz4740/jz4740_mmc.h>
+#include <asm/mach-jz4740/jz4740_nand.h>
 
 #include <linux/regulator/fixed.h>
 #include <linux/regulator/machine.h>
