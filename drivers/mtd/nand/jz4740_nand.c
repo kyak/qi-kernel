@@ -66,7 +66,7 @@ struct jz_nand {
 	void __iomem *bank_base[4];
 	struct resource *bank_mem[4];
 
-	int selected_chip;
+	int selected_bank;
 
 	struct jz_nand_platform_data *pdata;
 	bool is_reading;
@@ -82,18 +82,21 @@ static void jz_nand_select_chip(struct mtd_info *mtd, int chipnr)
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	struct nand_chip *chip = mtd->priv;
 	uint32_t ctrl;
+	int banknr;
 
 	ctrl = readl(nand->base + JZ_REG_NAND_CTRL);
 	ctrl &= ~JZ_NAND_CTRL_ASSERT_CHIP_MASK;
 
-	if (chipnr != -1) {
-		chipnr = nand->pdata->banks[chipnr] - 1;
-		chip->IO_ADDR_R = nand->bank_base[chipnr];
-		chip->IO_ADDR_W = nand->bank_base[chipnr];
+	if (chipnr == -1) {
+		banknr = -1;
+	} else {
+		banknr = nand->pdata->banks[chipnr] - 1;
+		chip->IO_ADDR_R = nand->bank_base[banknr];
+		chip->IO_ADDR_W = nand->bank_base[banknr];
 	}
 	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
 
-	nand->selected_chip = chipnr;
+	nand->selected_bank = banknr;
 }
 
 static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
@@ -101,9 +104,9 @@ static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	struct nand_chip *chip = mtd->priv;
 	uint32_t reg;
-	void __iomem *bank_base = nand->bank_base[nand->selected_chip];
+	void __iomem *bank_base = nand->bank_base[nand->selected_bank];
 
-	BUG_ON(nand->selected_chip < 0);
+	BUG_ON(nand->selected_bank < 0);
 
 	if (ctrl & NAND_CTRL_CHANGE) {
 		BUG_ON((ctrl & NAND_ALE) && (ctrl & NAND_CLE));
@@ -115,11 +118,13 @@ static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 
 		reg = readl(nand->base + JZ_REG_NAND_CTRL);
 		if (ctrl & NAND_NCE)
-			reg |= JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_chip);
+			reg |= JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_bank);
 		else
-			reg &= ~JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_chip);
+			reg &= ~JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_bank);
 		writel(reg, nand->base + JZ_REG_NAND_CTRL);
 	}
+	//printk("write %02X to %p (bank %d)\n",
+	//       dat, chip->IO_ADDR_W, nand->selected_bank + 1);
 	if (dat != NAND_CMD_NONE)
 		writeb(dat, chip->IO_ADDR_W);
 }
@@ -374,6 +379,18 @@ static inline void jz_nand_iounmap_resource(struct resource *res, void __iomem *
 	release_mem_region(res->start, resource_size(res));
 }
 
+static void jz_nand_iounmap_banks(
+	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
+{
+	int i;
+
+	for (i = 0; i < num_banks; ++i) {
+		unsigned char bank = banks[i];
+		jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
+					 nand->bank_base[bank - 1]);
+	}
+}
+
 static int jz_nand_ioremap_banks(struct platform_device *pdev,
 	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
 {
@@ -382,21 +399,19 @@ static int jz_nand_ioremap_banks(struct platform_device *pdev,
 	int i;
 
 	for (i = 0; i < num_banks; ++i) {
-	    sprintf(name, "bank%d", banks[i]);
+		unsigned char bank = banks[i];
+		sprintf(name, "bank%d", bank);
 
-	    ret = jz_nand_ioremap_resource(pdev, name, &nand->bank_mem[i],
-			&nand->bank_base[i]);
-
-	    if (ret)
-		    goto err;
+		ret = jz_nand_ioremap_resource(pdev, name,
+					       &nand->bank_mem[bank - 1],
+					       &nand->bank_base[bank - 1]);
+		if (ret) {
+			jz_nand_iounmap_banks(nand, banks, i);
+			return ret;
+		}
 	}
 
 	return 0;
-err:
-	for (--i; i >= 0; --i)
-	    jz_nand_iounmap_resource(nand->bank_mem[i], nand->bank_base[i]);
-
-	return ret;
 }
 
 static int __devinit jz_nand_probe(struct platform_device *pdev)
@@ -410,7 +425,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	struct mtd_partition *partition_info;
 	int num_partitions = 0;
 #endif
-	size_t num_banks, i;
+	size_t num_banks;
 	unsigned char bank;
 	uint32_t ctrl;
 
@@ -533,8 +548,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 err_nand_release:
 	nand_release(&nand->mtd);
 err_iounmap_banks:
-	for (i = 0; i < num_banks; ++i)
-	    jz_nand_iounmap_resource(nand->bank_mem[i], nand->bank_base[i]);
+	jz_nand_iounmap_banks(nand, pdata->banks, num_banks);
 err_gpio_free:
 	platform_set_drvdata(pdev, NULL);
 	gpio_free(pdata->busy_gpio);
