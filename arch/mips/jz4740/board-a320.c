@@ -268,6 +268,7 @@ static struct gpio_keys_button a320_buttons[] = {
 static struct gpio_keys_platform_data a320_gpio_keys_pdata = {
 	.buttons = a320_buttons,
 	.nbuttons = ARRAY_SIZE(a320_buttons),
+	.rep = 1,
 };
 
 static struct platform_device a320_gpio_keys_device = {
