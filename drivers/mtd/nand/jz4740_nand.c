@@ -565,6 +565,7 @@ err_free:
 static int __devexit jz_nand_remove(struct platform_device *pdev)
 {
 	struct jz_nand *nand = platform_get_drvdata(pdev);
+	struct jz_nand_platform_data *pdata = pdev->dev.platform_data;
 	int i;
 
 	nand_release(&nand->mtd);
@@ -572,11 +573,11 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
 	/* Deassert and disable all chips */
 	writel(0, nand->base + JZ_REG_NAND_CTRL);
 
-	i = 0;
-	do {
-	    jz_nand_iounmap_resource(nand->bank_mem[i], nand->bank_base[i]);
-	    ++i;
-	} while (nand->bank_base[i] != 0 && i < 4);
+	for (i = 0; i < 4; ++i)
+		if (nand->bank_base[i] != 0)
+			jz_nand_iounmap_resource(nand->bank_mem[i],
+						 nand->bank_base[i]);
+	gpio_free(pdata->busy_gpio);
 
 	jz_nand_iounmap_resource(nand->mem, nand->base);
 
