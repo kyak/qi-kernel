@@ -483,13 +483,28 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 
 	ctrl = 0;
 	for (num_banks = 0; num_banks < 4 ; ++num_banks) {
+		int gpio;
+		char name[9];
+
 		bank = pdata->banks[num_banks];
 		if (bank == 0)
 			break;
 		if (bank > 4) {
+			dev_err(&pdev->dev, "Non-existing bank: %d\n", bank);
 			ret = -EINVAL;
 			goto err_gpio_free;
 		}
+
+		sprintf(name, "NAND CS%d", bank);
+		gpio = JZ_GPIO_MEM_CS0 + bank - 1;
+		ret = gpio_request(gpio, name);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"Failed to request %s gpio %d: %d\n",
+				name, gpio, ret);
+			goto err_gpio_free;
+		}
+		jz_gpio_set_function(gpio, JZ_GPIO_FUNC_MEM_CS0);
 
 		ctrl |= JZ_NAND_CTRL_ENABLE_CHIP(bank - 1);
 	}
@@ -555,6 +570,10 @@ err_iounmap_banks:
 err_gpio_free:
 	platform_set_drvdata(pdev, NULL);
 	gpio_free(pdata->busy_gpio);
+	while (num_banks--) {
+		bank = pdata->banks[num_banks];
+		gpio_free(JZ_GPIO_MEM_CS0 + bank - 1);
+	}
 err_iounmap_mmio:
 	iounmap(nand->base);
 err_free:
@@ -574,9 +593,11 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
 	writel(0, nand->base + JZ_REG_NAND_CTRL);
 
 	for (i = 0; i < 4; ++i)
-		if (nand->bank_base[i] != 0)
+		if (nand->bank_base[i] != 0) {
 			jz_nand_iounmap_resource(nand->bank_mem[i],
 						 nand->bank_base[i]);
+			gpio_free(JZ_GPIO_MEM_CS0 + i);
+		}
 	gpio_free(pdata->busy_gpio);
 
 	jz_nand_iounmap_resource(nand->mem, nand->base);
