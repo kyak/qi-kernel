@@ -23,6 +23,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_AK4671 if I2C
 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
 	select SND_SOC_CS4270 if I2C
+	select SND_SOC_JZ4740 if SOC_JZ4740
 	select SND_SOC_MAX9877 if I2C
 	select SND_SOC_DA7210 if I2C
 	select SND_SOC_PCM3008
@@ -136,6 +137,9 @@ config SND_SOC_CS4270_VD33_ERRATA
 	depends on SND_SOC_CS4270
 
 config SND_SOC_CX20442
+	tristate
+
+config SND_SOC_JZ4740_CODEC
 	tristate
 
 config SND_SOC_L3
