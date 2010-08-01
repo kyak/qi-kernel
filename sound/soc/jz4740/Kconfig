@@ -21,3 +21,11 @@ config SND_JZ4740_SOC_QI_LB60
 	help
 	  Say Y if you want to add support for ASoC audio on the Qi LB60 board
 	  a.k.a Qi Ben NanoNote.
+
+config SND_JZ4740_SOC_N516
+	tristate "SoC Audio support for Hanvon N516 eBook reader"
+	depends on SND_JZ4740_SOC && JZ4740_N516
+	select SND_JZ4740_SOC_I2S
+    select SND_SOC_JZCODEC
+	help
+	  Say Y if you want to enable support for SoC audio on the Hanvon N516.
