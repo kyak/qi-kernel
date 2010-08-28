@@ -111,10 +111,7 @@ static struct mtd_partition a320_nand_partitions[] = {
 static uint8_t a320_nand_bbt_pattern[] = {'b', 'b', 't', '8' };
 
 static struct nand_bbt_descr a320_nand_bbt_main_descr = {
-	/* TODO(MtH): 1 bit per block is just a guess.
-	              On my Dingoo the entire page is filled with 0xFF;
-	              I guess that means it has no bad blocks. */
-	.options = NAND_BBT_ABSPAGE | NAND_BBT_1BIT,
+	.options = NAND_BBT_ABSPAGE | NAND_BBT_8BIT,
 	/* TODO(MtH): Maybe useful flags for the future:
 	NAND_BBT_CREATE | NAND_BBT_WRITE | NAND_BBT_VERSION | NAND_BBT_PERCHIP
 	*/
