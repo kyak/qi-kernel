@@ -19,5 +19,6 @@ obj-$(CONFIG_JZ4740_ID800WT)	+= board-id800wt.o
 # PM support
 
 obj-$(CONFIG_PM) += pm.o
+obj-$(CONFIG_CPU_FREQ_JZ) += cpufreq.o
 
 EXTRA_CFLAGS += -Werror -Wall

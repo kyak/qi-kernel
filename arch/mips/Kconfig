@@ -186,6 +186,7 @@ config MACH_JZ4740
 	select ARCH_REQUIRE_GPIOLIB
 	select SYS_HAS_EARLY_PRINTK
 	select HAVE_PWM
+	select CPU_SUPPORTS_CPUFREQ
 
 config LASAT
 	bool "LASAT Networks platforms"
