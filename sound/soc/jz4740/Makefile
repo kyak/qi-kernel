@@ -11,7 +11,9 @@ obj-$(CONFIG_SND_JZ4740_SOC_I2S) += snd-soc-jz4740-i2s.o
 snd-soc-qi-lb60-objs := qi_lb60.o
 snd-soc-n516-objs := n516.o
 snd-soc-n526-objs := n526.o
+snd-soc-a320-objs := a320.o
 
 obj-$(CONFIG_SND_JZ4740_SOC_QI_LB60) += snd-soc-qi-lb60.o
 obj-$(CONFIG_SND_JZ4740_SOC_N516) += snd-soc-n516.o
 obj-$(CONFIG_SND_JZ4740_SOC_N526) += snd-soc-n526.o
+obj-$(CONFIG_SND_JZ4740_SOC_A320) += snd-soc-a320.o
