@@ -2240,13 +2240,13 @@ config FB_JZ4740
 
 config FB_JZ4740_SLCD
 	tristate "JZ4740 Smart LCD framebuffer support"
-	depends on FB && SOC_JZ4740 && HAS_DMA
+	depends on FB
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT
-	---help---
+	help
 	  This is the frame buffer device driver for the JZ4740 Smart LCD controller.
-	  If you say Y here, please say N to 'JZ4720/JZ4740 LCD framebuffer support'.
+	  If you say Y here, please say N to 'JZ4740 LCD framebuffer support'.
 
 config JZ_SLCD_ILI9325
 	bool "ILI9325 Smart LCD panel"

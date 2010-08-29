@@ -123,7 +123,7 @@ choice
 #
 config USB_GADGET_JZ4740
 	boolean "JZ4740 UDC"
-	depends on SOC_JZ4740
+	depends on MACH_JZ4740
 	select USB_GADGET_SELECTED
 	select USB_GADGET_DUALSPEED
 	help
