@@ -123,10 +123,19 @@ static struct nand_bbt_descr a320_nand_bbt_main_descr = {
 };
 
 static struct nand_ecclayout a320_nand_ecc_layout = {
-	.eccpos = { 4 },
+	.eccpos = {
+		 4,  5,  6,  7,  8,  9, 10, 11, 12, /* sector 0 */
+		16, 17, 18, 19, 20, 21, 22, 23, 24, /* sector 1 */
+		28, 29, 30, 31, 32, 33, 34, 35, 36, /* sector 2 */
+		40, 41, 42, 43, 44, 45, 46, 47, 48, /* sector 3 */
+		52, 53, 54, 55, 56, 57, 58, 59, 60, /* sector 4 */
+		64, 65, 66, 67, 68, 69, 70, 71, 72, /* sector 5 */
+		76, 77, 78, 79, 80, 81, 82, 83, 84, /* sector 6 */
+		88, 89, 90, 91, 92, 93, 94, 95, 96, /* sector 7 */
+	},
 	.oobfree = {
 		{ .offset = 100, .length = 22 },
-		}
+	}
 };
 
 static void a320_nand_ident(struct platform_device *pdev,
@@ -135,7 +144,6 @@ static void a320_nand_ident(struct platform_device *pdev,
 			    int *num_partitions)
 {
 	chip->options |= NAND_USE_FLASH_BBT;
-	chip->ecc.bytes = 12; /* 9 bytes ECC + 3 bytes zero padding */
 	chip->bbt_td = &a320_nand_bbt_main_descr;
 	/* MtH: I did not find a mirror bbt yet, but it might exist. */
 	chip->bbt_md = NULL;
