@@ -283,41 +283,41 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_GPIO
 	&a320_i2c_device,
 #endif
-	&jz4740_usb_ohci_device,
-	&jz4740_usb_gdt_device,
+	/* USB host is not usable since the PCB does not route the pins to
+	 * a place where new wires can be soldered. */
+	/*&jz4740_usb_ohci_device,*/
+	&jz4740_udc_device,
 	&jz4740_mmc_device,
 	&jz4740_nand_device,
-	/* TODO(MtH): A320 equivalent?
-	&qi_lb60_keypad, */
-	/* TODO(MtH): Not needed for Dingux?
-	&spigpio_device, */
-	/*&jz4740_framebuffer_device,*/
-	&jz4740_slcd_framebuffer_device,
+	&jz4740_framebuffer_device,
 	&jz4740_i2s_device,
 	&jz4740_codec_device,
 	&jz4740_rtc_device,
 	&jz4740_adc_device,
-	&jz4740_battery_device,
 	&a320_charger_device,
 	&a320_backlight_device,
 	&a320_gpio_keys_device,
 };
 
+static void __init board_gpio_setup(void)
+{
+	/* We only need to enable/disable pullup here for pins used in generic
+	 * drivers. Everything else is done by the drivers themselves. */
+
+	/* Disable pullup of the USB detection pin: on the A320 pullup or not
+	 * seems to make no difference, but on A330 the signal will be unstable
+	 * when the pullup is enabled. */
+	jz_gpio_disable_pullup(JZ_GPIO_PORTD(28));
+}
+
 static int __init a320_init_platform_devices(void)
 {
-	/*jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;*/
-	jz4740_slcd_framebuffer_device.dev.platform_data = &a320_fb_pdata;
+	jz4740_framebuffer_device.dev.platform_data = &a320_fb_pdata;
 	jz4740_nand_device.dev.platform_data = &a320_nand_pdata;
-	jz4740_battery_device.dev.platform_data = &a320_battery_pdata;
+	jz4740_adc_device.dev.platform_data = &a320_battery_pdata;
 	jz4740_mmc_device.dev.platform_data = &a320_mmc_pdata;
 
 	jz4740_serial_device_register();
-
-	/* TODO(MtH): Dingux has no SPI support enabled.
-	              See drivers/spi/Kconfig.
-	spi_register_board_info(a320_spi_board_info,
-				ARRAY_SIZE(a320_spi_board_info));
-	*/
 
 	return platform_add_devices(jz_platform_devices,
 					ARRAY_SIZE(jz_platform_devices));
@@ -328,23 +328,13 @@ struct jz4740_clock_board_data jz4740_clock_bdata = {
 	.rtc_rate = 32768,
 };
 
-extern int jz_gpiolib_init(void);
-
 static int __init a320_board_setup(void)
 {
-	printk("JZ4740 A320 board setup\n");
+	printk(KERN_INFO "JZ4740 A320 board setup\n");
 
-	/* TODO(MtH): Does the blink code require the GPIO to be initialized or not? */
-	if (jz_gpiolib_init())
-		panic("Failed to initalize jz gpio\n");
 	panic_blink = a320_panic_blink_callback;
 
-	jz4740_clock_init();
-
-	/* Disable pullup of the USB detection pin: on the A320 pullup or not
-	   seems to make no difference, but on A330 the signal will be unstable
-	   when the pullup is enabled. */
-	jz_gpio_disable_pullup(JZ_GPIO_PORTD(28));
+	board_gpio_setup();
 
 	if (a320_init_platform_devices())
 		panic("Failed to initalize platform devices\n");
