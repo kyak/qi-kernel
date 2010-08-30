@@ -497,18 +497,17 @@ static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 
 static int jzfb_alloc_devmem(struct jzfb *jzfb)
 {
-	int max_videosize = 0;
+	int max_framesize = 0;
 	struct fb_videomode *mode = jzfb->pdata->modes;
 	void *page;
 	int i;
 
 	for (i = 0; i < jzfb->pdata->num_modes; ++mode, ++i) {
-		if (max_videosize < mode->xres * mode->yres)
-			max_videosize = mode->xres * mode->yres;
+		if (max_framesize < mode->xres * mode->yres)
+			max_framesize = mode->xres * mode->yres;
 	}
 
-	max_videosize *= jzfb_get_controller_bpp(jzfb) >> 3;
-	max_videosize *= 2; /* allow double buffering */
+	max_framesize *= jzfb_get_controller_bpp(jzfb) >> 3;
 
 	jzfb->framedesc = dma_alloc_coherent(&jzfb->pdev->dev,
 				    sizeof(*jzfb->framedesc),
@@ -517,7 +516,8 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 	if (!jzfb->framedesc)
 		return -ENOMEM;
 
-	jzfb->vidmem_size = PAGE_ALIGN(max_videosize);
+	/* reserve memory for two frames to allow double buffering */
+	jzfb->vidmem_size = PAGE_ALIGN(max_framesize * 2);
 	jzfb->vidmem = dma_alloc_coherent(&jzfb->pdev->dev,
 						jzfb->vidmem_size,
 						&jzfb->vidmem_phys, GFP_KERNEL);
@@ -535,7 +535,7 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 	jzfb->framedesc->addr = jzfb->vidmem_phys;
 	jzfb->framedesc->id = 0xdeafbead;
 	jzfb->framedesc->cmd = 0;
-	jzfb->framedesc->cmd |= max_videosize / 4;
+	jzfb->framedesc->cmd |= max_framesize / 4;
 
 	return 0;
 
