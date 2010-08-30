@@ -150,7 +150,7 @@ struct nand_oobfree {
  */
 struct nand_ecclayout {
 	__u32 eccbytes;
-	__u32 eccpos[64];
+	__u32 eccpos[72];
 	__u32 oobavail;
 	struct nand_oobfree oobfree[MTD_MAX_OOBFREE_ENTRIES];
 };
