@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009, Lars-Peter Clausen <lars@metafoo.de>
+ * Copyright (C) 2010, Maarten ter Huurne <maarten@treewalker.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,7 +23,7 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-#include "../codecs/jzcodec.h"
+#include "../codecs/jz4740.h"
 #include "jz4740-pcm.h"
 #include "jz4740-i2s.h"
 
@@ -66,16 +67,9 @@ static int a320_codec_init(struct snd_soc_codec *codec)
 {
 	int ret;
 	struct snd_soc_dai *cpu_dai = codec->socdev->card->dai_link->cpu_dai;
-	struct snd_soc_dai *codec_dai = codec->socdev->card->dai_link->codec_dai;
 
 	snd_soc_dapm_nc_pin(codec, "LIN");
 	snd_soc_dapm_nc_pin(codec, "RIN");
-
-	ret = snd_soc_dai_set_fmt(codec_dai, A320_DAIFMT);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai format: %d\n", ret);
-		return ret;
-	}
 
 	ret = snd_soc_dai_set_fmt(cpu_dai, A320_DAIFMT);
 	if (ret < 0) {
@@ -83,27 +77,18 @@ static int a320_codec_init(struct snd_soc_codec *codec)
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(codec_dai, JZCODEC_SYSCLK, 111,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		dev_err(codec->dev, "Failed to set codec dai sysclk: %d\n", ret);
-		return ret;
-	}
-
 	snd_soc_dapm_new_controls(codec, a320_widgets, ARRAY_SIZE(a320_widgets));
-
 	snd_soc_dapm_add_routes(codec, a320_routes, ARRAY_SIZE(a320_routes));
-
 	snd_soc_dapm_sync(codec);
 
 	return 0;
 }
 
 static struct snd_soc_dai_link a320_dai = {
-	.name = "jz-codec",
-	.stream_name = "JZCODEC",
+	.name = "jz4740",
+	.stream_name = "jz4740",
 	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz_codec_dai,
+	.codec_dai = &jz4740_codec_dai,
 	.init = a320_codec_init,
 };
 
@@ -116,7 +101,7 @@ static struct snd_soc_card a320 = {
 
 static struct snd_soc_device a320_snd_devdata = {
 	.card = &a320,
-	.codec_dev = &soc_codec_dev_jzcodec,
+	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *a320_snd_device;
@@ -129,7 +114,6 @@ static int __init a320_init(void)
 
 	if (!a320_snd_device)
 		return -ENOMEM;
-
 
 	ret = gpio_request(A320_SND_GPIO, "SND");
 	if (ret) {
@@ -179,6 +163,6 @@ static void __exit a320_exit(void)
 }
 module_exit(a320_exit);
 
-MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
+MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>, Maarten ter Huurne <maarten@treewalker.org>");
 MODULE_DESCRIPTION("ALSA SoC Dingoo A320 Audio support");
 MODULE_LICENSE("GPL v2");
