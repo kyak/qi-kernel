@@ -161,7 +161,7 @@ static int jz4740_freq_target(struct cpufreq_policy *policy,
 	return ret;
 }
 
-static int __init jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
+static int jz4740_cpufreq_driver_init(struct cpufreq_policy *policy)
 {
 	int ret;
 
