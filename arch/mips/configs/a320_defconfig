@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35
-# Mon Aug 30 23:07:20 2010
+# Tue Aug 31 02:12:01 2010
 #
 CONFIG_MIPS=y
 
@@ -1074,8 +1074,8 @@ CONFIG_STAGING=y
 # RAR Register Driver
 #
 # CONFIG_IIO is not set
-CONFIG_RAMZSWAP=y
-CONFIG_RAMZSWAP_STATS=y
+CONFIG_ZRAM=y
+CONFIG_ZRAM_STATS=y
 # CONFIG_BATMAN_ADV is not set
 # CONFIG_FB_SM7XX is not set
 
