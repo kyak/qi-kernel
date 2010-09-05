@@ -24,6 +24,8 @@
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
 
+#include <linux/leds.h>
+
 #include <linux/i2c.h>
 
 #include "clock.h"
@@ -251,9 +253,9 @@ static struct gpio_keys_button n526_gpio_keys_buttons[] = {
 	},
 };
 
-static struct gpio_keys_platform_data qi_lb60_gpio_keys_data = {
-	.nbuttons = ARRAY_SIZE(qi_lb60_gpio_keys_buttons),
-	.buttons = qi_lb60_gpio_keys_buttons,
+static struct gpio_keys_platform_data n526_gpio_keys_data = {
+	.nbuttons = ARRAY_SIZE(n526_gpio_keys_buttons),
+	.buttons = n526_gpio_keys_buttons,
 };
 
 static struct platform_device n526_gpio_keys_device = {
