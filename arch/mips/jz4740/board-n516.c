@@ -35,14 +35,10 @@
 
 #include "clock.h"
 
-static long n516_panic_blink(long time)
+static long n516_panic_blink(int state)
 {
-	gpio_set_value(GPIO_LED_ENABLE, 1);
-	mdelay(200);
-	gpio_set_value(GPIO_LED_ENABLE, 0);
-	mdelay(200);
-
-	return 400;
+	gpio_set_value(GPIO_LED_ENABLE, state ? 1 : 0);
+	return 0;
 }
 
 static void __init board_gpio_setup(void)
@@ -170,8 +166,6 @@ struct jz4740_clock_board_data jz4740_clock_bdata = {
 	.ext_rate = 12000000,
 	.rtc_rate = 32768,
 };
-
-extern int jz_gpiolib_init(void);
 
 static int n516_setup_platform(void)
 {
