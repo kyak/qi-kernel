@@ -14,6 +14,10 @@ config JZ4740_N526
 	bool "Hanvon n526 eBook reader"
 	select SOC_JZ4740
 
+config JZ4740_ID800WT
+	bool "Sungale id800wt picture frame"
+	select SOC_JZ4740
+
 endchoice
 
 config HAVE_PWM
