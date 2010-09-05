@@ -142,7 +142,7 @@ static struct resource jz4740_i2c_resources[] = {
 };
 
 struct platform_device jz4740_i2c_device = {
-	.name		= "jz4740-i2c",
+	.name		= "jz47xx-i2c",
 	.id		= 0,
 	.num_resources  = ARRAY_SIZE(jz4740_i2c_resources),
 	.resource	= jz4740_i2c_resources,
