@@ -46,9 +46,9 @@
 enum {
 	JZ_ADC_IRQ_ADCIN = 0,
 	JZ_ADC_IRQ_BATTERY,
-	JZ_ADC_IRQ_TOUCH,
-	JZ_ADC_IRQ_PENUP,
-	JZ_ADC_IRQ_PENDOWN,
+	JZ_ADC_IRQ_TS_DATA_READY,
+	JZ_ADC_IRQ_TS_PENUP,
+	JZ_ADC_IRQ_TS_PENDOWN,
 };
 
 struct jz4740_adc {
@@ -226,6 +226,27 @@ static struct resource jz4740_battery_resources[] = {
 	},
 };
 
+static struct resource jz4740_ts_resources[] = {
+	{
+		.start = JZ_ADC_IRQ_TS_DATA_READY,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = JZ_ADC_IRQ_TS_PENUP,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = JZ_ADC_IRQ_TS_PENDOWN,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start	= JZ_REG_ADC_TOUCHSCREEN_BASE,
+		.end	= JZ_REG_ADC_TOUCHSCREEN_BASE + 0xb,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+
 const struct mfd_cell jz4740_adc_cells[] = {
 	{
 		.id = 0,
@@ -241,6 +262,17 @@ const struct mfd_cell jz4740_adc_cells[] = {
 		.name = "jz4740-battery",
 		.num_resources = ARRAY_SIZE(jz4740_battery_resources),
 		.resources = jz4740_battery_resources,
+
+		.enable = jz4740_adc_cell_enable,
+		.disable = jz4740_adc_cell_disable,
+	},
+	{
+		.id = 2,
+		.name = "jz4740-ts",
+		.num_resources = ARRAY_SIZE(jz4740_ts_resources),
+		.resources = jz4740_ts_resources,
+		.platform_data = (void *)&jz4740_adc_cells[2],
+		.data_size = sizeof(struct mfd_cell),
 
 		.enable = jz4740_adc_cell_enable,
 		.disable = jz4740_adc_cell_disable,

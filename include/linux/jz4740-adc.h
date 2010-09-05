@@ -25,7 +25,7 @@ int jz4740_adc_set_config(struct device *dev, uint32_t mask, uint32_t val);
 #define JZ_ADC_CONFIG_BAT_MB		BIT(4)
 
 #define JZ_ADC_CONFIG_DNUM(dnum)	((dnum) << 16)
-#define JZ_ADC_CONFIG_XYZ_OFFSET(dnum)	((xyz) << 13)
+#define JZ_ADC_CONFIG_XYZ_OFFSET(xyz)	((xyz) << 13)
 #define JZ_ADC_CONFIG_SAMPLE_NUM(x)	((x) << 10)
 #define JZ_ADC_CONFIG_CLKDIV(div)	((div) << 5)
 
