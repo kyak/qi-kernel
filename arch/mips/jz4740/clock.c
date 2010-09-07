@@ -268,8 +268,17 @@ static void jz_clk_pll_calc_dividers(unsigned long rate,
 static unsigned long jz_clk_pll_round_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned int in_div, feedback, out_div;
+	/* The PLL frequency must be a multiple of 24 MHz, since the LCD pixel
+	 * clock must be exactly 12 MHz for the TV-out to work.
+	 * TODO: A multiple of 12 MHz for the PLL would work if the PLL would
+	 *       not be divided by 2 before being passed to the set of derived
+	 *       clocks that includes the LCD pixel clock.
+	 * TODO: Systemwide decisions like this should be made by the board
+	 *       support code, so add some kind of hook for that.
+	 */
+	unsigned long rate24 = (rate / 24000000) * 24000000;
 
-	jz_clk_pll_calc_dividers(rate, &in_div, &feedback, &out_div);
+	jz_clk_pll_calc_dividers(rate24, &in_div, &feedback, &out_div);
 	return jz_clk_pll_calc_rate(in_div, feedback, out_div);
 }
 
