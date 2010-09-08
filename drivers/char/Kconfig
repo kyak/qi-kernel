@@ -88,6 +88,16 @@ config VT_HW_CONSOLE_BINDING
 	 information. For framebuffer console users, please refer to
 	 <file:Documentation/fb/fbcon.txt>.
 
+config DEVMEM
+	bool "/dev/mem virtual device support"
+	default y
+	help
+	  Say Y here if you want to support the /dev/mem device.
+	  Some X server drivers access the video hardware using this device.
+	  Accessing hardware directly from user space can be useful in some
+	  cases, but it is not without risks.
+	  When in doubt, say "N".
+
 config DEVKMEM
 	bool "/dev/kmem virtual device support"
 	default y
