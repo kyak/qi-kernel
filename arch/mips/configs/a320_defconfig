@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35
-# Tue Aug 31 02:12:01 2010
+# Wed Sep  8 02:26:06 2010
 #
 CONFIG_MIPS=y
 
@@ -668,7 +668,8 @@ CONFIG_CONSOLE_TRANSLATIONS=y
 CONFIG_VT_CONSOLE=y
 CONFIG_HW_CONSOLE=y
 CONFIG_VT_HW_CONSOLE_BINDING=y
-CONFIG_DEVKMEM=y
+# CONFIG_DEVMEM is not set
+# CONFIG_DEVKMEM is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
 # CONFIG_N_GSM is not set
 
