@@ -254,20 +254,76 @@ static struct platform_device a320_charger_device = {
     /* TODO(CongoZombie): Confirm power slider pin (Booboo's docs seem unsure)  */
 
 static struct gpio_keys_button a320_buttons[] = {
-	{ .gpio = JZ_GPIO_PORTD(6),	.active_low = 1,	.code = KEY_UP		}, /* D-pad up */
-	{ .gpio = JZ_GPIO_PORTD(27),	.active_low = 1,	.code = KEY_DOWN	}, /* D-pad down */
-	{ .gpio = JZ_GPIO_PORTD(5),	.active_low = 1,	.code = KEY_LEFT	}, /* D-pad left */
-	{ .gpio = JZ_GPIO_PORTD(18),	.active_low = 1,	.code = KEY_RIGHT	}, /* D-pad right */
-	{ .gpio = JZ_GPIO_PORTD(0),	.active_low = 1,	.code = KEY_LEFTCTRL	}, /* A button */
-	{ .gpio = JZ_GPIO_PORTD(1),	.active_low = 1,	.code = KEY_LEFTALT	}, /* B button */
-	{ .gpio = JZ_GPIO_PORTD(19),	.active_low = 1,	.code = KEY_SPACE	}, /* X button */
-	{ .gpio = JZ_GPIO_PORTD(2),	.active_low = 1,	.code = KEY_LEFTSHIFT	}, /* Y button */
-	{ .gpio = JZ_GPIO_PORTD(14),	.active_low = 1,	.code = KEY_TAB		}, /* Left shoulder button */
-	{ .gpio = JZ_GPIO_PORTD(15),	.active_low = 1,	.code = KEY_BACKSPACE	}, /* Right shoulder button */
-	{ .gpio = JZ_GPIO_PORTC(17),	.active_low = 1,	.code = KEY_ENTER	}, /* START button */
-	{ .gpio = JZ_GPIO_PORTD(17),	.active_low = 1,	.code = KEY_ESC		}, /* SELECT button */
-	{ .gpio = JZ_GPIO_PORTD(29),	.active_low = 1,	.code = KEY_POWER	}, /* POWER slider */
-	{ .gpio = JZ_GPIO_PORTD(22),	.active_low = 1,	.code = KEY_PAUSE	}, /* POWER hold */
+	/* D-pad up */ {
+		.gpio		= JZ_GPIO_PORTD(6),
+		.active_low	= 1,
+		.code		= KEY_UP
+	},
+	/* D-pad down */ {
+		.gpio		= JZ_GPIO_PORTD(27),
+		.active_low	= 1,
+		.code		= KEY_DOWN
+	},
+	/* D-pad left */ {
+		.gpio		= JZ_GPIO_PORTD(5),
+		.active_low	= 1,
+		.code		= KEY_LEFT
+	},
+	/* D-pad right */ {
+		.gpio		= JZ_GPIO_PORTD(18),
+		.active_low	= 1,
+		.code		= KEY_RIGHT
+	},
+	/* A button */ {
+		.gpio		= JZ_GPIO_PORTD(0),
+		.active_low	= 1,
+		.code		= KEY_LEFTCTRL
+	},
+	/* B button */ {
+		.gpio		= JZ_GPIO_PORTD(1),
+		.active_low	= 1,
+		.code		= KEY_LEFTALT
+	},
+	/* X button */ {
+		.gpio		= JZ_GPIO_PORTD(19),
+		.active_low	= 1,
+		.code		= KEY_SPACE
+	},
+	/* Y button */ {
+		.gpio		= JZ_GPIO_PORTD(2),
+		.active_low	= 1,
+		.code		= KEY_LEFTSHIFT
+	},
+	/* Left shoulder button */ {
+		.gpio		= JZ_GPIO_PORTD(14),
+		.active_low	= 1,
+		.code		= KEY_TAB
+	},
+	/* Right shoulder button */ {
+		.gpio		= JZ_GPIO_PORTD(15),
+		.active_low	= 1,
+		.code		= KEY_BACKSPACE
+	},
+	/* START button */ {
+		.gpio		= JZ_GPIO_PORTC(17),
+		.active_low	= 1,
+		.code		= KEY_ENTER
+	},
+	/* SELECT button */ {
+		.gpio		= JZ_GPIO_PORTD(17),
+		.active_low	= 1,
+		.code		= KEY_ESC
+	},
+	/* POWER slider */ {
+		.gpio		= JZ_GPIO_PORTD(29),
+		.active_low	= 1,
+		.code		= KEY_POWER,
+	},
+	/* POWER hold */ {
+		.gpio		= JZ_GPIO_PORTD(22),
+		.active_low	= 1,
+		.code		= KEY_PAUSE
+	},
 };
 
 static struct gpio_keys_platform_data a320_gpio_keys_pdata = {
