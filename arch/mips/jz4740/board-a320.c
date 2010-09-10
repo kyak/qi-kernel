@@ -318,6 +318,7 @@ static struct gpio_keys_button a320_buttons[] = {
 		.gpio		= JZ_GPIO_PORTD(29),
 		.active_low	= 1,
 		.code		= KEY_POWER,
+		.wakeup		= 1,
 	},
 	/* POWER hold */ {
 		.gpio		= JZ_GPIO_PORTD(22),
