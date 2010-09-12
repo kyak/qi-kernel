@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35
-# Sun Sep 12 04:07:55 2010
+# Sun Sep 12 16:10:03 2010
 #
 CONFIG_MIPS=y
 
@@ -163,7 +163,7 @@ CONFIG_HZ=100
 CONFIG_PREEMPT_NONE=y
 # CONFIG_PREEMPT_VOLUNTARY is not set
 # CONFIG_PREEMPT is not set
-CONFIG_KEXEC=y
+# CONFIG_KEXEC is not set
 # CONFIG_SECCOMP is not set
 CONFIG_LOCKDEP_SUPPORT=y
 CONFIG_STACKTRACE_SUPPORT=y
@@ -265,7 +265,7 @@ CONFIG_RT_MUTEXES=y
 CONFIG_BASE_SMALL=1
 # CONFIG_MODULES is not set
 CONFIG_BLOCK=y
-CONFIG_LBDAF=y
+# CONFIG_LBDAF is not set
 # CONFIG_BLK_DEV_BSG is not set
 # CONFIG_BLK_DEV_INTEGRITY is not set
 
@@ -368,7 +368,7 @@ CONFIG_NET=y
 #
 # Networking options
 #
-CONFIG_PACKET=y
+# CONFIG_PACKET is not set
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -547,23 +547,7 @@ CONFIG_BLK_DEV_LOOP=y
 # CONFIG_CDROM_PKTCDVD is not set
 # CONFIG_ATA_OVER_ETH is not set
 # CONFIG_BLK_DEV_HD is not set
-CONFIG_MISC_DEVICES=y
-# CONFIG_AD525X_DPOT is not set
-# CONFIG_ICS932S401 is not set
-# CONFIG_ENCLOSURE_SERVICES is not set
-# CONFIG_ISL29003 is not set
-# CONFIG_SENSORS_TSL2550 is not set
-# CONFIG_DS1682 is not set
-# CONFIG_C2PORT is not set
-
-#
-# EEPROM support
-#
-# CONFIG_EEPROM_AT24 is not set
-# CONFIG_EEPROM_LEGACY is not set
-# CONFIG_EEPROM_MAX6875 is not set
-# CONFIG_EEPROM_93CX6 is not set
-# CONFIG_IWMC3200TOP is not set
+# CONFIG_MISC_DEVICES is not set
 CONFIG_HAVE_IDE=y
 # CONFIG_IDE is not set
 
@@ -577,27 +561,7 @@ CONFIG_SCSI_MOD=y
 # CONFIG_SCSI_NETLINK is not set
 # CONFIG_ATA is not set
 # CONFIG_MD is not set
-CONFIG_NETDEVICES=y
-# CONFIG_DUMMY is not set
-# CONFIG_BONDING is not set
-# CONFIG_MACVLAN is not set
-# CONFIG_EQUALIZER is not set
-# CONFIG_TUN is not set
-# CONFIG_VETH is not set
-# CONFIG_NET_ETHERNET is not set
-# CONFIG_NETDEV_1000 is not set
-# CONFIG_NETDEV_10000 is not set
-# CONFIG_WLAN is not set
-
-#
-# Enable WiMAX (Networking options) to see the WiMAX drivers
-#
-# CONFIG_WAN is not set
-# CONFIG_PPP is not set
-# CONFIG_SLIP is not set
-# CONFIG_NETCONSOLE is not set
-# CONFIG_NETPOLL is not set
-# CONFIG_NET_POLL_CONTROLLER is not set
+# CONFIG_NETDEVICES is not set
 # CONFIG_ISDN is not set
 # CONFIG_PHONE is not set
 
@@ -701,7 +665,7 @@ CONFIG_LEGACY_PTY_COUNT=2
 # CONFIG_RAMOOPS is not set
 CONFIG_I2C=y
 CONFIG_I2C_BOARDINFO=y
-CONFIG_I2C_COMPAT=y
+# CONFIG_I2C_COMPAT is not set
 CONFIG_I2C_CHARDEV=y
 CONFIG_I2C_HELPER_AUTO=y
 CONFIG_I2C_ALGOBIT=y
@@ -1014,7 +978,7 @@ CONFIG_RTC_HCTOSYS_DEVICE="rtc0"
 # RTC interfaces
 #
 CONFIG_RTC_INTF_SYSFS=y
-CONFIG_RTC_INTF_PROC=y
+# CONFIG_RTC_INTF_PROC is not set
 CONFIG_RTC_INTF_DEV=y
 # CONFIG_RTC_INTF_DEV_UIE_EMUL is not set
 # CONFIG_RTC_DRV_TEST is not set
@@ -1087,24 +1051,21 @@ CONFIG_ZRAM_STATS=y
 #
 # File systems
 #
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
-# CONFIG_EXT2_FS_XIP is not set
+# CONFIG_EXT2_FS is not set
 # CONFIG_EXT3_FS is not set
 # CONFIG_EXT4_FS is not set
 # CONFIG_REISERFS_FS is not set
 # CONFIG_JFS_FS is not set
 # CONFIG_FS_POSIX_ACL is not set
 # CONFIG_XFS_FS is not set
-# CONFIG_GFS2_FS is not set
 # CONFIG_OCFS2_FS is not set
 # CONFIG_BTRFS_FS is not set
 # CONFIG_NILFS2_FS is not set
 CONFIG_FILE_LOCKING=y
-CONFIG_FSNOTIFY=y
-CONFIG_DNOTIFY=y
-CONFIG_INOTIFY=y
-CONFIG_INOTIFY_USER=y
+# CONFIG_FSNOTIFY is not set
+# CONFIG_DNOTIFY is not set
+# CONFIG_INOTIFY is not set
+# CONFIG_INOTIFY_USER is not set
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
@@ -1224,7 +1185,7 @@ CONFIG_TRACE_IRQFLAGS_SUPPORT=y
 CONFIG_ENABLE_WARN_DEPRECATED=y
 CONFIG_ENABLE_MUST_CHECK=y
 CONFIG_FRAME_WARN=1024
-CONFIG_MAGIC_SYSRQ=y
+# CONFIG_MAGIC_SYSRQ is not set
 # CONFIG_STRIP_ASM_SYMS is not set
 # CONFIG_UNUSED_SYMBOLS is not set
 # CONFIG_DEBUG_FS is not set
