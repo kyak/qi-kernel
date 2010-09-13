@@ -1206,7 +1206,7 @@ CONFIG_TRACING_SUPPORT=y
 CONFIG_HAVE_ARCH_KGDB=y
 # CONFIG_EARLY_PRINTK is not set
 CONFIG_CMDLINE_BOOL=y
-CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs.bin root=/dev/loop0 jz4740_udc.use_dma=0 mem=32M"
+CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs.bin root=/dev/loop0 mem=32M"
 CONFIG_CMDLINE_OVERRIDE=y
 
 #
