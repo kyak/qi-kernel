@@ -236,7 +236,7 @@ static const unsigned int qi_lb60_keypad_rows[] = {
 	QI_LB60_GPIO_KEYIN(3),
 	QI_LB60_GPIO_KEYIN(4),
 	QI_LB60_GPIO_KEYIN(5),
-	QI_LB60_GPIO_KEYIN(7),
+	QI_LB60_GPIO_KEYIN(6),
 	QI_LB60_GPIO_KEYIN8,
 };
 
