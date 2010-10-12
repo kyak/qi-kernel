@@ -70,7 +70,8 @@ static int ili8960_set_power(struct lcd_device *lcd, int power)
 
 static int ili8960_get_power(struct lcd_device *lcd)
 {
-	return ili8960->enabled ? FB_BLANK_UNBLANK : FB_BLANK_BLANK;
+	struct ili8960 *ili8960 = lcd_get_data(lcd);
+	return ili8960->enabled ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
 }
 
 static int ili8960_set_contrast(struct lcd_device *lcd, int contrast)
@@ -103,6 +104,9 @@ static int ili8960_set_brightness(struct ili8960 *ili8960, int brightness)
 static ssize_t ili8960_show_brightness(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
+	struct lcd_device *ld = to_lcd_device(dev);
+	struct ili8960 *ili8960 = lcd_get_data(ld);
+
 	return sprintf(buf, "%d\n", ili8960->brightness);
 }
 
@@ -141,7 +145,7 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	ili8960 = kmalloc(sizeof(*ili8960), GFP_KERNEL);
 
 	spi->bits_per_word = 8;
-	spi->mode = SPI_MODE_3 | SPI_3WIRE;
+	spi->mode = SPI_MODE_3;
 
 	ret = spi_setup(spi);
 	if (ret) {
@@ -170,10 +174,9 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	ili8960->enabled = true;
 	dev_set_drvdata(&spi->dev, ili8960);
 
-/*
 	ili8960_write_reg(spi, 0x13, 0x01);
 	ili8960_write_reg(spi, 0x5, 0xc7);
-*/
+
 	return 0;
 err_unregister_lcd:
 	lcd_device_unregister(ili8960->lcd);
