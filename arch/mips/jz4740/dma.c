@@ -15,12 +15,8 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
-
-#include <linux/dmapool.h>
-#include <linux/scatterlist.h>
 
 #include <linux/dma-mapping.h>
 #include <asm/mach-jz4740/dma.h>
@@ -75,7 +71,6 @@
 
 static void __iomem *jz4740_dma_base;
 static spinlock_t jz4740_dma_lock;
-static struct dma_pool *jz4740_dma_desc_pool;
 
 static inline uint32_t jz4740_dma_read(size_t reg)
 {
@@ -96,15 +91,6 @@ static inline void jz4740_dma_write_mask(size_t reg, uint32_t val, uint32_t mask
 	jz4740_dma_write(reg, val2);
 }
 
-struct jz4740_dma_desc {
-	uint32_t *data;
-	dma_addr_t phys_addr;
-	struct jz4740_dma_desc *next;
-
-	uint32_t transfer_shift;
-};
-#define JZ4740_DMA_DESC_SIZE (sizeof(uint32_t) * 4)
-
 struct jz4740_dma_chan {
 	unsigned int id;
 	void *dev;
@@ -114,8 +100,6 @@ struct jz4740_dma_chan {
 	uint32_t transfer_shift;
 
 	jz4740_dma_complete_callback_t complete_cb;
-
-	struct jz4740_dma_desc *desc;
 
 	unsigned used:1;
 };
@@ -158,9 +142,28 @@ struct jz4740_dma_chan *jz4740_dma_request(void *dev, const char *name)
 }
 EXPORT_SYMBOL_GPL(jz4740_dma_request);
 
-static uint32_t jz4740_dma_config_to_cmd(const struct jz4740_dma_config *config)
+void jz4740_dma_configure(struct jz4740_dma_chan *dma,
+	const struct jz4740_dma_config *config)
 {
 	uint32_t cmd;
+
+	switch (config->transfer_size) {
+	case JZ4740_DMA_TRANSFER_SIZE_2BYTE:
+		dma->transfer_shift = 1;
+		break;
+	case JZ4740_DMA_TRANSFER_SIZE_4BYTE:
+		dma->transfer_shift = 2;
+		break;
+	case JZ4740_DMA_TRANSFER_SIZE_16BYTE:
+		dma->transfer_shift = 4;
+		break;
+	case JZ4740_DMA_TRANSFER_SIZE_32BYTE:
+		dma->transfer_shift = 5;
+		break;
+	default:
+		dma->transfer_shift = 0;
+		break;
+	}
 
 	cmd = config->flags << JZ_DMA_CMD_FLAGS_OFFSET;
 	cmd |= config->src_width << JZ_DMA_CMD_SRC_WIDTH_OFFSET;
@@ -169,55 +172,11 @@ static uint32_t jz4740_dma_config_to_cmd(const struct jz4740_dma_config *config)
 	cmd |= config->mode << JZ_DMA_CMD_MODE_OFFSET;
 	cmd |= JZ_DMA_CMD_TRANSFER_IRQ_ENABLE;
 
-	return cmd;
-}
-
-static uint32_t jz4740_dma_config_shift(const struct jz4740_dma_config *config)
-{
-	unsigned int shift;
-
-	switch (config->transfer_size) {
-	case JZ4740_DMA_TRANSFER_SIZE_2BYTE:
-		shift = 1;
-		break;
-	case JZ4740_DMA_TRANSFER_SIZE_4BYTE:
-		shift = 2;
-		break;
-	case JZ4740_DMA_TRANSFER_SIZE_16BYTE:
-		shift = 4;
-		break;
-	case JZ4740_DMA_TRANSFER_SIZE_32BYTE:
-		shift = 5;
-		break;
-	default:
-		shift = 0;
-		break;
-	}
-
-	return shift;
-}
-
-void jz4740_dma_configure(struct jz4740_dma_chan *dma,
-	const struct jz4740_dma_config *config)
-{
-	uint32_t cmd;
-
-	dma->transfer_shift = jz4740_dma_config_shift(config);
-	cmd = jz4740_dma_config_to_cmd(config);
-
 	jz4740_dma_write(JZ_REG_DMA_CMD(dma->id), cmd);
 	jz4740_dma_write(JZ_REG_DMA_STATUS_CTRL(dma->id), 0);
 	jz4740_dma_write(JZ_REG_DMA_REQ_TYPE(dma->id), config->request_type);
 }
 EXPORT_SYMBOL_GPL(jz4740_dma_configure);
-
-void jz4740_dma_desc_configure(struct jz4740_dma_desc *desc,
-	const struct jz4740_dma_config *config)
-{
-	desc->transfer_shift = jz4740_dma_config_shift(config);
-	desc->data[0] = jz4740_dma_config_to_cmd(config);
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_configure);
 
 void jz4740_dma_set_src_addr(struct jz4740_dma_chan *dma, dma_addr_t src)
 {
@@ -255,26 +214,14 @@ EXPORT_SYMBOL_GPL(jz4740_dma_free);
 
 void jz4740_dma_enable(struct jz4740_dma_chan *dma)
 {
-	uint32_t ctrl;
-
-	ctrl = JZ_DMA_STATUS_CTRL_ENABLE;
-
-	if (!dma->desc)
-		ctrl |= JZ_DMA_STATUS_CTRL_NO_DESC;
-
 	jz4740_dma_write_mask(JZ_REG_DMA_STATUS_CTRL(dma->id),
-			ctrl,
+			JZ_DMA_STATUS_CTRL_NO_DESC | JZ_DMA_STATUS_CTRL_ENABLE,
 			JZ_DMA_STATUS_CTRL_HALT | JZ_DMA_STATUS_CTRL_NO_DESC |
 			JZ_DMA_STATUS_CTRL_ENABLE);
 
 	jz4740_dma_write_mask(JZ_REG_DMA_CTRL,
 			JZ_DMA_CTRL_ENABLE,
 			JZ_DMA_CTRL_HALT | JZ_DMA_CTRL_ENABLE);
-
-	if (dma->desc) {
-		jz4740_dma_write(JZ_REG_DMA_DESC_ADDR(dma->id), dma->desc->phys_addr);
-		jz4740_dma_write(JZ_REG_DMA_DOORBELL, BIT(dma->id));
-	}
 }
 EXPORT_SYMBOL_GPL(jz4740_dma_enable);
 
@@ -321,155 +268,6 @@ static irqreturn_t jz4740_dma_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-void jz4740_dma_chan_set_desc(struct jz4740_dma_chan *chan,
-	struct jz4740_dma_desc *desc)
-{
-	chan->desc = desc;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_chan_set_desc);
-
-struct jz4740_dma_desc *jz4740_dma_desc_alloc(void)
-{
-	struct jz4740_dma_desc *desc;
-	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-
-	if (!desc)
-		return NULL;
-
-	desc->data = dma_pool_alloc(jz4740_dma_desc_pool, GFP_KERNEL,
-		&desc->phys_addr);
-
-	if (!desc->data) {
-		kfree(desc);
-		return NULL;
-	}
-
-	return desc;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_alloc);
-
-void jz4740_dma_desc_free(struct jz4740_dma_desc *desc)
-{
-	dma_pool_free(jz4740_dma_desc_pool, desc->data, desc->phys_addr);
-	kfree(desc);
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_free);
-
-void jz4740_dma_desc_set_src_addr(struct jz4740_dma_desc *desc, dma_addr_t src)
-{
-	desc->data[1] = src;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_set_src_addr);
-
-void jz4740_dma_desc_set_dst_addr(struct jz4740_dma_desc *desc, dma_addr_t dst)
-{
-	desc->data[2] = dst;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_set_dst_addr);
-
-int jz4740_dma_desc_set_transfer_count(struct jz4740_dma_desc *desc,
-	uint32_t count)
-{
-	count >>= desc->transfer_shift;
-
-	if (count > 0xffffff)
-		return -EINVAL;
-
-	desc->data[3] &= ~0xffffff;
-	desc->data[3] |= count;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_set_transfer_count);
-
-int jz4740_dma_desc_set_next(struct jz4740_dma_desc *desc,
-	struct jz4740_dma_desc *next)
-{
-	if (!next) {
-		desc->next = NULL;
-		desc->data[3] &= 0xff000000;
-		desc->data[0] &= ~JZ_DMA_CMD_LINK_ENABLE;
-
-		return 0;
-	}
-
-	if ((desc->phys_addr & 0xfffff000) != (next->phys_addr & 0xfffff000))
-		return -EINVAL;
-
-	desc->next = next;
-
-	desc->data[3] &= 0xff000000;
-	desc->data[3] |= (next->phys_addr & 0xff0) << 20;
-
-	desc->data[0] |= JZ_DMA_CMD_LINK_ENABLE;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_desc_set_next);
-
-struct jz4740_dma_sg *jz4740_dma_sg_alloc(struct scatterlist *sgl,
-	size_t sg_len, enum dma_data_direction direction,
-	struct jz4740_dma_config *config, dma_addr_t device_addr)
-{
-	struct scatterlist *sg;
-	struct jz4740_dma_desc *descs;
-	struct jz4740_dma_desc *prev = NULL;
-	int i;
-
-	descs = kzalloc(sizeof(*descs) * sg_len, GFP_KERNEL);
-
-	if (!descs)
-		return descs;
-
-	for_each_sg(sgl, sg, sg_len, i) {
-		descs[i].data = dma_pool_alloc(jz4740_dma_desc_pool, GFP_KERNEL,
-			&descs[i].phys_addr);
-
-		if (!descs[i].data)
-			goto err;
-
-		jz4740_dma_desc_configure(&descs[i], config);
-		if (direction == DMA_TO_DEVICE) {
-			jz4740_dma_desc_set_src_addr(&descs[i], sg_phys(sg));
-			jz4740_dma_desc_set_dst_addr(&descs[i], device_addr);
-		} else {
-			jz4740_dma_desc_set_src_addr(&descs[i], device_addr);
-			jz4740_dma_desc_set_src_addr(&descs[i], sg_phys(sg));
-		}
-		jz4740_dma_desc_set_transfer_count(&descs[i], sg_dma_len(sg));
-
-		if (prev)
-			jz4740_dma_desc_set_next(&descs[i], prev);
-		prev = &descs[i];
-	}
-
-	return (struct jz4740_dma_sg *)descs;
-
-err:
-	kfree(descs);
-	for (--i; i >= 0; --i)
-		dma_pool_free(jz4740_dma_desc_pool, descs[i].data, descs[i].phys_addr);
-
-	return NULL;
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_sg_alloc);
-
-static struct jz4740_dma_desc *jz4740_dma_sg_get_desc(struct jz4740_dma_sg *sg)
-{
-	return (struct jz4740_dma_desc*)sg;
-}
-
-void jz4740_dma_sg_free(struct jz4740_dma_sg *sg)
-{
-	struct jz4740_dma_desc *desc = jz4740_dma_sg_get_desc(sg);
-	while (desc) {
-		dma_pool_free(jz4740_dma_desc_pool, desc->data, desc->phys_addr);
-		desc = desc->next;
-	}
-	kfree(sg);
-}
-EXPORT_SYMBOL_GPL(jz4740_dma_sg_free);
-
 static int jz4740_dma_init(void)
 {
 	unsigned int ret;
@@ -485,9 +283,6 @@ static int jz4740_dma_init(void)
 
 	if (ret)
 		printk(KERN_ERR "JZ4740 DMA: Failed to request irq: %d\n", ret);
-
-	jz4740_dma_desc_pool = dma_pool_create("jz4740 dma descriptors", NULL,
-		JZ4740_DMA_DESC_SIZE, JZ4740_DMA_DESC_SIZE, 0);
 
 	return ret;
 }
