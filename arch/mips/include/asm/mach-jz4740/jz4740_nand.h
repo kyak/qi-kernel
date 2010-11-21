@@ -27,6 +27,8 @@ struct jz_nand_platform_data {
 
 	unsigned int busy_gpio;
 
+	unsigned char banks[4];
+
 	void (*ident_callback)(struct platform_device *, struct nand_chip *,
 				struct mtd_partition **, int *num_partitions);
 };

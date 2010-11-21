@@ -52,9 +52,10 @@
 
 #define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT((x) << 1)
 #define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT(((x) << 1) + 1)
+#define JZ_NAND_CTRL_ASSERT_CHIP_MASK 0xaa
 
-#define JZ_NAND_MEM_ADDR_OFFSET 0x10000
 #define JZ_NAND_MEM_CMD_OFFSET 0x08000
+#define JZ_NAND_MEM_ADDR_OFFSET 0x10000
 
 struct jz_nand {
 	struct mtd_info mtd;
@@ -62,8 +63,10 @@ struct jz_nand {
 	void __iomem *base;
 	struct resource *mem;
 
-	void __iomem *bank_base;
-	struct resource *bank_mem;
+	void __iomem *bank_base[4];
+	struct resource *bank_mem[4];
+
+	int selected_bank;
 
 	struct jz_nand_platform_data *pdata;
 	bool is_reading;
@@ -74,28 +77,54 @@ static inline struct jz_nand *mtd_to_jz_nand(struct mtd_info *mtd)
 	return container_of(mtd, struct jz_nand, mtd);
 }
 
+static void jz_nand_select_chip(struct mtd_info *mtd, int chipnr)
+{
+	struct jz_nand *nand = mtd_to_jz_nand(mtd);
+	struct nand_chip *chip = mtd->priv;
+	uint32_t ctrl;
+	int banknr;
+
+	ctrl = readl(nand->base + JZ_REG_NAND_CTRL);
+	ctrl &= ~JZ_NAND_CTRL_ASSERT_CHIP_MASK;
+
+	if (chipnr == -1) {
+		banknr = -1;
+	} else {
+		banknr = nand->pdata->banks[chipnr] - 1;
+		chip->IO_ADDR_R = nand->bank_base[banknr];
+		chip->IO_ADDR_W = nand->bank_base[banknr];
+	}
+	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
+
+	nand->selected_bank = banknr;
+}
+
 static void jz_nand_cmd_ctrl(struct mtd_info *mtd, int dat, unsigned int ctrl)
 {
 	struct jz_nand *nand = mtd_to_jz_nand(mtd);
 	struct nand_chip *chip = mtd->priv;
 	uint32_t reg;
+	void __iomem *bank_base = nand->bank_base[nand->selected_bank];
+
+	BUG_ON(nand->selected_bank < 0);
 
 	if (ctrl & NAND_CTRL_CHANGE) {
 		BUG_ON((ctrl & NAND_ALE) && (ctrl & NAND_CLE));
 		if (ctrl & NAND_ALE)
-			chip->IO_ADDR_W = nand->bank_base + JZ_NAND_MEM_ADDR_OFFSET;
+			bank_base += JZ_NAND_MEM_ADDR_OFFSET;
 		else if (ctrl & NAND_CLE)
-			chip->IO_ADDR_W = nand->bank_base + JZ_NAND_MEM_CMD_OFFSET;
-		else
-			chip->IO_ADDR_W = nand->bank_base;
+			bank_base += JZ_NAND_MEM_CMD_OFFSET;
+		chip->IO_ADDR_W = bank_base;
 
 		reg = readl(nand->base + JZ_REG_NAND_CTRL);
 		if (ctrl & NAND_NCE)
-			reg |= JZ_NAND_CTRL_ASSERT_CHIP(0);
+			reg |= JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_bank);
 		else
-			reg &= ~JZ_NAND_CTRL_ASSERT_CHIP(0);
+			reg &= ~JZ_NAND_CTRL_ASSERT_CHIP(nand->selected_bank);
 		writel(reg, nand->base + JZ_REG_NAND_CTRL);
 	}
+	//printk("write %02X to %p (bank %d)\n",
+	//       dat, chip->IO_ADDR_W, nand->selected_bank + 1);
 	if (dat != NAND_CMD_NONE)
 		writeb(dat, chip->IO_ADDR_W);
 }
@@ -256,7 +285,7 @@ static const char *part_probes[] = {"cmdline", NULL};
 #endif
 
 static int jz_nand_ioremap_resource(struct platform_device *pdev,
-	const char *name, struct resource **res, void __iomem **base)
+	const char *name, struct resource **res, void *__iomem *base)
 {
 	int ret;
 
@@ -292,6 +321,47 @@ err:
 	return ret;
 }
 
+static inline void jz_nand_iounmap_resource(struct resource *res, void __iomem *base)
+{
+	iounmap(base);
+	release_mem_region(res->start, resource_size(res));
+}
+
+static void jz_nand_iounmap_banks(
+	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
+{
+	int i;
+
+	for (i = 0; i < num_banks; ++i) {
+		unsigned char bank = banks[i];
+		jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
+					 nand->bank_base[bank - 1]);
+	}
+}
+
+static int jz_nand_ioremap_banks(struct platform_device *pdev,
+	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
+{
+	int ret;
+	char name[6];
+	int i;
+
+	for (i = 0; i < num_banks; ++i) {
+		unsigned char bank = banks[i];
+		sprintf(name, "bank%d", bank);
+
+		ret = jz_nand_ioremap_resource(pdev, name,
+					       &nand->bank_mem[bank - 1],
+					       &nand->bank_base[bank - 1]);
+		if (ret) {
+			jz_nand_iounmap_banks(nand, banks, i);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 static int __devinit jz_nand_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -303,6 +373,9 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	struct mtd_partition *partition_info;
 	int num_partitions = 0;
 #endif
+	size_t num_banks;
+	unsigned char bank;
+	uint32_t ctrl;
 
 	nand = kzalloc(sizeof(*nand), GFP_KERNEL);
 	if (!nand) {
@@ -313,10 +386,6 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	ret = jz_nand_ioremap_resource(pdev, "mmio", &nand->mem, &nand->base);
 	if (ret)
 		goto err_free;
-	ret = jz_nand_ioremap_resource(pdev, "bank", &nand->bank_mem,
-			&nand->bank_base);
-	if (ret)
-		goto err_iounmap_mmio;
 
 	if (pdata && gpio_is_valid(pdata->busy_gpio)) {
 		ret = gpio_request(pdata->busy_gpio, "NAND busy pin");
@@ -324,7 +393,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev,
 				"Failed to request busy gpio %d: %d\n",
 				pdata->busy_gpio, ret);
-			goto err_iounmap_mem;
+			goto err_iounmap_mmio;
 		}
 	}
 
@@ -346,22 +415,58 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 
 	chip->chip_delay = 50;
 	chip->cmd_ctrl = jz_nand_cmd_ctrl;
+	chip->select_chip = jz_nand_select_chip;
 
 	if (pdata && gpio_is_valid(pdata->busy_gpio))
 		chip->dev_ready = jz_nand_dev_ready;
 
-	chip->IO_ADDR_R = nand->bank_base;
-	chip->IO_ADDR_W = nand->bank_base;
-
 	nand->pdata = pdata;
 	platform_set_drvdata(pdev, nand);
 
-	writel(JZ_NAND_CTRL_ENABLE_CHIP(0), nand->base + JZ_REG_NAND_CTRL);
+	if (pdata->banks[0] == 0)
+		pdata->banks[0] = 1;
 
-	ret = nand_scan_ident(mtd, 1, NULL);
+	ctrl = 0;
+	for (num_banks = 0; num_banks < 4 ; ++num_banks) {
+		int gpio;
+		char name[9];
+
+		bank = pdata->banks[num_banks];
+		if (bank == 0)
+			break;
+		if (bank > 4) {
+			dev_err(&pdev->dev, "Non-existing bank: %d\n", bank);
+			ret = -EINVAL;
+			goto err_gpio_free;
+		}
+
+		sprintf(name, "NAND CS%d", bank);
+		gpio = JZ_GPIO_MEM_CS0 + bank - 1;
+		ret = gpio_request(gpio, name);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"Failed to request %s gpio %d: %d\n",
+				name, gpio, ret);
+			goto err_gpio_free;
+		}
+		jz_gpio_set_function(gpio, JZ_GPIO_FUNC_MEM_CS0);
+
+		ctrl |= JZ_NAND_CTRL_ENABLE_CHIP(bank - 1);
+	}
+
+	ret = jz_nand_ioremap_banks(pdev, nand, pdata->banks, num_banks);
+	if (ret)
+		goto err_gpio_free;
+
+	chip->IO_ADDR_R = nand->bank_base[pdata->banks[0] - 1];
+	chip->IO_ADDR_W = nand->bank_base[pdata->banks[0] - 1];
+
+	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
+
+	ret = nand_scan_ident(mtd, num_banks, NULL);
 	if (ret) {
 		dev_err(&pdev->dev,  "Failed to scan nand\n");
-		goto err_gpio_free;
+		goto err_iounmap_banks;
 	}
 
 	if (pdata && pdata->ident_callback) {
@@ -372,7 +477,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	ret = nand_scan_tail(mtd);
 	if (ret) {
 		dev_err(&pdev->dev,  "Failed to scan nand\n");
-		goto err_gpio_free;
+		goto err_iounmap_banks;
 	}
 
 #ifdef CONFIG_MTD_PARTITIONS
@@ -402,11 +507,15 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 
 err_nand_release:
 	nand_release(&nand->mtd);
+err_iounmap_banks:
+	jz_nand_iounmap_banks(nand, pdata->banks, num_banks);
 err_gpio_free:
 	platform_set_drvdata(pdev, NULL);
 	gpio_free(pdata->busy_gpio);
-err_iounmap_mem:
-	iounmap(nand->bank_base);
+	while (num_banks--) {
+		bank = pdata->banks[num_banks];
+		gpio_free(JZ_GPIO_MEM_CS0 + bank - 1);
+	}
 err_iounmap_mmio:
 	iounmap(nand->base);
 err_free:
@@ -417,16 +526,23 @@ err_free:
 static int __devexit jz_nand_remove(struct platform_device *pdev)
 {
 	struct jz_nand *nand = platform_get_drvdata(pdev);
+	struct jz_nand_platform_data *pdata = pdev->dev.platform_data;
+	int i;
 
 	nand_release(&nand->mtd);
 
 	/* Deassert and disable all chips */
 	writel(0, nand->base + JZ_REG_NAND_CTRL);
 
-	iounmap(nand->bank_base);
-	release_mem_region(nand->bank_mem->start, resource_size(nand->bank_mem));
-	iounmap(nand->base);
-	release_mem_region(nand->mem->start, resource_size(nand->mem));
+	for (i = 0; i < 4; ++i)
+		if (nand->bank_base[i] != 0) {
+			jz_nand_iounmap_resource(nand->bank_mem[i],
+						 nand->bank_base[i]);
+			gpio_free(JZ_GPIO_MEM_CS0 + i);
+		}
+	gpio_free(pdata->busy_gpio);
+
+	jz_nand_iounmap_resource(nand->mem, nand->base);
 
 	platform_set_drvdata(pdev, NULL);
 	kfree(nand);
