@@ -51,7 +51,7 @@
  * TODO(MtH): This should use the backlight driver instead of directly
  *            manipulating the GPIO pin.
  */
-static long a320_panic_blink_callback(long time)
+static long a320_panic_blink_callback(int time)
 {
 	gpio_direction_output(JZ_GPIO_PORTD(31), (time / 500) & 1);
 	return 0;
