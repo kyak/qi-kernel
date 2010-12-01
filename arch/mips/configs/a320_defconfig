@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36
-# Sun Nov 21 18:15:25 2010
+# Thu Dec  2 00:17:25 2010
 #
 CONFIG_MIPS=y
 
@@ -716,7 +716,14 @@ CONFIG_BATTERY_JZ4740=y
 CONFIG_CHARGER_GPIO=y
 # CONFIG_HWMON is not set
 # CONFIG_THERMAL is not set
-# CONFIG_WATCHDOG is not set
+CONFIG_WATCHDOG=y
+# CONFIG_WATCHDOG_NOWAYOUT is not set
+
+#
+# Watchdog Device Drivers
+#
+# CONFIG_SOFT_WATCHDOG is not set
+CONFIG_JZ4740_WDT=y
 CONFIG_SSB_POSSIBLE=y
 
 #
