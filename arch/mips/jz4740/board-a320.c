@@ -360,6 +360,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_codec_device,
 	&jz4740_rtc_device,
 	&jz4740_adc_device,
+	&jz4740_wdt_device,
 	&a320_charger_device,
 	&a320_backlight_device,
 	&a320_gpio_keys_device,
