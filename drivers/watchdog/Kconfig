@@ -916,12 +916,6 @@ config OCTEON_WDT
 	  from the first interrupt, it is then only poked when the
 	  device is written.
 
-config JZ4740_WDT
-	tristate "Ingenic jz4740 SoC hardware watchdog"
-	depends on MACH_JZ4740
-	help
-	  Hardware driver for the built-in watchdog timer on Ingenic jz4740 SoCs.
-
 # PARISC Architecture
 
 # POWERPC Architecture
