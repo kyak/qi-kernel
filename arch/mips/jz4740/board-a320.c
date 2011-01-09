@@ -5,7 +5,7 @@
  *
  *  Copyright (c) 2006-2007  Ingenic Semiconductor Inc.
  *  Copyright (c) 2009       Ignacio Garcia Perez <iggarpe@gmail.com>
- *  Copyright (c) 2010       Maarten ter Huurne <maarten@treewalker.org>
+ *  Copyright (c) 2010-2011  Maarten ter Huurne <maarten@treewalker.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -123,6 +123,7 @@ static struct nand_bbt_descr a320_nand_bbt_main_descr = {
 };
 
 static struct nand_ecclayout a320_nand_ecc_layout = {
+	.eccbytes = 72,
 	.eccpos = {
 		 4,  5,  6,  7,  8,  9, 10, 11, 12, /* sector 0 */
 		16, 17, 18, 19, 20, 21, 22, 23, 24, /* sector 1 */
