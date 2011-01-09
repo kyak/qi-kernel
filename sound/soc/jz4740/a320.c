@@ -23,11 +23,6 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-#include "../codecs/jz4740.h"
-#include "jz4740-pcm.h"
-#include "jz4740-i2s.h"
-
-
 // TODO(MtH): These GPIOs are related to audio according to booboo's notes,
 //            but what they do exactly is not clear at the moment.
 #define A320_SND_GPIO JZ_GPIO_PORTC(27)
@@ -63,10 +58,11 @@ static const struct snd_soc_dapm_route a320_routes[] = {
 		     SND_SOC_DAIFMT_NB_NF | \
 		     SND_SOC_DAIFMT_CBM_CFM)
 
-static int a320_codec_init(struct snd_soc_codec *codec)
+static int a320_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret;
-	struct snd_soc_dai *cpu_dai = codec->socdev->card->dai_link->cpu_dai;
 
 	snd_soc_dapm_nc_pin(codec, "LIN");
 	snd_soc_dapm_nc_pin(codec, "RIN");
@@ -87,8 +83,10 @@ static int a320_codec_init(struct snd_soc_codec *codec)
 static struct snd_soc_dai_link a320_dai = {
 	.name = "jz4740",
 	.stream_name = "jz4740",
-	.cpu_dai = &jz4740_i2s_dai,
-	.codec_dai = &jz4740_codec_dai,
+	.cpu_dai_name = "jz4740-i2s",
+	.platform_name = "jz4740-pcm-audio",
+	.codec_dai_name = "jz4740-hifi",
+	.codec_name = "jz4740-codec",
 	.init = a320_codec_init,
 };
 
@@ -96,12 +94,6 @@ static struct snd_soc_card a320 = {
 	.name = "Dingoo A320",
 	.dai_link = &a320_dai,
 	.num_links = 1,
-	.platform = &jz4740_soc_platform,
-};
-
-static struct snd_soc_device a320_snd_devdata = {
-	.card = &a320,
-	.codec_dev = &soc_codec_dev_jz4740_codec,
 };
 
 static struct platform_device *a320_snd_device;
@@ -132,8 +124,8 @@ static int __init a320_init(void)
 	gpio_direction_output(A320_SND_GPIO, 0);
 	gpio_direction_output(A320_AMP_GPIO, 0);
 
-	platform_set_drvdata(a320_snd_device, &a320_snd_devdata);
-	a320_snd_devdata.dev = &a320_snd_device->dev;
+	platform_set_drvdata(a320_snd_device, &a320);
+
 	ret = platform_device_add(a320_snd_device);
 	if (ret) {
 		pr_err("a320 snd: Failed to add snd soc device: %d\n", ret);
