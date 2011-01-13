@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.37 Kernel Configuration
-# Wed Jan 12 01:39:03 2011
+# Thu Jan 13 21:47:37 2011
 #
 CONFIG_MIPS=y
 
@@ -350,7 +350,7 @@ CONFIG_NET=y
 #
 # Networking options
 #
-# CONFIG_PACKET is not set
+CONFIG_PACKET=y
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
