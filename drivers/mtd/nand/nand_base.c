@@ -1294,9 +1294,16 @@ static int nand_read_page_hwecc_oob_first(struct mtd_info *mtd,
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 
 	/* Read the OOB area first */
-	chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
-	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
+	/* Read the OOB area first */
+	if (mtd->writesize > 512) {
+		chip->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
+		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
+		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
+	} else {
+		chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
+		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
+		chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
+	}
 
 	for (i = 0; i < chip->ecc.total; i++)
 		ecc_code[i] = chip->oob_poi[eccpos[i]];
@@ -1465,7 +1472,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 		if (realpage != chip->pagebuf || oob) {
 			bufpoi = aligned ? buf : chip->buffers->databuf;
 
-			if (likely(sndcmd)) {
+			if (likely(sndcmd) && chip->ecc.mode != NAND_ECC_HW_OOB_FIRST) {
 				chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 				sndcmd = 0;
 			}
