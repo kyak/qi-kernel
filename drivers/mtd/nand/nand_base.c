@@ -1316,17 +1316,14 @@ static int nand_read_page_hwecc_oob_first(struct mtd_info *mtd,
 	/* Read the OOB area first */
 	/* Read the OOB area first */
 	if (mtd->writesize > 512) {
-		chip->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
-		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
+		chip->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize + eccpos[0], page);
+		chip->read_buf(mtd, ecc_code, chip->ecc.total);
 		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
 	} else {
 		chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
 		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
 		chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
 	}
-
-	for (i = 0; i < chip->ecc.total; i++)
-		ecc_code[i] = chip->oob_poi[eccpos[i]];
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		int stat;
@@ -1382,17 +1379,14 @@ static int nand_read_subpage_hwecc_oob_first(struct mtd_info *mtd, struct nand_c
 
 	/* Read the OOB area first */
 	if (mtd->writesize > 512) {
-		chip->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize, page);
-		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
+		chip->cmdfunc(mtd, NAND_CMD_READ0, mtd->writesize + eccpos[0], page);
+		chip->read_buf(mtd, ecc_code, chip->ecc.total);
 		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, data_col_addr, -1);
 	} else {
 		chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
 		chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
 		chip->cmdfunc(mtd, NAND_CMD_READ0, data_col_addr, page);
 	}
-
-	for (i = 0; i < chip->ecc.total; i++)
-		ecc_code[i] = chip->oob_poi[eccpos[i]];
 
 	p = bufpoi + data_col_addr;
 
