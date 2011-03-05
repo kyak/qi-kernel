@@ -23,35 +23,41 @@
 #include <sound/soc-dapm.h>
 #include <linux/gpio.h>
 
-// TODO(MtH): These GPIOs are related to audio according to booboo's notes,
-//            but what they do exactly is not clear at the moment.
-#define A320_SND_GPIO JZ_GPIO_PORTC(27)
-#define A320_AMP_GPIO JZ_GPIO_PORTD(7)
+#define A320_SPK_GPIO JZ_GPIO_PORTC(27)
+#define A320_HPTV_GPIO JZ_GPIO_PORTD(7)
 
 static int a320_spk_event(struct snd_soc_dapm_widget *widget,
 			  struct snd_kcontrol *ctrl, int event)
 {
-	int on = 0;
-	if (event & SND_SOC_DAPM_POST_PMU)
-		on = 1;
-	else if (event & SND_SOC_DAPM_PRE_PMD)
-		on = 0;
-
-	gpio_set_value(A320_SND_GPIO, on);
-	gpio_set_value(A320_AMP_GPIO, on);
-
+	gpio_set_value(A320_SPK_GPIO, SND_SOC_DAPM_EVENT_ON(event));
 	return 0;
 }
 
+static int a320_hptv_event(
+			struct snd_soc_dapm_widget *widget,
+			struct snd_kcontrol *ctrl, int event)
+{
+	gpio_set_value(A320_HPTV_GPIO, SND_SOC_DAPM_EVENT_ON(event));
+	return 0;
+}
+
+static const struct snd_kcontrol_new a320_controls[] = {
+	SOC_DAPM_PIN_SWITCH("Speaker"),
+	SOC_DAPM_PIN_SWITCH("Headphones + TV-out"),
+};
+
 static const struct snd_soc_dapm_widget a320_widgets[] = {
-	SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
 	SND_SOC_DAPM_MIC("Mic", NULL),
+	SND_SOC_DAPM_SPK("Speaker", a320_spk_event),
+	SND_SOC_DAPM_LINE("Headphones + TV-out", a320_hptv_event),
 };
 
 static const struct snd_soc_dapm_route a320_routes[] = {
 	{"Mic", NULL, "MIC"},
 	{"Speaker", NULL, "LOUT"},
 	{"Speaker", NULL, "ROUT"},
+	{"Headphones + TV-out", NULL, "LOUT"},
+	{"Headphones + TV-out", NULL, "ROUT"},
 };
 
 #define A320_DAIFMT (SND_SOC_DAIFMT_I2S | \
@@ -72,6 +78,8 @@ static int a320_codec_init(struct snd_soc_pcm_runtime *rtd)
 		dev_err(codec->dev, "Failed to set cpu dai format: %d\n", ret);
 		return ret;
 	}
+
+	snd_soc_add_controls(codec, a320_controls, ARRAY_SIZE(a320_controls));
 
 	snd_soc_dapm_new_controls(codec, a320_widgets, ARRAY_SIZE(a320_widgets));
 	snd_soc_dapm_add_routes(codec, a320_routes, ARRAY_SIZE(a320_routes));
@@ -107,22 +115,22 @@ static int __init a320_init(void)
 	if (!a320_snd_device)
 		return -ENOMEM;
 
-	ret = gpio_request(A320_SND_GPIO, "SND");
+	ret = gpio_request(A320_SPK_GPIO, "SPK");
 	if (ret) {
-		pr_err("a320 snd: Failed to request SND GPIO(%d): %d\n",
-				A320_SND_GPIO, ret);
+		pr_err("a320 snd: Failed to request SPK GPIO(%d): %d\n",
+				A320_SPK_GPIO, ret);
 		goto err_device_put;
 	}
 
-	ret = gpio_request(A320_AMP_GPIO, "AMP");
+	ret = gpio_request(A320_HPTV_GPIO, "HPTV");
 	if (ret) {
-		pr_err("a320 snd: Failed to request AMP GPIO(%d): %d\n",
-				A320_AMP_GPIO, ret);
-		goto err_gpio_free_snd;
+		pr_err("a320 snd: Failed to request HPTV GPIO(%d): %d\n",
+				A320_HPTV_GPIO, ret);
+		goto err_gpio_free_spk;
 	}
 
-	gpio_direction_output(A320_SND_GPIO, 0);
-	gpio_direction_output(A320_AMP_GPIO, 0);
+	gpio_direction_output(A320_SPK_GPIO, 0);
+	gpio_direction_output(A320_HPTV_GPIO, 0);
 
 	platform_set_drvdata(a320_snd_device, &a320);
 
@@ -136,10 +144,10 @@ static int __init a320_init(void)
 
 err_unset_pdata:
 	platform_set_drvdata(a320_snd_device, NULL);
-/*err_gpio_free_amp:*/
-	gpio_free(A320_AMP_GPIO);
-err_gpio_free_snd:
-	gpio_free(A320_SND_GPIO);
+/*err_gpio_free_hptv:*/
+	gpio_free(A320_HPTV_GPIO);
+err_gpio_free_spk:
+	gpio_free(A320_SPK_GPIO);
 err_device_put:
 	platform_device_put(a320_snd_device);
 
@@ -149,12 +157,12 @@ module_init(a320_init);
 
 static void __exit a320_exit(void)
 {
-	gpio_free(A320_AMP_GPIO);
-	gpio_free(A320_SND_GPIO);
+	gpio_free(A320_HPTV_GPIO);
+	gpio_free(A320_SPK_GPIO);
 	platform_device_unregister(a320_snd_device);
 }
 module_exit(a320_exit);
 
-MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>, Maarten ter Huurne <maarten@treewalker.org>");
+MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>, Maarten ter Huurne <maarten@treewalker.org>, Paul Cercueil <paul@crapouillou.net>");
 MODULE_DESCRIPTION("ALSA SoC Dingoo A320 Audio support");
 MODULE_LICENSE("GPL v2");
