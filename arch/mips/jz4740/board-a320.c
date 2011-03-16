@@ -234,8 +234,8 @@ static struct gpio_charger_platform_data a320_charger_pdata = {
 	.type = POWER_SUPPLY_TYPE_USB,
 	.gpio = JZ_GPIO_PORTD(28),
 	.gpio_active_low = 0,
-	.batteries = a320_batteries,
-	.num_batteries = ARRAY_SIZE(a320_batteries),
+	.supplied_to = a320_batteries,
+	.num_supplicants = ARRAY_SIZE(a320_batteries),
 };
 
 static struct platform_device a320_charger_device = {
