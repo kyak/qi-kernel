@@ -18,6 +18,10 @@ config JZ4740_ID800WT
 	bool "Sungale id800wt picture frame"
 	select SOC_JZ4740
 
+config JZ4740_A320
+	bool "Dingoo A320 game and media player"
+	select SYS_SUPPORTS_ZBOOT
+
 endchoice
 
 config HAVE_PWM
