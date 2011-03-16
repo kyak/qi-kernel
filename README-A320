@@ -1,0 +1,168 @@
+
+               Linux for the Dingoo A320
+
+-------------
+** History **
+-------------
+
+The initial port of Linux 2.6.24.3 to the A320 was done by Ignacio Garcia Perez
+aka booboo. He added support for the Dingoo to the 2.6.24.3 kernel from Ingenic.
+	Ignacio Garcia Perez <iggarpe@gmail.com>
+	http://www.dingux.com/
+
+The OpenDingux tree is a merge between booboo's patches and the qi-kernel tree
+from Qi Hardware. This tree is kept up-to-date with the mainline kernel and
+the latest drivers from Ingenic.
+	http://projects.qi-hardware.com/index.php/p/qi-kernel/
+
+------------------
+** Contributing **
+------------------
+
+You can find the latest code on github:
+	http://github.com/mthuurne/opendingux-kernel
+
+Developers can be found on the #dingoonity channel on freenode IRC:
+	irc://irc.freenode.net/dingoonity
+
+----------------
+** Quickstart **
+----------------
+
+First download booboo's Dingux toolchain from:
+	http://code.google.com/p/dingoo-linux/downloads/list
+It must be unpacked in /opt, otherwise applications will fail to link.
+
+Tell the Linux kernel build that you want to compile for MIPS:
+	export ARCH=mips
+Alternatively, you can pass "ARCH=mips" to every "make" command.
+
+Use "make a320_defconfig" for a default configuration.
+After that, you can modify the kernel configuration using "make menuconfig".
+
+There are three different LCD controllers used in the Dingoo A320 over time:
+until mid-2009 the ILI9325 was used, from then until mid-2011 the ILI9331 was
+used and after that the ILI9338 was used. The default config uses ILI9331;
+if your Dingoo has a different LCD controller you should change the config:
+
+    Device drivers
+    |---Graphics support
+        |---Support for framebuffer devices
+            |---SLCD panel
+
+If you have a Dingoo A330, keep the ILI9331 setting. If you want to use the
+full 64 MB of RAM, you need a new boot loader:
+  http://boards.dingoonity.org/dingux-releases/(release)-64mb-dingux-for-a330
+
+To build the kernel, use "make vmlinuz.bin". It will produce the kernel
+binary named "vmlinuz.bin" in the top-level directory. The current u-boot
+boot loaders expect the kernel image under its old name "zImage", so you
+have to rename it if you put it on an SD card.
+
+--------------
+** Keyboard **
+--------------
+
+The keyboard driver has been completely rewritten now using the polled
+input device code. The standard keyboard map is as follows:
+
+    D-pad up            KEY_UP          KEY_VOLUMEUP            's'
+    D-pad down          KEY_DOWN        KEY_VOLUMEDOWN          'u'
+    D-pad left          KEY_LEFT        KEY_BRIGHTNESSDOWN      'e'
+    D-pad right         KEY_RIGHT       KEY_BRIGHTNESSUP        'i'
+    A button            KEY_LEFTCTRL
+    B button            KEY_LEFTATL
+    X button            KEY_SPACE
+    Y button            KEY_LEFTSHIFT
+    Left shoulder       KEY_TAB		KEY_EXIT
+    Right shoulder      KEY_BACKSPACE
+    START button        KEY_ENTER
+    SELECT button       KEY_ESC         KEY_MENU		'b'
+
+The second column is the generated keycode when the button is pressed normally.
+The third column is the generated keycode when the button is pressed while the
+power slider is pressed too.
+The fourth column is the generated system request when the button is pressed
+while both the power slider and the START button are pressed:
+
+'s'	Emergency sync of all discs.
+'u'	Remount all discs read-only.
+'e'	Send SIGTERM to all processes except init.
+'i'	Send SIGKILL to all processes except init.
+'b'	Reboot immediately.
+
+For example, to reboot the console syncing all disces and mounting read-only,
+press and hold POWER, press and hold START, and press secuentially UP, DOWN
+and SELECT. Note that SELECT is also used in dual-boot to select linux boot,
+so if you hold SELECT pressed at the end of the previous sequence, you should
+reboot back into linux.
+
+Note that the POWER + key combinations are selected to enable an user space
+daemon handle the volume, LCD bightness, and perhaps an on-screen keyboard.
+
+If you hold the power slider pressed alone this is what will happen:
+- After two seconds a KEY_POWER key press and release will be generated.
+- After five seconds, an inmediate reboot will happen.
+
+This is subject to change when hardware powerdown or idle support works.
+
+I did my best to come up with a clever and useful keyboard map, but if you
+have any suggestions, please do not hesitate to contact me.
+
+-----------
+** Sound **
+-----------
+
+The audio driver uses ALSA. For backwards compatibility, the OSS PCM API
+driver is enabled as well.
+
+The build of SDL in booboo's rootfs contains only OSS support. Some
+applications are statically linked against an SDL that contains both OSS
+and ALSA support. However, the latter tries to load libalsa at runtime,
+which is not included in the rootfs. To force the use of OSS, set the
+following environment variable:
+	export SDL_AUDIODRIVER=dsp
+
+---------------------------------
+** IPU (Image Processing Unit) **
+---------------------------------
+
+There is no IPU driver yet in this new kernel.
+
+---------------------------
+** CPU frequency scaling **
+---------------------------
+
+CPU frequency scaling is now default enabled. Have a look at the stuff
+in /sys/devices/system/cpu/cpu0/cpufreq/. Default governor is "userspace".
+It is untested, and anyway at the moment you can only REDUCE the CPU
+frequency below the 336MHz set by the boot hardware initialization code
+(in hwinit if you're booting vía USB boot).
+
+-------------
+** Battery **
+-------------
+
+You can read the battery status from the following file:
+	/sys/class/power_supply/battery/capacity
+It contains a percentage: 0 is empty and 100 is full.
+
+The /proc/jz interface of the old kernel is no longer supported. The new
+interface is platform independent, so using it will improve the portability
+of your applications.
+
+-------------------
+** LCD backlight **
+-------------------
+
+You can change the LCD backlight level by writing a value between 0 (off)
+and 255 (max) to:
+	/sys/class/backlight/pwm-backlight/brightness
+
+-------------------
+** Miscellaneous **
+-------------------
+
+Lots of JZ4740 hardware support is disabled. Not because it doesn't
+work but because it is untested. Enable it at your own risk.
+
