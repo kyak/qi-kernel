@@ -6,6 +6,11 @@ choice
 config JZ4740_QI_LB60
 	bool "Qi Hardware Ben NanoNote"
 
+config JZ4740_A320
+	bool "Dingoo A320 game and media player"
+	select SOC_JZ4740
+	select SYS_SUPPORTS_ZBOOT
+
 endchoice
 
 config HAVE_PWM
