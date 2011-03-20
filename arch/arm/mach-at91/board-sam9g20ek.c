@@ -105,6 +105,11 @@ static struct at91_udc_data __initdata ek_udc_data = {
 /*
  * SPI devices.
  */
+static struct at86rf230_platform_data rf231_pdata = {
+	.rstn		= AT91_PIN_PB10,
+	.slp_tr		= AT91_PIN_PB11,
+	.dig2		= AT91_PIN_PB12,
+};
 static struct spi_board_info ek_spi_devices[] = {
 #if !(defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_AT91))
 	{	/* DataFlash chip */
@@ -122,6 +127,14 @@ static struct spi_board_info ek_spi_devices[] = {
 	},
 #endif
 #endif
+	{
+		.modalias	= "at86rf230",
+		.chip_select	= 3,
+		.max_speed_hz	= 3 * 1000 * 1000,
+		.bus_num	= 1,
+		.irq		= AT91_PIN_PB13,
+		.platform_data	= &rf231_pdata,
+	},
 };
 
 
@@ -321,6 +334,46 @@ static void __init ek_add_device_buttons(void)
 }
 #else
 static void __init ek_add_device_buttons(void) {}
+#endif
+
+#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+static struct regulator_consumer_supply ek_audio_consumer_supplies[] = {
+	REGULATOR_SUPPLY("AVDD", "0-001b"),
+	REGULATOR_SUPPLY("HPVDD", "0-001b"),
+	REGULATOR_SUPPLY("DBVDD", "0-001b"),
+	REGULATOR_SUPPLY("DCVDD", "0-001b"),
+};
+
+static struct regulator_init_data ek_avdd_reg_init_data = {
+	.constraints	= {
+		.name	= "3V3",
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.consumer_supplies = ek_audio_consumer_supplies,
+	.num_consumer_supplies = ARRAY_SIZE(ek_audio_consumer_supplies),
+};
+
+static struct fixed_voltage_config ek_vdd_pdata = {
+	.supply_name	= "board-3V3",
+	.microvolts	= 3300000,
+	.gpio		= -EINVAL,
+	.enabled_at_boot = 0,
+	.init_data	= &ek_avdd_reg_init_data,
+};
+static struct platform_device ek_voltage_regulator = {
+	.name		= "reg-fixed-voltage",
+	.id		= -1,
+	.num_resources	= 0,
+	.dev		= {
+		.platform_data	= &ek_vdd_pdata,
+	},
+};
+static void __init ek_add_regulators(void)
+{
+	platform_device_register(&ek_voltage_regulator);
+}
+#else
+static void __init ek_add_regulators(void) {}
 #endif
 
 #if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)

@@ -53,6 +53,7 @@
 #include <linux/spi/pxa2xx_spi.h>
 #include <linux/mfd/da903x.h>
 #include <linux/sht15.h>
+#include <linux/spi/cc2420.h>
 
 #include "devices.h"
 #include "generic.h"
@@ -369,6 +370,22 @@ static struct pxa2xx_spi_chip cc2420_info = {
 	.gpio_cs = 39,
 };
 
+#define GPIO_FIFOP	0
+#define GPIO_SFD	16
+#define GPIO_RESET	22
+#define GPIO_FIFO	114
+#define GPIO_VREG	115
+#define GPIO_CCA	116
+
+static struct cc2420_platform_data cc2420_pdata = {
+	.fifo	= GPIO_FIFO,
+	.cca	= GPIO_CCA,
+	.fifop	= GPIO_FIFOP,
+	.sfd	= GPIO_SFD,
+	.reset	= GPIO_RESET,
+	.vreg	= GPIO_VREG,
+};
+
 static struct spi_board_info spi_board_info[] __initdata = {
 	{
 		.modalias = "lis3l02dq",
@@ -383,6 +400,8 @@ static struct spi_board_info spi_board_info[] __initdata = {
 		.bus_num = 3,
 		.chip_select = 0,
 		.controller_data = &cc2420_info,
+		.platform_data = &cc2420_pdata,
+
 	},
 };
 
