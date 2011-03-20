@@ -109,6 +109,9 @@ int mac802154_send_beacon_req(struct net_device *dev);
 
 struct mac802154_priv *mac802154_slave_get_priv(struct net_device *dev);
 
+void mac802154_monitors_rx(struct mac802154_priv *priv, struct sk_buff *skb);
+void mac802154_monitor_setup(struct net_device *dev);
+
 void mac802154_wpans_rx(struct mac802154_priv *priv, struct sk_buff *skb);
 void mac802154_wpan_setup(struct net_device *dev);
 
