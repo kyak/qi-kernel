@@ -50,6 +50,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_arcnet.h>
 #include <linux/if_infiniband.h>
+#include <net/af_ieee802154.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
@@ -1529,6 +1530,14 @@ static int addrconf_ifid_eui48(u8 *eui, struct net_device *dev)
 	return 0;
 }
 
+static int addrconf_ifid_eui64(u8 *eui, struct net_device *dev)
+{
+	if (dev->addr_len != IEEE802154_ADDR_LEN)
+		return -1;
+	memcpy(eui, dev->dev_addr, 8);
+	return 0;
+}
+
 static int addrconf_ifid_arcnet(u8 *eui, struct net_device *dev)
 {
 	/* XXX: inherit EUI-64 from other interface -- yoshfuji */
@@ -1585,6 +1594,8 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		return addrconf_ifid_infiniband(eui, dev);
 	case ARPHRD_SIT:
 		return addrconf_ifid_sit(eui, dev);
+	case ARPHRD_IEEE802154:
+		return addrconf_ifid_eui64(eui, dev);
 	}
 	return -1;
 }
@@ -2382,6 +2393,7 @@ static void addrconf_dev_config(struct net_device *dev)
 	    (dev->type != ARPHRD_FDDI) &&
 	    (dev->type != ARPHRD_IEEE802_TR) &&
 	    (dev->type != ARPHRD_ARCNET) &&
+	    (dev->type != ARPHRD_IEEE802154) &&
 	    (dev->type != ARPHRD_INFINIBAND)) {
 		/* Alas, we support only Ethernet autoconfiguration. */
 		return;

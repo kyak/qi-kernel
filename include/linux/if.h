@@ -78,6 +78,8 @@
 #define IFF_OVS_DATAPATH	0x10000	/* device used as Open vSwitch
 					 * datapath port */
 
+#define IFF_IEEE802154_COORD 0x400	/* IEEE802.15.4 PAN coordinator */
+
 #define IF_GET_IFACE	0x0001		/* for querying only */
 #define IF_GET_PROTO	0x0002
 
