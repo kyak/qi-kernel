@@ -141,6 +141,10 @@ static struct net_device *mac802154_add_iface(struct wpan_phy *phy,
 		dev = alloc_netdev(sizeof(struct mac802154_sub_if_data),
 				name, mac802154_monitor_setup);
 		break;
+	case IEEE802154_DEV_SMAC:
+		dev = alloc_netdev(sizeof(struct mac802154_sub_if_data),
+				name, mac802154_smac_setup);
+		break;
 	default:
 		dev = NULL;
 		err = -EINVAL;

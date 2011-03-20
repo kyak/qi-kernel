@@ -54,6 +54,7 @@ static void mac802154_subif_rx(struct ieee802154_dev *hw, struct sk_buff *skb)
 	}
 
 	mac802154_monitors_rx(priv, skb);
+	mac802154_smacs_rx(priv, skb);
 	mac802154_wpans_rx(priv, skb);
 
 out:

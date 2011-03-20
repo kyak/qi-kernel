@@ -112,6 +112,9 @@ struct mac802154_priv *mac802154_slave_get_priv(struct net_device *dev);
 void mac802154_monitors_rx(struct mac802154_priv *priv, struct sk_buff *skb);
 void mac802154_monitor_setup(struct net_device *dev);
 
+void mac802154_smacs_rx(struct mac802154_priv *priv, struct sk_buff *skb);
+void mac802154_smac_setup(struct net_device *dev);
+
 void mac802154_wpans_rx(struct mac802154_priv *priv, struct sk_buff *skb);
 void mac802154_wpan_setup(struct net_device *dev);
 
