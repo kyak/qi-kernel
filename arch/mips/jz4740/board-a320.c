@@ -182,11 +182,23 @@ static struct jz4740_fb_platform_data a320_fb_pdata = {
 	.register_select_active_low	= 1,
 };
 
+static int a320_backlight_notify(struct device *dev, int brightness)
+{
+	if (!gpio_get_value(JZ_GPIO_PORTB(18))) {
+		/* RESET_N pin of the ILI chip is pulled down,
+		   so force backlight off. */
+		return 0;
+	}
+
+	return brightness;
+}
+
 static struct platform_pwm_backlight_data a320_backlight_pdata = {
 	.pwm_id = 7,
 	.max_brightness = 255,
 	.dft_brightness = 100,
 	.pwm_period_ns = 5000000,
+	.notify = a320_backlight_notify,
 };
 
 static struct platform_device a320_backlight_device = {

@@ -562,6 +562,12 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 
 static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
+	int blank = jzfb->is_enabled ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
+	struct fb_event event = {
+		.info = jzfb->fb,
+		.data = &blank,
+	};
+
 	printk("A320 TV out: %d\n", mode);
 
 	if (mode != FB_A320TV_OFF) {
@@ -618,6 +624,9 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		jzfb->panel->enable(jzfb);
 		schedule_delayed_work(&jzfb->refresh_work, 0);
 	}
+
+	/* reaffirm the current blanking state, to trigger a backlight update */
+	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
 }
 
 static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
