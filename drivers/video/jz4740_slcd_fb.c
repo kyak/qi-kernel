@@ -473,6 +473,7 @@ static void jzfb_disable(struct jzfb *jzfb)
 static int jzfb_blank(int blank_mode, struct fb_info *info)
 {
 	struct jzfb* jzfb = info->par;
+	int ret = 0;
 	int new_enabled = (blank_mode == FB_BLANK_UNBLANK);
 
 	mutex_lock(&jzfb->lock);
@@ -480,13 +481,19 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 		if (!jzfb->is_enabled)
 			jzfb_enable(jzfb);
 	} else {
-		if (jzfb->is_enabled)
-			jzfb_disable(jzfb);
+		if (jzfb->is_enabled) {
+			/* No sleep in TV-out mode. */
+			if (readl(jzfb->base + JZ_REG_LCD_CFG) & JZ_LCD_CFG_SLCD)
+				jzfb_disable(jzfb);
+			else
+				ret = -EBUSY;
+		}
 	}
-	jzfb->is_enabled = new_enabled;
+	if (!ret)
+		jzfb->is_enabled = new_enabled;
 	mutex_unlock(&jzfb->lock);
 
-	return 0;
+	return ret;
 }
 
 static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
@@ -634,6 +641,10 @@ static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 	struct jzfb *jzfb = info->par;
 	switch (cmd) {
 		case FBIOA320TVOUT:
+			/* No TV-out mode while sleeping. */
+			if (!jzfb->is_enabled)
+				return -EBUSY;
+
 			jzfb_tv_out(jzfb, arg);
 			break;
 		default:
