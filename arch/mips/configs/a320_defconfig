@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.38 Kernel Configuration
-# Thu Mar 24 11:50:19 2011
+# Thu Mar 24 11:58:12 2011
 #
 CONFIG_MIPS=y
 
@@ -975,7 +975,7 @@ CONFIG_USB_ETH=y
 # CONFIG_NOP_USB_XCEIV is not set
 CONFIG_MMC=y
 # CONFIG_MMC_DEBUG is not set
-# CONFIG_MMC_UNSAFE_RESUME is not set
+CONFIG_MMC_UNSAFE_RESUME=y
 # CONFIG_MMC_CLKGATE is not set
 
 #
