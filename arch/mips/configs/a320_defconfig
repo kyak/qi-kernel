@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.38 Kernel Configuration
-# Wed Mar 16 03:47:23 2011
+# Thu Mar 24 11:50:19 2011
 #
 CONFIG_MIPS=y
 
@@ -587,7 +587,7 @@ CONFIG_NETDEVICES=y
 #
 CONFIG_INPUT=y
 # CONFIG_INPUT_FF_MEMLESS is not set
-CONFIG_INPUT_POLLDEV=y
+# CONFIG_INPUT_POLLDEV is not set
 # CONFIG_INPUT_SPARSEKMAP is not set
 
 #
