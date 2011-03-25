@@ -173,32 +173,32 @@ static const struct jz_gpio_bulk_request jz_lcd_ctrl_pins[] = {
 
 #ifdef CONFIG_MACH_JZ4760
 static const struct jz_gpio_bulk_request jz_lcd_data_pins[] = {
-    { JZ_GPIO_PORTC(0), "LCD_B0", JZ4760_GPIO_C00_FUNC_LCD_B0 },
-    { JZ_GPIO_PORTC(1), "LCD_B1", JZ4760_GPIO_C01_FUNC_LCD_B1 },
-    { JZ_GPIO_PORTC(2), "LCD_B2", JZ4760_GPIO_C02_FUNC_LCD_B2 },
     { JZ_GPIO_PORTC(3), "LCD_B3", JZ4760_GPIO_C03_FUNC_LCD_B3 },
     { JZ_GPIO_PORTC(4), "LCD_B4", JZ4760_GPIO_C04_FUNC_LCD_B4 },
-    { JZ_GPIO_PORTC(10), "LCD_G0", JZ4760_GPIO_C10_FUNC_LCD_G0 },
-    { JZ_GPIO_PORTC(11), "LCD_G1", JZ4760_GPIO_C11_FUNC_LCD_G1 },
+    { JZ_GPIO_PORTC(5), "LCD_B5", JZ4760_GPIO_C05_FUNC_LCD_B5 },
+    { JZ_GPIO_PORTC(6), "LCD_B6", JZ4760_GPIO_C06_FUNC_LCD_B6 },
+    { JZ_GPIO_PORTC(7), "LCD_B7", JZ4760_GPIO_C07_FUNC_LCD_B7 },
     { JZ_GPIO_PORTC(12), "LCD_G2", JZ4760_GPIO_C12_FUNC_LCD_G2 },
     { JZ_GPIO_PORTC(13), "LCD_G3", JZ4760_GPIO_C13_FUNC_LCD_G3 },
     { JZ_GPIO_PORTC(14), "LCD_G4", JZ4760_GPIO_C14_FUNC_LCD_G4 },
     { JZ_GPIO_PORTC(15), "LCD_G5", JZ4760_GPIO_C15_FUNC_LCD_G5 },
-    { JZ_GPIO_PORTC(20), "LCD_R0", JZ4760_GPIO_C20_FUNC_LCD_R0 },
-    { JZ_GPIO_PORTC(21), "LCD_R1", JZ4760_GPIO_C21_FUNC_LCD_R1 },
-    { JZ_GPIO_PORTC(22), "LCD_R2", JZ4760_GPIO_C22_FUNC_LCD_R2 },
-    { JZ_GPIO_PORTC(23), "LCD_R3", JZ4760_GPIO_C23_FUNC_LCD_R3 },
-    { JZ_GPIO_PORTC(24), "LCD_R4", JZ4760_GPIO_C24_FUNC_LCD_R4 },
-
-    { JZ_GPIO_PORTC(5), "LCD_B5", JZ4760_GPIO_C05_FUNC_LCD_B5 },
-    { JZ_GPIO_PORTC(25), "LCD_R5", JZ4760_GPIO_C25_FUNC_LCD_R5 },
-
-    { JZ_GPIO_PORTC(6), "LCD_B6", JZ4760_GPIO_C06_FUNC_LCD_B6 },
-    { JZ_GPIO_PORTC(7), "LCD_B7", JZ4760_GPIO_C07_FUNC_LCD_B7 },
     { JZ_GPIO_PORTC(16), "LCD_G6", JZ4760_GPIO_C16_FUNC_LCD_G6 },
     { JZ_GPIO_PORTC(17), "LCD_G7", JZ4760_GPIO_C17_FUNC_LCD_G7 },
+    { JZ_GPIO_PORTC(23), "LCD_R3", JZ4760_GPIO_C23_FUNC_LCD_R3 },
+    { JZ_GPIO_PORTC(24), "LCD_R4", JZ4760_GPIO_C24_FUNC_LCD_R4 },
+    { JZ_GPIO_PORTC(25), "LCD_R5", JZ4760_GPIO_C25_FUNC_LCD_R5 },
     { JZ_GPIO_PORTC(26), "LCD_R6", JZ4760_GPIO_C26_FUNC_LCD_R6 },
     { JZ_GPIO_PORTC(27), "LCD_R7", JZ4760_GPIO_C27_FUNC_LCD_R7 },
+
+    { JZ_GPIO_PORTC(2), "LCD_B2", JZ4760_GPIO_C02_FUNC_LCD_B2 },
+    { JZ_GPIO_PORTC(22), "LCD_R2", JZ4760_GPIO_C22_FUNC_LCD_R2 },
+
+    { JZ_GPIO_PORTC(0), "LCD_B0", JZ4760_GPIO_C00_FUNC_LCD_B0 },
+    { JZ_GPIO_PORTC(1), "LCD_B1", JZ4760_GPIO_C01_FUNC_LCD_B1 },
+    { JZ_GPIO_PORTC(10), "LCD_G0", JZ4760_GPIO_C10_FUNC_LCD_G0 },
+    { JZ_GPIO_PORTC(11), "LCD_G1", JZ4760_GPIO_C11_FUNC_LCD_G1 },
+    { JZ_GPIO_PORTC(20), "LCD_R0", JZ4760_GPIO_C20_FUNC_LCD_R0 },
+    { JZ_GPIO_PORTC(21), "LCD_R1", JZ4760_GPIO_C21_FUNC_LCD_R1 },
 };
 #else
 static const struct jz_gpio_bulk_request jz_lcd_data_pins[] = {
@@ -229,9 +229,8 @@ static unsigned int jzfb_num_ctrl_pins(struct jzfb *jzfb)
 
 	switch (jzfb->pdata->lcd_type) {
 	case JZ_LCD_TYPE_GENERIC_16_BIT:
-		num = 4;
-		break;
 	case JZ_LCD_TYPE_GENERIC_18_BIT:
+	case JZ_LCD_TYPE_GENERIC_24_BIT:
 		num = 4;
 		break;
 	case JZ_LCD_TYPE_8BIT_SERIAL:
@@ -259,7 +258,7 @@ static unsigned int jzfb_num_data_pins(struct jzfb *jzfb)
 		break;
 	case JZ_LCD_TYPE_GENERIC_18_BIT:
 		num = 18;
-	break;
+		break;
 	case JZ_LCD_TYPE_GENERIC_24_BIT:
 		num = 24;
 		break;
@@ -376,8 +375,8 @@ static int jzfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 		var->blue.length = 6;
 		var->bits_per_pixel = 32;
 		break;
-	case 32:
 	case 24:
+	case 32:
 		var->transp.offset = 24;
 		var->transp.length = 8;
 		var->red.offset = 16;

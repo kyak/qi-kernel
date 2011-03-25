@@ -1,7 +1,7 @@
 /*
  * Touchscreen driver for Ingenic JZ SoCs.
  *
- * Copyright (C) 2010, Lars-Peter Clausen <lars@metafoo.de>
+ * Copyright (C) 2010-2011, Lars-Peter Clausen <lars@metafoo.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,6 +21,10 @@
 #include <linux/bitops.h>
 #include <linux/jz4740-adc.h>
 
+#define JZ_REG_TS_SAME 0x00
+#define JZ_REG_TS_WAIT 0x04
+#define JZ_REG_TS_DATA 0x08
+
 struct jz4740_ts {
 	struct platform_device *pdev;
 
@@ -28,26 +32,28 @@ struct jz4740_ts {
 	void __iomem *base;
 
 	int irq_penup;
-	int irq_pendown;
 	int irq_data_ready;
 
 	struct mfd_cell *cell;
 	struct input_dev *input;
 
 	bool is_open;
+
+	struct completion penup_completion;
+	unsigned int penup_count;
 };
 
 static irqreturn_t jz4740_ts_data_ready_irq_handler(int irq, void *devid)
 {
 	struct jz4740_ts *jz4740_ts = devid;
 	uint32_t data;
-	unsigned long x, y, z1, z2, pressure;
+	unsigned long pressure, x, y, z1, z2;
 
-	data = readl(jz4740_ts->base + 0x08);
+	data = readl(jz4740_ts->base + JZ_REG_TS_DATA);
 	x = data & 0xfff;
 	y = (data >> 16) & 0xfff;
 
-	data = readl(jz4740_ts->base + 0x08);
+	data = readl(jz4740_ts->base + JZ_REG_TS_DATA);
 	z1 = data & 0xfff;
 	z2 = (data >> 16) & 0xfff;
 	if (z1 == 0) {
@@ -56,42 +62,40 @@ static irqreturn_t jz4740_ts_data_ready_irq_handler(int irq, void *devid)
 		pressure = 0;
 	} else {
 		if (data & 0x8000)
-			pressure = (((480UL * x * z2) / z1) - 480UL * x) / 4096UL;
+			pressure = ((((480UL * z2) / z1) * x) - 480UL * x) / 4096UL;
 		else
-			pressure = (((272UL * y * z2) / z1) - 272UL * y) / 4096UL;
+			pressure = ((((272UL * z2) / z1) * y) - 272UL * y) / 4096UL;
 		if (pressure >= 4096UL)
 			pressure = 4095UL;
 		pressure = 4095UL - pressure;
 	}
 
-	input_report_abs(jz4740_ts->input, ABS_X, y);
-	input_report_abs(jz4740_ts->input, ABS_Y, 4095 - x);
+	input_report_abs(jz4740_ts->input, ABS_X, x);
+	input_report_abs(jz4740_ts->input, ABS_Y, y);
 	input_report_abs(jz4740_ts->input, ABS_PRESSURE, pressure);
 	input_report_key(jz4740_ts->input, BTN_TOUCH, 1);
 	input_sync(jz4740_ts->input);
 
+	jz4740_ts->penup_count = 0;
+	complete(&jz4740_ts->penup_completion);
+
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t jz4740_ts_pen_irq_handler(int irq, void *devid)
+static irqreturn_t jz4740_ts_pen_up_irq_handler(int irq, void *devid)
 {
 	struct jz4740_ts *jz4740_ts = devid;
-	int is_pressed;
 
-	if (irq == jz4740_ts->irq_penup) {
-		enable_irq(jz4740_ts->irq_pendown);
-		is_pressed = 0;
-	} else {
-		enable_irq(jz4740_ts->irq_penup);
-		is_pressed = 1;
-	}
-	disable_irq_nosync(irq);
+	/* Filter out sparse penup IRQs */
+	if (++jz4740_ts->penup_count < 5)
+		return IRQ_HANDLED;
 
-	printk("pen irq: %d\n", irq);
-	input_report_key(jz4740_ts->input, BTN_TOUCH, is_pressed);
-	if (is_pressed == 0)
-		input_report_abs(jz4740_ts->input, ABS_PRESSURE, 0);
+	input_report_key(jz4740_ts->input, BTN_TOUCH, 0);
+	input_report_abs(jz4740_ts->input, ABS_PRESSURE, 0);
 	input_sync(jz4740_ts->input);
+
+	INIT_COMPLETION(jz4740_ts->penup_completion);
+	wait_for_completion(&jz4740_ts->penup_completion);
 
 	return IRQ_HANDLED;
 }
@@ -129,6 +133,8 @@ static int __devinit jz4740_ts_probe(struct platform_device *pdev)
 	jz4740_ts->pdev = pdev;
 	jz4740_ts->cell = pdev->dev.platform_data;
 
+	init_completion(&jz4740_ts->penup_completion);
+
 	jz4740_ts->irq_data_ready = platform_get_irq(pdev, 0);
 	if (jz4740_ts->irq_data_ready < 0) {
 		ret = jz4740_ts->irq_data_ready;
@@ -139,13 +145,6 @@ static int __devinit jz4740_ts_probe(struct platform_device *pdev)
 	jz4740_ts->irq_penup = platform_get_irq(pdev, 1);
 	if (jz4740_ts->irq_penup < 0) {
 		ret = jz4740_ts->irq_penup;
-		dev_err(&pdev->dev, "Failed to get platform irq: %d\n", ret);
-		goto err_free;
-	}
-
-	jz4740_ts->irq_pendown = platform_get_irq(pdev, 2);
-	if (jz4740_ts->irq_pendown < 0) {
-		ret = jz4740_ts->irq_pendown;
 		dev_err(&pdev->dev, "Failed to get platform irq: %d\n", ret);
 		goto err_free;
 	}
@@ -183,8 +182,8 @@ static int __devinit jz4740_ts_probe(struct platform_device *pdev)
 	input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	__set_bit(BTN_TOUCH, input->keybit);
 
-	input_set_abs_params(input, ABS_X, 150, 3920, 0, 0);
-	input_set_abs_params(input, ABS_Y, 270, 3700, 0, 0);
+	input_set_abs_params(input, ABS_X, 0, 4096, 0, 0);
+	input_set_abs_params(input, ABS_Y, 0, 4096, 0, 0);
 	input_set_abs_params(input, ABS_PRESSURE, 0, 4096, 0, 0);
 
 	input->name = pdev->name;
@@ -211,28 +210,23 @@ static int __devinit jz4740_ts_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to request irq %d\n", ret);
 		goto err_input_unregister_device;
 	}
-	ret = request_irq(jz4740_ts->irq_penup, jz4740_ts_pen_irq_handler, 0, pdev->name,
+	ret = request_threaded_irq(jz4740_ts->irq_penup, NULL,
+			jz4740_ts_pen_up_irq_handler, IRQF_ONESHOT, pdev->name,
 			jz4740_ts);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request irq %d\n", ret);
 		goto err_free_irq_data_ready;
 	}
-	disable_irq(jz4740_ts->irq_penup);
-	ret = request_irq(jz4740_ts->irq_pendown, jz4740_ts_pen_irq_handler, 0, pdev->name,
-			jz4740_ts);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to request irq %d\n", ret);
-		goto err_free_irq_penup;
-	}
 	platform_set_drvdata(pdev, jz4740_ts);
 
 	jz4740_adc_set_config(pdev->dev.parent,
-		JZ_ADC_CONFIG_EX_IN | JZ_ADC_CONFIG_XYZ_OFFSET(2) | JZ_ADC_CONFIG_DNUM(7),
-		JZ_ADC_CONFIG_EX_IN | JZ_ADC_CONFIG_XYZ_MASK | JZ_ADC_CONFIG_DNUM_MASK);
+		JZ_ADC_CONFIG_SPZZ | JZ_ADC_CONFIG_XYZ_OFFSET(2) | JZ_ADC_CONFIG_DNUM(7)
+		| (5 << 10),
+		JZ_ADC_CONFIG_SPZZ | JZ_ADC_CONFIG_XYZ_MASK | JZ_ADC_CONFIG_DNUM_MASK |
+		(0x7 << 10));
 
-
-	writel(0x15e, jz4740_ts->base);
-	writel(0x32, jz4740_ts->base + 0x04);
+	writel(0x1, jz4740_ts->base + JZ_REG_TS_SAME);
+	writel(500, jz4740_ts->base + JZ_REG_TS_WAIT);
 
 	return 0;
 
@@ -256,8 +250,6 @@ static int __devexit jz4740_ts_remove(struct platform_device *pdev)
 {
 	struct jz4740_ts *jz4740_ts = platform_get_drvdata(pdev);
 
-
-	free_irq(jz4740_ts->irq_pendown, jz4740_ts);
 	free_irq(jz4740_ts->irq_penup, jz4740_ts);
 	free_irq(jz4740_ts->irq_data_ready, jz4740_ts);
 

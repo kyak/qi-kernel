@@ -211,6 +211,7 @@ config MACH_JZ47XX
 	select HAVE_PWM
 	select HAVE_CLK
 	select CLKDEV_LOOKUP
+	select SYS_SUPPORTS_ZBOOT_UART16550
 
 config LASAT
 	bool "LASAT Networks platforms"

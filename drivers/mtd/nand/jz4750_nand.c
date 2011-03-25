@@ -37,8 +37,8 @@
 #define JZ_NAND_CTRL_ENABLE_CHIP(x) BIT((x) << 1)
 #define JZ_NAND_CTRL_ASSERT_CHIP(x) BIT(((x) << 1) + 1)
 
-#define JZ_NAND_MEM_ADDR_OFFSET	0x10000
-#define JZ_NAND_MEM_CMD_OFFSET	0x08000
+#define JZ_NAND_MEM_ADDR_OFFSET	0x800000
+#define JZ_NAND_MEM_CMD_OFFSET	0x400000
 
 #define JZ_REG_BCH_CR		0x00
 #define JZ_REG_BCH_CR_SET	0x04
@@ -46,13 +46,15 @@
 #define JZ_REG_BCH_CNT		0x0C
 #define JZ_REG_BCH_DR		0x10
 #define JZ_REG_BCH_PAR(i)	(0x14 + (i))
-#define JZ_REG_BCH_STATUS	0x24
-#define JZ_REG_BCH_ERR(i)	(0x28 + ((i) << 2))
+#define JZ_REG_BCH_STATUS	0x6C
+#define JZ_REG_BCH_STATUS_SET	0x74
+#define JZ_REG_BCH_STATUS_CLR	0x78
+#define JZ_REG_BCH_ERR(i)	(0x3C + ((i) << 2))
 
 #define JZ_BCH_ENABLE		BIT(0)
 #define JZ_BCH_RESET		BIT(1)
-#define JZ_BCH_8BIT		BIT(2)
-#define JZ_BCH_ENCODE		BIT(3)
+#define JZ_BCH_8BIT		BIT(3)
+#define JZ_BCH_ENCODE		BIT(2)
 #define JZ_BCH_USE_DMA		BIT(4)
 
 #define JZ_BCH_STATUS_ERROR		BIT(0)
@@ -158,13 +160,14 @@ static int jz_nand_calculate_ecc_bch(struct mtd_info *mtd, const uint8_t *dat,
 	int size  = nand->chip.ecc.size,
 	    bytes = nand->chip.ecc.bytes;
 
+	return 0;
+
 	if (nand->is_reading)
 		return 0;
 
-	writel(JZ_BCH_ENABLE, nand->bch_base + JZ_REG_BCH_CR_SET);
-	writel(JZ_BCH_RESET,  nand->bch_base + JZ_REG_BCH_CR_SET);
+	writel(JZ_BCH_ENABLE | JZ_BCH_RESET, nand->bch_base + JZ_REG_BCH_CR_SET);
 
-	writel(size & 0xffff, nand->bch_base + JZ_REG_BCH_CNT);
+	writel((size << 1) & 0xffff, nand->bch_base + JZ_REG_BCH_CNT);
 
 	for(i = 0; i < size; i++)
 		writeb(dat[i], nand->bch_base + JZ_REG_BCH_DR);
@@ -196,13 +199,14 @@ static int jz_nand_correct_ecc_bch(struct mtd_info *mtd, uint8_t *dat,
 	int size  = nand->chip.ecc.size,
 	    bytes = nand->chip.ecc.bytes;
 
-	writel(JZ_BCH_ENABLE, nand->bch_base + JZ_REG_BCH_CR_SET);
-	writel(JZ_BCH_RESET,  nand->bch_base + JZ_REG_BCH_CR_SET);
+	return 0;
+
+	writel(JZ_BCH_ENABLE | JZ_BCH_RESET, nand->bch_base + JZ_REG_BCH_CR_SET);
 
 	/* Clear status bits */
-	writel(0xff,          nand->bch_base + JZ_REG_BCH_STATUS);
+	writel(0xff,          nand->bch_base + JZ_REG_BCH_STATUS_CLR);
 
-	writel((size + bytes) << 16, nand->bch_base + JZ_REG_BCH_CNT);
+	writel((size + bytes) << 17, nand->bch_base + JZ_REG_BCH_CNT);
 
 	for (i = 0; i < size; i++)
 		writeb(dat[i], nand->bch_base + JZ_REG_BCH_DR);

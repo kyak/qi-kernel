@@ -586,7 +586,7 @@ config MFD_JANZ_CMODIO
 config MFD_JZ4740_ADC
 	tristate "Support for the JZ4740 SoC ADC core"
 	select MFD_CORE
-	depends on MACH_JZ4740 || MACH_JZ4750L
+	depends on MACH_JZ4740 || MACH_JZ4750L || MACH_JZ4760
 	help
 	  Say yes here if you want support for the ADC unit in the JZ4740 SoC.
 	  This driver is necessary for jz4740-battery and jz4740-hwmon driver.

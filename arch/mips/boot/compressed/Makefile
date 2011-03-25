@@ -58,8 +58,10 @@ $(obj)/piggy.o: $(obj)/dummy.o $(obj)/vmlinux.bin.z FORCE
 # Calculate the load address of the compressed kernel image
 hostprogs-y := calc_vmlinuz_load_addr
 
-VMLINUZ_LOAD_ADDRESS = $(shell $(obj)/calc_vmlinuz_load_addr \
-		$(obj)/vmlinux.bin $(VMLINUX_LOAD_ADDRESS))
+#VMLINUZ_LOAD_ADDRESS = $(shell $(obj)/calc_vmlinuz_load_addr \
+#		$(obj)/vmlinux.bin $(VMLINUX_LOAD_ADDRESS))
+VMLINUZ_LOAD_ADDRESS:=0x80600000
+
 
 vmlinuzobjs-y += $(obj)/piggy.o
 

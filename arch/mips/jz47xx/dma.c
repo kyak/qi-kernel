@@ -289,4 +289,3 @@ static int jz4740_dma_init(void)
 
 	return ret;
 }
-arch_initcall(jz4740_dma_init);

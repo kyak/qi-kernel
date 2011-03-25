@@ -29,11 +29,14 @@
 
 #include <linux/jz4740-adc.h>
 
+#include <asm/mach-jz47xx/soc.h>
+
 
 #define JZ_REG_ADC_ENABLE	0x00
 #define JZ_REG_ADC_CFG		0x04
 #define JZ_REG_ADC_CTRL		0x08
 #define JZ_REG_ADC_STATUS	0x0c
+#define JZ_REG_ADC_CLKDIV	0x28
 
 #define JZ_REG_ADC_TOUCHSCREEN_BASE	0x10
 #define JZ_REG_ADC_BATTERY_BASE	0x1c
@@ -358,8 +361,16 @@ static int __devinit jz4740_adc_probe(struct platform_device *pdev)
 	set_irq_data(adc->irq, adc);
 	set_irq_chained_handler(adc->irq, jz4740_adc_irq_demux);
 
+	jz4740_adc_clk_enable(adc);
 	writeb(0x00, adc->base + JZ_REG_ADC_ENABLE);
 	writeb(0xff, adc->base + JZ_REG_ADC_CTRL);
+
+	if (soc_is_jz4760()) {
+		unsigned int div;
+		div = clk_get_rate(adc->clk) / 100000 - 1;
+		printk("clk div: %u\n", div);
+		writel(div | (1 << 12) | (1 << 18), adc->base + JZ_REG_ADC_CLKDIV);
+	}
 
 	ret = mfd_add_devices(&pdev->dev, 0, jz4740_adc_cells,
 		ARRAY_SIZE(jz4740_adc_cells), mem_base, adc->irq_base);
@@ -368,7 +379,6 @@ static int __devinit jz4740_adc_probe(struct platform_device *pdev)
 
 	/* In JZ4750, enabling a clock and issuing a request immediately
 	 * misses an irq. So keep clock running all the time. */
-	jz4740_adc_clk_enable(adc);
 
 	return 0;
 

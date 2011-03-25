@@ -169,8 +169,7 @@ static struct jz4740_fb_platform_data lepus_fb_pdata = {
 	.num_modes	= ARRAY_SIZE(lepus_video_modes),
 	.modes		= lepus_video_modes,
 	.bpp		= 24,
-	.lcd_type	= JZ_LCD_TYPE_GENERIC_24_BIT,
-	.pixclk_falling_edge = 1,
+	.lcd_type	= JZ_LCD_TYPE_GENERIC_18_BIT,
 
 	.gpio_reset	= JZ_GPIO_PORTF(10),
 	.reset_active_low = 1,
@@ -213,6 +212,12 @@ static int __init lepus_board_setup(void)
 
 	for (i = 20; i < 30; ++i)
 		jz_gpio_disable_pullup(JZ_GPIO_PORTE(i));
+
+	for (i = 0; i < 28; ++i)
+		jz_gpio_disable_pullup(JZ_GPIO_PORTC(i));
+
+
+	gpio_direction_output(JZ_GPIO_PORTB(31), 1);
 
 	if (lepus_init_platform_devices())
 		panic("Failed to initalize platform devices\n");
