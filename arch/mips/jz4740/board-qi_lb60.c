@@ -336,7 +336,7 @@ printk(KERN_ERR "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
 	msleep(10);	/* precharge caps */
 
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, 1 << 2);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, 1 << 2 | 1 << 9);
 	msleep(10);
 }
 
@@ -360,7 +360,7 @@ static struct spi_board_info qi_lb60_spi_board_info[] = {
 		.modalias = "at86rf230",
 		.platform_data = &at86rf230_platform_data,
 		.controller_data = (void *)JZ_GPIO_PORTD(13),
-		.irq = JZ_GPIO_PORTD(12),
+		/* set .irq later */
 		.chip_select = 0,
 		.bus_num = 2,
 		.max_speed_hz = 8 * 1000 * 1000,
@@ -512,6 +512,7 @@ static int __init qi_lb60_init_platform_devices(void)
 
 	jz4740_serial_device_register();
 
+	qi_lb60_spi_board_info[1].irq = gpio_to_irq(JZ_GPIO_PORTD(12));
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));
 
