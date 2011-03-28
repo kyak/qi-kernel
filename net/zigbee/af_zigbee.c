@@ -216,7 +216,7 @@ static struct net_proto_family zb_family_ops = {
 	.owner		= THIS_MODULE,
 };
 
-/* 
+/*
  * Main ZigBEE NWK receive routine.
  */
 static int zb_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)

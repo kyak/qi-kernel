@@ -151,7 +151,7 @@ static int dgram_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 	}
 #if 0
-	/* May be implement here the commands */ 
+	/* May be implement here the commands */
 	case IEEE80215_SIOC_NETWORK_DISCOVERY:
 		return ioctl_network_discovery(sk, (struct ieee80215_user_data __user *) arg);
 		break;

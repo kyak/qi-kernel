@@ -397,7 +397,7 @@ process_command(struct zb_device *zbdev)
 		serial_net_rx(zbdev);
 		break;
 	case RESP_ADDRESS:
-		pr_debug("Received address, %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n", 
+		pr_debug("Received address, %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
 			zbdev->data[0], zbdev->data[1], zbdev->data[2], zbdev->data[3],
 			zbdev->data[4], zbdev->data[5], zbdev->data[6], zbdev->data[7]);
 		break;
