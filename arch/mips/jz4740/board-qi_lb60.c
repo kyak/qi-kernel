@@ -14,6 +14,7 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 #include <linux/gpio.h>
 
 #include <linux/input.h>
@@ -33,6 +34,7 @@
 #include <linux/regulator/machine.h>
 
 #include <linux/leds_pwm.h>
+#include <linux/spi/at86rf230.h>
 
 #include <asm/mach-jz4740/platform.h>
 
@@ -303,6 +305,49 @@ static struct platform_device spigpio_device = {
 	},
 };
 
+/* atben 8:10 card */
+static struct spi_gpio_platform_data atben_platform_data = {
+	.sck = JZ_GPIO_PORTD(11),
+	.mosi = JZ_GPIO_PORTD(8),
+	.miso = JZ_GPIO_PORTD(10),
+	.num_chipselect = 1,
+};
+
+static struct platform_device qi_lb60_atben = {
+	.name = "spi_gpio",
+	.id   = 2,
+	.dev = {
+		.platform_data = &atben_platform_data,
+	},
+};
+
+static void atben_reset(void *reset_data)
+{
+	const int charge = 1 << 13 | 1 << 8 | 1 << 9 | 1 << 11;
+	const int discharge = charge | 1 << 12 | 1 << 10;
+
+printk(KERN_ERR "atben_reset\n");
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
+	jz_gpio_port_direction_output(JZ_GPIO_PORTD(0), discharge);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
+	msleep(100);	/* let power drop */
+
+	jz_gpio_port_direction_input(JZ_GPIO_PORTD(0), discharge-charge);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
+	msleep(10);	/* precharge caps */
+
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, 1 << 2);
+	msleep(10);
+}
+
+static struct at86rf230_platform_data at86rf230_platform_data = {
+	.rstn	= -1,
+	.slp_tr	= JZ_GPIO_PORTD(9),
+	.dig2	= -1,
+	.reset	= atben_reset,
+};
+
+/* SPI */
 static struct spi_board_info qi_lb60_spi_board_info[] = {
 	{
 		.modalias = "ili8960",
@@ -310,6 +355,15 @@ static struct spi_board_info qi_lb60_spi_board_info[] = {
 		.chip_select = 0,
 		.bus_num = 1,
 		.max_speed_hz = 30 * 1000,
+	},
+	{
+		.modalias = "at86rf230",
+		.platform_data = &at86rf230_platform_data,
+		.controller_data = (void *)JZ_GPIO_PORTD(13),
+		.irq = JZ_GPIO_PORTD(12),
+		.chip_select = 0,
+		.bus_num = 2,
+		.max_speed_hz = 8 * 1000 * 1000,
 	},
 };
 
@@ -417,10 +471,9 @@ static struct platform_device qi_lb60_charger_device = {
 	},
 };
 
-
 static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_udc_device,
-	&jz4740_mmc_device,
+//	&jz4740_mmc_device,
 	&jz4740_nand_device,
 	&qi_lb60_keypad,
 	&spigpio_device,
@@ -433,6 +486,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&qi_lb60_gpio_keys,
 	&qi_lb60_pwm_beeper,
 	&qi_lb60_charger_device,
+	&qi_lb60_atben,
 };
 
 static void __init board_gpio_setup(void)
@@ -441,6 +495,12 @@ static void __init board_gpio_setup(void)
 	 * drivers. Everything else is done by the drivers themselfs. */
 	jz_gpio_disable_pullup(QI_LB60_GPIO_SD_VCC_EN_N);
 	jz_gpio_disable_pullup(QI_LB60_GPIO_SD_CD);
+	jz_gpio_set_function(JZ_GPIO_PORTD(12), JZ_GPIO_FUNC_NONE);
+	jz_gpio_set_function(JZ_GPIO_PORTD(13), JZ_GPIO_FUNC_NONE);
+	jz_gpio_set_function(JZ_GPIO_PORTD(8), JZ_GPIO_FUNC_NONE);
+	jz_gpio_set_function(JZ_GPIO_PORTD(9), JZ_GPIO_FUNC_NONE);
+	jz_gpio_set_function(JZ_GPIO_PORTD(10), JZ_GPIO_FUNC_NONE);
+	jz_gpio_set_function(JZ_GPIO_PORTD(11), JZ_GPIO_FUNC_NONE);
 }
 
 static int __init qi_lb60_init_platform_devices(void)
