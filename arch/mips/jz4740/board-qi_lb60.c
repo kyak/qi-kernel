@@ -323,8 +323,17 @@ static struct platform_device qi_lb60_atben = {
 
 static void atben_reset(void *reset_data)
 {
-	const int charge = 1 << 13 | 1 << 8 | 1 << 9 | 1 << 11;
-	const int discharge = charge | 1 << 12 | 1 << 10;
+	enum {
+		MASK_IRQ	= 1 << 12,
+		MASK_nSEL	= 1 << 13,
+		MASK_MOSI	= 1 << 8,
+		MASK_nVDD	= 1 << 2,
+		MASK_SLP_TR	= 1 << 9,
+		MASK_MISO	= 1 << 10,
+		MASK_SCLK	= 1 << 11,
+	};
+	const int charge = MASK_nSEL | MASK_MOSI | MASK_SLP_TR | MASK_SCLK;
+	const int discharge = charge | MASK_IRQ | MASK_MISO;
 
 printk(KERN_ERR "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
@@ -332,7 +341,12 @@ printk(KERN_ERR "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
 	msleep(100);	/* let power drop */
 
-	jz_gpio_port_direction_input(JZ_GPIO_PORTD(0), discharge-charge);
+	/*
+ 	 * Hack: PD12/DAT2/IRQ is an active-high interrupt input, which is
+	 * indicated by setting its direction bit to 1. We thus must not
+	 * configure it as an "input".
+	 */
+	jz_gpio_port_direction_input(JZ_GPIO_PORTD(0), MASK_MISO);
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
 	msleep(10);	/* precharge caps */
 
@@ -495,6 +509,7 @@ static void __init board_gpio_setup(void)
 	 * drivers. Everything else is done by the drivers themselfs. */
 	jz_gpio_disable_pullup(QI_LB60_GPIO_SD_VCC_EN_N);
 	jz_gpio_disable_pullup(QI_LB60_GPIO_SD_CD);
+
 	jz_gpio_set_function(JZ_GPIO_PORTD(12), JZ_GPIO_FUNC_NONE);
 	jz_gpio_set_function(JZ_GPIO_PORTD(13), JZ_GPIO_FUNC_NONE);
 	jz_gpio_set_function(JZ_GPIO_PORTD(8), JZ_GPIO_FUNC_NONE);
