@@ -440,7 +440,7 @@ at86rf230_ed(struct ieee802154_dev *dev, u8 *level)
 }
 
 static int
-at86rf230_state(struct ieee802154_dev *dev, int state)
+at86rf230_state(struct ieee802154_dev *dev, int cmd, int state)
 {
 	struct at86rf230_local *lp = dev->priv;
 	int rc;
@@ -459,8 +459,8 @@ at86rf230_state(struct ieee802154_dev *dev, int state)
 	if (val == state)
 		return 0;
 
-	/* state is equal to phy states */
-	rc = at86rf230_write_subreg(lp, SR_TRX_CMD, state);
+	/* state is equal to phy states, except for "forced" transitions  */
+	rc = at86rf230_write_subreg(lp, SR_TRX_CMD, cmd);
 	if (rc)
 		goto err;
 
@@ -484,13 +484,13 @@ err:
 static int
 at86rf230_start(struct ieee802154_dev *dev)
 {
-	return at86rf230_state(dev, STATE_RX_ON);
+	return at86rf230_state(dev, STATE_RX_ON, STATE_RX_ON);
 }
 
 static void
 at86rf230_stop(struct ieee802154_dev *dev)
 {
-	at86rf230_state(dev, STATE_FORCE_TRX_OFF);
+	at86rf230_state(dev, STATE_FORCE_TRX_OFF, STATE_TRX_OFF);
 }
 
 static int
@@ -530,7 +530,7 @@ at86rf230_xmit(struct ieee802154_dev *dev, struct sk_buff *skb)
 	INIT_COMPLETION(lp->tx_complete);
 	spin_unlock_irqrestore(&lp->lock, flags);
 
-	rc = at86rf230_state(dev, STATE_FORCE_TX_ON);
+	rc = at86rf230_state(dev, STATE_FORCE_TX_ON, STATE_TX_ON);
 	if (rc)
 		goto err;
 
@@ -552,12 +552,12 @@ at86rf230_xmit(struct ieee802154_dev *dev, struct sk_buff *skb)
 	if (rc < 0)
 		goto err_rx;
 
-	rc = at86rf230_state(dev, STATE_RX_ON);
+	rc = at86rf230_state(dev, STATE_RX_ON, STATE_RX_ON);
 
 	return rc;
 
 err_rx:
-	at86rf230_state(dev, STATE_RX_ON);
+	at86rf230_state(dev, STATE_RX_ON, STATE_RX_ON);
 err:
 	spin_lock_irqsave(&lp->lock, flags);
 	lp->is_tx = 0;
