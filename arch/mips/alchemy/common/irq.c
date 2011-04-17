@@ -30,7 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
-#include <linux/sysdev.h>
+#include <linux/syscore_ops.h>
 
 #include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
@@ -556,17 +556,15 @@ void __init arch_init_irq(void)
 	}
 }
 
-struct alchemy_ic_sysdev {
-	struct sys_device sysdev;
+struct alchemy_ic {
 	void __iomem *base;
 	unsigned long pmdata[7];
 };
 
-static int alchemy_ic_suspend(struct sys_device *dev, pm_message_t state)
-{
-	struct alchemy_ic_sysdev *icdev =
-			container_of(dev, struct alchemy_ic_sysdev, sysdev);
+static struct alchemy_ic alchemy_ic_data[2];
 
+static void alchemy_suspend_one_ic(struct alchemy_ic *icdev)
+{
 	icdev->pmdata[0] = __raw_readl(icdev->base + IC_CFG0RD);
 	icdev->pmdata[1] = __raw_readl(icdev->base + IC_CFG1RD);
 	icdev->pmdata[2] = __raw_readl(icdev->base + IC_CFG2RD);
@@ -574,15 +572,17 @@ static int alchemy_ic_suspend(struct sys_device *dev, pm_message_t state)
 	icdev->pmdata[4] = __raw_readl(icdev->base + IC_ASSIGNRD);
 	icdev->pmdata[5] = __raw_readl(icdev->base + IC_WAKERD);
 	icdev->pmdata[6] = __raw_readl(icdev->base + IC_MASKRD);
+}
 
+static int alchemy_ic_suspend(void)
+{
+	alchemy_suspend_one_ic(alchemy_ic_data);
+	alchemy_suspend_one_ic(alchemy_ic_data + 1);
 	return 0;
 }
 
-static int alchemy_ic_resume(struct sys_device *dev)
+static void alchemy_resume_one_ic(struct alchemy_ic *icdev)
 {
-	struct alchemy_ic_sysdev *icdev =
-			container_of(dev, struct alchemy_ic_sysdev, sysdev);
-
 	__raw_writel(0xffffffff, icdev->base + IC_MASKCLR);
 	__raw_writel(0xffffffff, icdev->base + IC_CFG0CLR);
 	__raw_writel(0xffffffff, icdev->base + IC_CFG1CLR);
@@ -604,42 +604,26 @@ static int alchemy_ic_resume(struct sys_device *dev)
 
 	__raw_writel(icdev->pmdata[6], icdev->base + IC_MASKSET);
 	wmb();
-
-	return 0;
 }
 
-static struct sysdev_class alchemy_ic_sysdev_class = {
-	.name		= "ic",
+static void alchemy_ic_resume(void)
+{
+	alchemy_resume_one_ic(alchemy_ic_data + 1);
+	alchemy_resume_one_ic(alchemy_ic_data);
+}
+
+static struct syscore_ops alchemy_ic_syscore_ops = {
 	.suspend	= alchemy_ic_suspend,
 	.resume		= alchemy_ic_resume,
 };
 
-static int __init alchemy_ic_sysdev_init(void)
+static int __init alchemy_ic_syscore_init(void)
 {
-	struct alchemy_ic_sysdev *icdev;
-	unsigned long icbase[2] = { IC0_PHYS_ADDR, IC1_PHYS_ADDR };
-	int err, i;
+	alchemy_ic_data[0].base = ioremap(icbase[IC0_PHYS_ADDR], 0x1000);
+	alchemy_ic_data[1].base = ioremap(icbase[IC1_PHYS_ADDR], 0x1000);
 
-	err = sysdev_class_register(&alchemy_ic_sysdev_class);
-	if (err)
-		return err;
-
-	for (i = 0; i < 2; i++) {
-		icdev = kzalloc(sizeof(struct alchemy_ic_sysdev), GFP_KERNEL);
-		if (!icdev)
-			return -ENOMEM;
-
-		icdev->base = ioremap(icbase[i], 0x1000);
-
-		icdev->sysdev.id = i;
-		icdev->sysdev.cls = &alchemy_ic_sysdev_class;
-		err = sysdev_register(&icdev->sysdev);
-		if (err) {
-			kfree(icdev);
-			return err;
-		}
-	}
+	register_syscore_ops(&alchemy_ic_syscore_ops);
 
 	return 0;
 }
-device_initcall(alchemy_ic_sysdev_init);
+device_initcall(alchemy_ic_syscore_init);
