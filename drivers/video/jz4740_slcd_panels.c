@@ -45,10 +45,10 @@ static void send_panel_command(struct jzfb *jzfb, u32 cmd) {
 	}
 }
 
-static void set_panel_reg(struct jzfb *jzfb, u32 cmd, u32 data)
+/* Send data without command. */
+static void send_panel_data(struct jzfb *jzfb, u32 data)
 {
 	u16 slcd_cfg = readw(jzfb->base + JZ_REG_SLCD_CFG);
-	send_panel_command(jzfb, cmd);
 	switch (slcd_cfg & SLCD_CFG_DWIDTH_MASK) {
 	case SLCD_CFG_DWIDTH_18:
 		while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
@@ -70,6 +70,13 @@ static void set_panel_reg(struct jzfb *jzfb, u32 cmd, u32 data)
 		writel(SLCD_DATA_RS_DATA | (data&0xffff), jzfb->base + JZ_REG_SLCD_DATA);
 		break;
 	}
+}
+
+/* Send command and data. */
+static void set_panel_reg(struct jzfb *jzfb, u32 cmd, u32 data)
+{
+	send_panel_command(jzfb, cmd);
+	send_panel_data(jzfb, data);
 }
 
 #ifdef CONFIG_JZ_SLCD_ILI9325
