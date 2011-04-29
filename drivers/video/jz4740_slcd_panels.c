@@ -5,6 +5,7 @@
  * Copyright (C) 2005-2007, Ingenic Semiconductor Inc.
  * Copyright (C) 2009, Ignacio Garcia Perez <iggarpe@gmail.com>
  * Copyright (C) 2010, Maarten ter Huurne <maarten@treewalker.org>
+ * Copyright (C) 2011, ChinaChip
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -314,6 +315,138 @@ static void ili9331_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9331_GPIO_CS_N, 1);
 	/* Keep RESET active */
 	gpio_set_value(ILI9331_GPIO_RESET_N, 0);
+}
+
+#endif
+
+#ifdef CONFIG_JZ_SLCD_ILI9338
+
+#define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
+#define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
+
+static int ili9338_init(struct jzfb *jzfb)
+{
+	struct device *dev = &jzfb->pdev->dev;
+	int ret;
+
+	ret = gpio_request(ILI9338_GPIO_CS_N, dev_name(dev));
+	if (ret)
+		goto err_cs;
+	gpio_direction_output(ILI9338_GPIO_CS_N, 1);
+
+	ret = gpio_request(ILI9338_GPIO_RESET_N, dev_name(dev));
+	if (ret)
+		goto err_reset;
+	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
+
+	mdelay(100);
+	return 0;
+
+err_reset:
+	gpio_free(ILI9338_GPIO_CS_N);
+err_cs:
+	dev_err(dev, "Could not reserve GPIO pins for ILI9338 panel driver\n");
+	return ret;
+}
+
+static void ili9338_exit(struct jzfb *jzfb)
+{
+	gpio_free(ILI9338_GPIO_CS_N);
+	gpio_free(ILI9338_GPIO_RESET_N);
+}
+
+static void ili9338_enable(struct jzfb *jzfb)
+{
+	/* RESET pulse */
+	gpio_set_value(ILI9338_GPIO_RESET_N, 0);
+	mdelay(10);
+	gpio_set_value(ILI9338_GPIO_RESET_N, 1);
+	mdelay(50);
+
+	/* Enable chip select */
+	gpio_set_value(ILI9338_GPIO_CS_N, 0);
+
+	/* Black magic */
+	send_panel_command(jzfb, 0x11);
+	mdelay(100);
+
+	send_panel_command(jzfb, 0xCB);
+	send_panel_data(jzfb, 0x01);
+
+	send_panel_command(jzfb, 0xC0);
+	send_panel_data(jzfb, 0x26);
+	send_panel_data(jzfb, 0x01);
+	send_panel_command(jzfb, 0xC1);
+	send_panel_data(jzfb, 0x10);
+	send_panel_command(jzfb, 0xC5);
+	send_panel_data(jzfb, 0x10);
+	send_panel_data(jzfb, 0x52);
+
+	send_panel_command(jzfb, 0x26);
+	send_panel_data(jzfb, 0x01);
+	send_panel_command(jzfb, 0xE0);
+	send_panel_data(jzfb, 0x10);
+	send_panel_data(jzfb, 0x10);
+	send_panel_data(jzfb, 0x10);
+	send_panel_data(jzfb, 0x08);
+	send_panel_data(jzfb, 0x0E);
+	send_panel_data(jzfb, 0x06);
+	send_panel_data(jzfb, 0x42);
+	send_panel_data(jzfb, 0x28);
+	send_panel_data(jzfb, 0x36);
+	send_panel_data(jzfb, 0x03);
+	send_panel_data(jzfb, 0x0E);
+	send_panel_data(jzfb, 0x04);
+	send_panel_data(jzfb, 0x13);
+	send_panel_data(jzfb, 0x0E);
+	send_panel_data(jzfb, 0x0C);
+	send_panel_command(jzfb, 0XE1);
+	send_panel_data(jzfb, 0x0C);
+	send_panel_data(jzfb, 0x23);
+	send_panel_data(jzfb, 0x26);
+	send_panel_data(jzfb, 0x04);
+	send_panel_data(jzfb, 0x0C);
+	send_panel_data(jzfb, 0x04);
+	send_panel_data(jzfb, 0x39);
+	send_panel_data(jzfb, 0x24);
+	send_panel_data(jzfb, 0x4B);
+	send_panel_data(jzfb, 0x03);
+	send_panel_data(jzfb, 0x0B);
+	send_panel_data(jzfb, 0x0B);
+	send_panel_data(jzfb, 0x33);
+	send_panel_data(jzfb, 0x37);
+	send_panel_data(jzfb, 0x0F);
+
+	send_panel_command(jzfb, 0x2a);
+	send_panel_data(jzfb, 0x00);
+	send_panel_data(jzfb, 0x00);
+	send_panel_data(jzfb, 0x01);
+	send_panel_data(jzfb, 0x3f);
+
+	send_panel_command(jzfb, 0x2b);
+	send_panel_data(jzfb, 0x00);
+	send_panel_data(jzfb, 0x00);
+	send_panel_data(jzfb, 0x00);
+	send_panel_data(jzfb, 0xef);
+
+	send_panel_command(jzfb, 0x36);
+	send_panel_data(jzfb, 0xe8);
+
+	send_panel_command(jzfb, 0x3A);
+	send_panel_data(jzfb, 0x05);
+
+	send_panel_command(jzfb, 0x29);
+
+	send_panel_command(jzfb, 0x2c);
+}
+
+/* TODO(IGP): make sure LCD power consumption is low in these conditions */
+static void ili9338_disable(struct jzfb *jzfb)
+{
+	/* Keep chip select disabled */
+	gpio_set_value(ILI9338_GPIO_CS_N, 1);
+	/* Keep RESET active */
+	gpio_set_value(ILI9338_GPIO_RESET_N, 0);
 }
 
 #endif
@@ -693,6 +826,12 @@ static const struct jz_slcd_panel jz_slcd_panels[] = {
 	{
 		ili9331_init, ili9331_exit,
 		ili9331_enable, ili9331_disable,
+	},
+#endif
+#ifdef CONFIG_JZ_SLCD_ILI9338
+	{
+		ili9338_init, ili9338_exit,
+		ili9338_enable, ili9338_disable,
 	},
 #endif
 #ifdef CONFIG_JZ_SLCD_LGDP4551

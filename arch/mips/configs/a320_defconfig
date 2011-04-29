@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.38 Kernel Configuration
-# Thu Mar 24 11:58:12 2011
+# Fri Apr 29 12:40:10 2011
 #
 CONFIG_MIPS=y
 
@@ -859,6 +859,7 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 CONFIG_FB_JZ4740_SLCD=y
 # CONFIG_JZ_SLCD_ILI9325 is not set
 CONFIG_JZ_SLCD_ILI9331=y
+# CONFIG_JZ_SLCD_ILI9338 is not set
 # CONFIG_JZ_SLCD_LGDP4551 is not set
 # CONFIG_JZ_SLCD_SPFD5420A is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
