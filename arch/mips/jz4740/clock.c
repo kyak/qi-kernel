@@ -1098,7 +1098,7 @@ static int jz4740_clock_init(void)
 	if (!jz_clock_base)
 		return -EBUSY;
 
-	jz_emc_base = ioremap(CPHYSADDR(JZ4740_EMC_BASE_ADDR), 0x100);
+	jz_emc_base = ioremap(JZ4740_EMC_BASE_ADDR, 0x100);
 	if (!jz_emc_base)
 		return -EBUSY;
 
