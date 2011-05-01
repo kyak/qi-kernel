@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.38 Kernel Configuration
-# Fri Apr 29 12:40:10 2011
+# Sun May  1 02:01:22 2011
 #
 CONFIG_MIPS=y
 
@@ -1245,7 +1245,7 @@ CONFIG_TRACING_SUPPORT=y
 CONFIG_HAVE_ARCH_KGDB=y
 # CONFIG_EARLY_PRINTK is not set
 CONFIG_CMDLINE_BOOL=y
-CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs.bin root=/dev/loop0 mem=32M"
+CONFIG_CMDLINE="console=tty0 boot=/dev/mmcblk0,/dev/mmcblk0p1 loop0=/boot/rootfs.bin root=/dev/loop0"
 CONFIG_CMDLINE_OVERRIDE=y
 
 #
