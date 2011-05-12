@@ -10,6 +10,14 @@ menuconfig IEEE802154_DRIVERS
 	  If you say N, all options in this submenu will be skipped and
 	  disabled.
 
+config IEEE802154_DRIVER_DEBUG
+	bool "Driver debugging messages"
+	depends on IEEE802154_DRIVERS
+	default y
+	help
+	  Say Y here to make the IEEE 802.15.4 drivers generate extensive
+	  debugging messages.
+
 config IEEE802154_FAKEHARD
 	tristate "Fake LR-WPAN driver with several interconnected devices"
 	depends on  IEEE802154_DRIVERS

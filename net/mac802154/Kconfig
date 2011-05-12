@@ -15,3 +15,10 @@ config MAC802154
 	  say N here. Alternatievly you can say M to compile it as
 	  module.
 
+config MAC802154_DEBUG
+	bool "IEEE 802.15.4 SoftMAC debugging messages"
+	depends on MAC802154
+	default y
+	help
+	  Say Y here to make the IEEE 802.15.4 SoftMAC generate extensive
+	  debugging messages.

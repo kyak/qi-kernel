@@ -10,3 +10,12 @@ config IEEE802154
 
 	  Say Y here to compile LR-WPAN support into the kernel or say M to
 	  compile it as modules.
+
+config IEEE802154_PROTO_DEBUG
+	bool "IEEE 802.15.4 protocol stack debugging messages"
+	depends on IEEE802154
+	default y
+	help
+	  Say Y here to make the IEEE 802.15.4 protocol stack generate
+	  extensive debugging messages.
+
