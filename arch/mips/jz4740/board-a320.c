@@ -155,7 +155,7 @@ static struct jz_nand_platform_data a320_nand_pdata = {
 	.partitions		= a320_nand_partitions,
 	.ecc_layout		= &a320_nand_ecc_layout,
 	.busy_gpio		= JZ_GPIO_PORTC(30),
-	.banks			= { 1, 2 },
+	.banks			= { 1, 2, 3, 4 },
 	.ident_callback		= a320_nand_ident,
 };
 
