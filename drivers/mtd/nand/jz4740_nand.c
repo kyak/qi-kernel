@@ -57,14 +57,17 @@
 #define JZ_NAND_MEM_CMD_OFFSET 0x08000
 #define JZ_NAND_MEM_ADDR_OFFSET 0x10000
 
+#define JZ_NAND_NUM_BANKS 4
+
 struct jz_nand {
 	struct mtd_info mtd;
 	struct nand_chip chip;
 	void __iomem *base;
 	struct resource *mem;
 
-	void __iomem *bank_base[4];
-	struct resource *bank_mem[4];
+	unsigned char banks[JZ_NAND_NUM_BANKS];
+	void __iomem *bank_base[JZ_NAND_NUM_BANKS];
+	struct resource *bank_mem[JZ_NAND_NUM_BANKS];
 
 	int selected_bank;
 
@@ -90,7 +93,7 @@ static void jz_nand_select_chip(struct mtd_info *mtd, int chipnr)
 	if (chipnr == -1) {
 		banknr = -1;
 	} else {
-		banknr = nand->pdata->banks[chipnr] - 1;
+		banknr = nand->banks[chipnr] - 1;
 		chip->IO_ADDR_R = nand->bank_base[banknr];
 		chip->IO_ADDR_W = nand->bank_base[banknr];
 	}
@@ -327,39 +330,82 @@ static inline void jz_nand_iounmap_resource(struct resource *res, void __iomem *
 	release_mem_region(res->start, resource_size(res));
 }
 
-static void jz_nand_iounmap_banks(
-	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
-{
-	int i;
-
-	for (i = 0; i < num_banks; ++i) {
-		unsigned char bank = banks[i];
-		jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
-					 nand->bank_base[bank - 1]);
-	}
-}
-
-static int jz_nand_ioremap_banks(struct platform_device *pdev,
-	struct jz_nand *nand, unsigned char *banks, size_t num_banks)
-{
+static int __devinit jz_nand_detect_bank(struct platform_device *pdev, struct jz_nand *nand, unsigned char bank, size_t chipnr, uint8_t *nand_maf_id, uint8_t *nand_dev_id) {
 	int ret;
-	char name[6];
-	int i;
+	int gpio;
+	char gpio_name[9];
+	char res_name[6];
+	uint32_t ctrl;
+	struct mtd_info *mtd = &nand->mtd;
+	struct nand_chip *chip = &nand->chip;
 
-	for (i = 0; i < num_banks; ++i) {
-		unsigned char bank = banks[i];
-		sprintf(name, "bank%d", bank);
-
-		ret = jz_nand_ioremap_resource(pdev, name,
-					       &nand->bank_mem[bank - 1],
-					       &nand->bank_base[bank - 1]);
-		if (ret) {
-			jz_nand_iounmap_banks(nand, banks, i);
-			return ret;
-		}
+	/* Request GPIO port. */
+	gpio = JZ_GPIO_MEM_CS0 + bank - 1;
+	sprintf(gpio_name, "NAND CS%d", bank);
+	ret = gpio_request(gpio, gpio_name);
+	if (ret) {
+		dev_warn(&pdev->dev,
+			"Failed to request %s gpio %d: %d\n",
+			gpio_name, gpio, ret);
+		goto notfound_gpio;
 	}
 
+	/* Request I/O resource. */
+	sprintf(res_name, "bank%d", bank);
+	ret = jz_nand_ioremap_resource(pdev, res_name,
+					&nand->bank_mem[bank - 1],
+					&nand->bank_base[bank - 1]);
+	if (ret)
+		goto notfound_resource;
+
+	/* Enable chip in bank. */
+	jz_gpio_set_function(gpio, JZ_GPIO_FUNC_MEM_CS0);
+	ctrl = readl(nand->base + JZ_REG_NAND_CTRL);
+	ctrl |= JZ_NAND_CTRL_ENABLE_CHIP(bank - 1);
+	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
+
+	if (chipnr == 0) {
+		/* Detect first chip. */
+		ret = nand_scan_ident(mtd, 1, NULL);
+		if (ret)
+			goto notfound_id;
+
+		/* Retrieve the IDs from the first chip. */
+		chip->select_chip(mtd, 0);
+		chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+		chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
+		*nand_maf_id = chip->read_byte(mtd);
+		*nand_dev_id = chip->read_byte(mtd);
+	} else {
+		/* Detect additional chip. */
+		chip->select_chip(mtd, chipnr);
+		chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+		chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
+		if (*nand_maf_id != chip->read_byte(mtd)
+		 || *nand_dev_id != chip->read_byte(mtd)) {
+			ret = -ENODEV;
+			goto notfound_id;
+		}
+
+		/* Update size of the MTD. */
+		chip->numchips++;
+		mtd->size += chip->chipsize;
+	}
+
+	dev_info(&pdev->dev, "Found chip %i on bank %i\n", chipnr, bank);
 	return 0;
+
+notfound_id:
+	dev_info(&pdev->dev, "No chip found on bank %i\n", bank);
+	ctrl &= ~(JZ_NAND_CTRL_ENABLE_CHIP(bank - 1));
+	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
+	jz_gpio_set_function(gpio, JZ_GPIO_FUNC_NONE);
+	jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
+				 nand->bank_base[bank - 1]);
+notfound_resource:
+	gpio_free(gpio);
+notfound_gpio:
+	return ret;
 }
 
 static int __devinit jz_nand_probe(struct platform_device *pdev)
@@ -373,9 +419,8 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	struct mtd_partition *partition_info;
 	int num_partitions = 0;
 #endif
-	size_t num_banks;
-	unsigned char bank;
-	uint32_t ctrl;
+	size_t chipnr, bank_idx;
+	uint8_t nand_maf_id = 0, nand_dev_id = 0;
 
 	nand = kzalloc(sizeof(*nand), GFP_KERNEL);
 	if (!nand) {
@@ -423,50 +468,43 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	nand->pdata = pdata;
 	platform_set_drvdata(pdev, nand);
 
-	if (pdata->banks[0] == 0)
-		pdata->banks[0] = 1;
+	/* We are going to autodetect NAND chips in the banks specified in the
+	 * platform data. Although nand_scan_ident() can detect multiple chips,
+	 * it requires those chips to be numbered consecuitively, which is not
+	 * always the case for external memory banks. And a fixed chip-to-bank
+	 * mapping is not practical either, since for example Dingoo units
+	 * produced at different times have NAND chips in different banks.
+	 */
+	chipnr = 0;
+	for (bank_idx = 0; bank_idx < JZ_NAND_NUM_BANKS; bank_idx++) {
+		unsigned char bank;
 
-	ctrl = 0;
-	for (num_banks = 0; num_banks < 4 ; ++num_banks) {
-		int gpio;
-		char name[9];
-
-		bank = pdata->banks[num_banks];
+		/* If there is no platform data, look for NAND in bank 1,
+		 * which is the most likely bank since it is the only one
+		 * that can be booted from.
+		 */
+		bank = pdata ? pdata->banks[bank_idx] : bank_idx ^ 1;
 		if (bank == 0)
 			break;
-		if (bank > 4) {
-			dev_err(&pdev->dev, "Non-existing bank: %d\n", bank);
-			ret = -EINVAL;
-			goto err_gpio_free;
+		if (bank > JZ_NAND_NUM_BANKS) {
+			dev_warn(&pdev->dev,
+				"Skipping non-existing bank: %d\n", bank);
+			continue;
 		}
-
-		sprintf(name, "NAND CS%d", bank);
-		gpio = JZ_GPIO_MEM_CS0 + bank - 1;
-		ret = gpio_request(gpio, name);
-		if (ret) {
-			dev_err(&pdev->dev,
-				"Failed to request %s gpio %d: %d\n",
-				name, gpio, ret);
-			goto err_gpio_free;
-		}
-		jz_gpio_set_function(gpio, JZ_GPIO_FUNC_MEM_CS0);
-
-		ctrl |= JZ_NAND_CTRL_ENABLE_CHIP(bank - 1);
+		/* The detection routine will directly or indirectly call
+		 * jz_nand_select_chip(), so nand->banks has to contain the
+		 * bank we're checking.
+		 */
+		nand->banks[chipnr] = bank;
+		if (jz_nand_detect_bank(pdev, nand, bank, chipnr,
+					&nand_maf_id, &nand_dev_id) == 0)
+			chipnr++;
+		else
+			nand->banks[chipnr] = 0;
 	}
-
-	ret = jz_nand_ioremap_banks(pdev, nand, pdata->banks, num_banks);
-	if (ret)
-		goto err_gpio_free;
-
-	chip->IO_ADDR_R = nand->bank_base[pdata->banks[0] - 1];
-	chip->IO_ADDR_W = nand->bank_base[pdata->banks[0] - 1];
-
-	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
-
-	ret = nand_scan_ident(mtd, num_banks, NULL);
-	if (ret) {
-		dev_err(&pdev->dev,  "Failed to scan nand\n");
-		goto err_iounmap_banks;
+	if (chipnr == 0) {
+		dev_err(&pdev->dev, "No NAND chips found\n");
+		goto err_gpio_busy;
 	}
 
 	if (pdata && pdata->ident_callback) {
@@ -476,8 +514,8 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 
 	ret = nand_scan_tail(mtd);
 	if (ret) {
-		dev_err(&pdev->dev,  "Failed to scan nand\n");
-		goto err_iounmap_banks;
+		dev_err(&pdev->dev,  "Failed to scan NAND\n");
+		goto err_unclaim_banks;
 	}
 
 #ifdef CONFIG_MTD_PARTITIONS
@@ -494,7 +532,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 		ret = add_mtd_partitions(mtd, partition_info, num_partitions);
 	else
 #endif
-	ret = add_mtd_device(mtd);
+	ret = add_mtd_device(mtd) ? -ENODEV : 0;
 
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to add mtd device\n");
@@ -506,18 +544,21 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	return 0;
 
 err_nand_release:
-	nand_release(&nand->mtd);
-err_iounmap_banks:
-	jz_nand_iounmap_banks(nand, pdata->banks, num_banks);
-err_gpio_free:
-	platform_set_drvdata(pdev, NULL);
-	gpio_free(pdata->busy_gpio);
-	while (num_banks--) {
-		bank = pdata->banks[num_banks];
+	nand_release(mtd);
+err_unclaim_banks:
+	while (chipnr--) {
+		unsigned char bank = nand->banks[chipnr];
 		gpio_free(JZ_GPIO_MEM_CS0 + bank - 1);
+		jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
+					 nand->bank_base[bank - 1]);
 	}
+	writel(0, nand->base + JZ_REG_NAND_CTRL);
+err_gpio_busy:
+	if (pdata && gpio_is_valid(pdata->busy_gpio))
+		gpio_free(pdata->busy_gpio);
+	platform_set_drvdata(pdev, NULL);
 err_iounmap_mmio:
-	iounmap(nand->base);
+	jz_nand_iounmap_resource(nand->mem, nand->base);
 err_free:
 	kfree(nand);
 	return ret;
@@ -527,20 +568,23 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
 {
 	struct jz_nand *nand = platform_get_drvdata(pdev);
 	struct jz_nand_platform_data *pdata = pdev->dev.platform_data;
-	int i;
+	size_t i;
 
 	nand_release(&nand->mtd);
 
 	/* Deassert and disable all chips */
 	writel(0, nand->base + JZ_REG_NAND_CTRL);
 
-	for (i = 0; i < 4; ++i)
-		if (nand->bank_base[i] != 0) {
-			jz_nand_iounmap_resource(nand->bank_mem[i],
-						 nand->bank_base[i]);
-			gpio_free(JZ_GPIO_MEM_CS0 + i);
+	for (i = 0; i < JZ_NAND_NUM_BANKS; ++i) {
+		unsigned char bank = nand->banks[i];
+		if (bank != 0) {
+			jz_nand_iounmap_resource(nand->bank_mem[bank - 1],
+						 nand->bank_base[bank - 1]);
+			gpio_free(JZ_GPIO_MEM_CS0 + bank - 1);
 		}
-	gpio_free(pdata->busy_gpio);
+	}
+	if (pdata && gpio_is_valid(pdata->busy_gpio))
+		gpio_free(pdata->busy_gpio);
 
 	jz_nand_iounmap_resource(nand->mem, nand->base);
 
