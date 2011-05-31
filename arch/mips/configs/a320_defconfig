@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux/mips 2.6.38 Kernel Configuration
-# Sun May  1 02:01:22 2011
+# Tue May 31 04:22:45 2011
 #
 CONFIG_MIPS=y
 
@@ -196,7 +196,7 @@ CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_SYSFS_DEPRECATED is not set
 # CONFIG_RELAY is not set
 CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="initrd.cpio"
+CONFIG_INITRAMFS_SOURCE="initrd/tree.txt"
 CONFIG_INITRAMFS_ROOT_UID=0
 CONFIG_INITRAMFS_ROOT_GID=0
 # CONFIG_RD_GZIP is not set
