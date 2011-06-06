@@ -257,7 +257,8 @@ static inline int write_packet(struct jz4740_ep *ep,
 
 	DEBUG("Write %d (count %d), fifo %x\n", length, count, ep->fifo);
 
-	memcpy_toio(fifo, buf, length);
+	writesl(fifo, buf, length >> 2);
+	writesb(fifo, &buf[length - (length & 3)], length & 3);
 
 	return length;
 }
@@ -277,7 +278,10 @@ static int read_packet(struct jz4740_ep *ep,
 		length = count;
 	req->req.actual += length;
 
-	memcpy_fromio(buf, fifo, length);
+	DEBUG("Read %d, fifo %x\n", length, ep->fifo);
+
+	readsl(fifo, buf, length >> 2);
+	readsb(fifo, &buf[length - (length & 3)], length & 3);
 
 	return length;
 }
