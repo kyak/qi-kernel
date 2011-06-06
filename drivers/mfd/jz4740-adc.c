@@ -271,8 +271,6 @@ const struct mfd_cell jz4740_adc_cells[] = {
 		.name = "jz4740-ts",
 		.num_resources = ARRAY_SIZE(jz4740_ts_resources),
 		.resources = jz4740_ts_resources,
-		.platform_data = (void *)&jz4740_adc_cells[2],
-		.data_size = sizeof(struct mfd_cell),
 
 		.enable = jz4740_adc_cell_enable,
 		.disable = jz4740_adc_cell_disable,
