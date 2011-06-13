@@ -19,8 +19,8 @@
  * Written by:
  * Dmitry Eremin-Solenikov <dmitry.baryshkov@siemens.com>
  */
-#ifndef AT86RF230_H
-#define AT86RF230_H
+#ifndef LINUX_SPI_AT86RF230_H
+#define LINUX_SPI_AT86RF230_H
 
 struct at86rf230_platform_data {
 	int rstn;
