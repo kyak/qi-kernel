@@ -59,7 +59,6 @@ struct at86rf230_local {
 	struct ieee802154_dev *dev;
 
 	spinlock_t lock;
-	unsigned irq_disabled:1; /* P: lock */
 	unsigned is_tx:1; /* P: lock */
 };
 
@@ -460,12 +459,7 @@ static void at86rf230_irqwork(struct work_struct *work)
 
 	} while (status != 0);
 
-	spin_lock_irqsave(&lp->lock, flags);
-	if (lp->irq_disabled) {
-		lp->irq_disabled = 0;
-		enable_irq(lp->spi->irq);
-	}
-	spin_unlock_irqrestore(&lp->lock, flags);
+	enable_irq(lp->spi->irq);
 }
 
 static irqreturn_t at86rf230_isr(int irq, void *data)
@@ -474,13 +468,7 @@ static irqreturn_t at86rf230_isr(int irq, void *data)
 
 	dev_dbg(&lp->spi->dev, "IRQ!\n");
 
-	spin_lock(&lp->lock);
-	if (!lp->irq_disabled) {
-		disable_irq_nosync(irq);
-		lp->irq_disabled = 1;
-	}
-	spin_unlock(&lp->lock);
-
+	disable_irq_nosync(irq);
 	schedule_work(&lp->irqwork);
 
 	return IRQ_HANDLED;
@@ -757,10 +745,10 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 
 	return rc;
 
-	ieee802154_unregister_device(lp->dev);
 err_irq:
-	free_irq(spi->irq, lp);
+	disable_irq(spi->irq);
 	flush_work(&lp->irqwork);
+	free_irq(spi->irq, lp);
 err_gpio_dir:
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
@@ -779,10 +767,15 @@ static int __devexit at86rf230_remove(struct spi_device *spi)
 {
 	struct at86rf230_local *lp = spi_get_drvdata(spi);
 
+	/*
+	 * @@@ this looks wrong - what if a frame arrives before
+	 * disable_irq ? -- wa
+	 */
 	ieee802154_unregister_device(lp->dev);
 
-	free_irq(spi->irq, lp);
+	disable_irq(spi->irq);
 	flush_work(&lp->irqwork);
+	free_irq(spi->irq, lp);
 
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
