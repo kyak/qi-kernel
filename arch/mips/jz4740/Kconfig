@@ -20,6 +20,7 @@ config JZ4740_ID800WT
 
 config JZ4740_A320
 	bool "Dingoo A320 game and media player"
+	select SOC_JZ4740
 	select SYS_SUPPORTS_ZBOOT
 
 endchoice
