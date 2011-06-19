@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/scatterlist.h>
 #include <linux/clk.h>
+#include <linux/cpufreq.h>
 
 #include <linux/bitops.h>
 #include <linux/gpio.h>
@@ -899,6 +900,60 @@ static void jz4740_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	jz4740_mmc_set_irq_enabled(host, JZ_MMC_IRQ_SDIO, enable);
 }
 
+#ifdef CONFIG_CPU_FREQ
+
+static struct jz4740_mmc_host *cpufreq_host;
+
+static int jz4740_mmc_cpufreq_transition(struct notifier_block *nb,
+					 unsigned long val, void *data)
+{
+	/* TODO: We only have to take action when the PLL freq changes:
+	         the main dividers have no influence on the MSC device clock. */
+
+	if (val == CPUFREQ_PRECHANGE) {
+		mmc_claim_host(cpufreq_host->mmc);
+		clk_disable_unprepare(cpufreq_host->clk);
+	} else if (val == CPUFREQ_POSTCHANGE) {
+		struct mmc_ios *ios = &cpufreq_host->mmc->ios;
+		if (ios->clock)
+			jz4740_mmc_set_clock_rate(cpufreq_host, ios->clock);
+		if (ios->power_mode != MMC_POWER_OFF)
+			clk_prepare_enable(cpufreq_host->clk);
+		mmc_release_host(cpufreq_host->mmc);
+	}
+	return 0;
+}
+
+static struct notifier_block jz4740_mmc_cpufreq_nb = {
+	.notifier_call = jz4740_mmc_cpufreq_transition,
+};
+
+static inline int jz4740_mmc_cpufreq_register(struct jz4740_mmc_host *host)
+{
+	cpufreq_host = host;
+	return cpufreq_register_notifier(&jz4740_mmc_cpufreq_nb,
+					 CPUFREQ_TRANSITION_NOTIFIER);
+}
+
+static inline void jz4740_mmc_cpufreq_unregister(void)
+{
+	cpufreq_unregister_notifier(&jz4740_mmc_cpufreq_nb,
+				    CPUFREQ_TRANSITION_NOTIFIER);
+}
+
+#else
+
+static inline int jz4740_mmc_cpufreq_register(struct jz4740_mmc_host *host)
+{
+	return 0;
+}
+
+static inline void jz4740_mmc_cpufreq_unregister(void)
+{
+}
+
+#endif
+
 static const struct mmc_host_ops jz4740_mmc_ops = {
 	.request	= jz4740_mmc_request,
 	.pre_req	= jz4740_mmc_pre_request,
@@ -1022,6 +1077,13 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 		goto err_free_host;
 	}
 
+	ret = jz4740_mmc_cpufreq_register(host);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"Failed to register cpufreq transition notifier\n");
+		goto err_free_host;
+	}
+
 	host->mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	host->base = devm_ioremap_resource(&pdev->dev, host->mem_res);
 	if (IS_ERR(host->base)) {
@@ -1033,7 +1095,7 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 	ret = jz_gpio_bulk_request(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request mmc pins: %d\n", ret);
-		goto err_free_host;
+		goto err_cpufreq_unreg;
 	}
 
 	ret = jz4740_mmc_request_gpios(mmc, pdev);
@@ -1100,6 +1162,8 @@ err_gpio_bulk_free:
 	if (host->use_dma)
 		jz4740_mmc_release_dma_channels(host);
 	jz_gpio_bulk_free(jz4740_mmc_pins, jz4740_mmc_num_pins(host));
+err_cpufreq_unreg:
+	jz4740_mmc_cpufreq_unregister();
 err_free_host:
 	mmc_free_host(mmc);
 
@@ -1124,6 +1188,7 @@ static int jz4740_mmc_remove(struct platform_device *pdev)
 	if (host->use_dma)
 		jz4740_mmc_release_dma_channels(host);
 
+	jz4740_mmc_cpufreq_unregister();
 	mmc_free_host(host->mmc);
 
 	return 0;
