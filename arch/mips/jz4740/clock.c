@@ -366,6 +366,11 @@ static int jz_clk_pll_set_rate(struct clk *clk, unsigned long rate)
 		:
 		: "r" (jz_clock_base + JZ_REG_CLOCK_PLL), "r" (plcr1));
 
+	/* MtH: For some reason the MSC will have problems if this flag is not
+	        restored, even though the MSC is supposedly the only divider
+	        that is not affected by this flag. */
+	jz_clk_reg_set_bits(JZ_REG_CLOCK_CTRL, JZ_CLOCK_CTRL_CHANGE_ENABLE);
+
 	return 0;
 }
 
