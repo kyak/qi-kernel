@@ -396,17 +396,21 @@ at86rf230_xmit(struct ieee802154_dev *dev, struct sk_buff *skb)
 	gpio_set_value(lp->slp_tr, 0);
 
 	rc = wait_for_completion_interruptible(&lp->tx_complete);
-	if (rc < 0)
+	if (rc < 0) {
 		at86rf230_state(dev, STATE_FORCE_TX_ON);
+		synchronize_irq(lp->spi->irq);
+		flush_work(&lp->irqwork);
+	}
 
 err_rx:
+	lp->is_tx = 0;
+
 	rc2 = at86rf230_start(dev);
 	if (!rc)
 		rc = rc2;
 err:
 	if (rc)
 		pr_err("%s error: %d\n", __func__, rc);
-	lp->is_tx = 0;
 
 	return rc;
 }
