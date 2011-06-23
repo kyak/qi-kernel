@@ -275,6 +275,16 @@ static int atusb_probe(struct usb_interface *interface,
 	usb_set_intfdata(interface, atusb);
 
 	/*
+	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
+	 * attaching to both interfaces
+	 */
+        if (interface == udev->actconfig->interface[1]) {
+                dev_info(&udev->dev,
+                         "Ignoring interface 1 reserved for DFU\n");
+                return -ENODEV;
+        }
+
+	/*
 	 * Get the static info from the device and save it ...
 	 */
 	retval = atusb_get_static_info(atusb);
