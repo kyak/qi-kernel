@@ -58,3 +58,8 @@ config IEEE802154_ADF7242
        depends on IEEE802154_DRIVERS && MAC802154
        depends on SPI
 
+config IEEE802154_ATUSB
+       tristate "Ben WPAN USB transceiver driver"
+       depends on IEEE802154_DRIVERS && MAC802154
+       depends on USB
+
