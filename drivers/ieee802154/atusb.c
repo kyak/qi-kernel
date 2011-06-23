@@ -103,10 +103,20 @@ static ssize_t rf_show_part(struct device *dev,
 {
 	struct usb_interface *intf = to_usb_interface(dev);
 	struct atusb_dev *atusb = usb_get_intfdata(intf);
+	char *chip;
 
-	return sprintf(buf, "%u: %s\n", atusb->rf_part_num,
-			(atusb->rf_part_num == 2) ?
-				"AT86RF230" : "Unknown");
+	switch(atusb->rf_part_num) {
+	case 2:
+		chip = "AT86RF230";
+		break;
+	case 3:
+		chip = "AT86RF231";
+		break;
+	default:
+		chip = "Unknown";
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%s (%u)\n", chip, atusb->rf_part_num);
 }
 
 static DEVICE_ATTR(rf_part_num, S_IRUGO, rf_show_part, NULL);
