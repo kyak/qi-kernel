@@ -340,6 +340,8 @@ static int atusb_probe(struct usb_interface *interface,
 		goto error;
 	}
 
+	dev_info(&udev->dev, "Firmware: %s\n", atusb->atusb_build);
+
 	retval = ieee802154_register_device(atusb->dev);
 	if (retval)
 		return retval;
