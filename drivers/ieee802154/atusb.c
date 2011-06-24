@@ -65,37 +65,52 @@ enum rf_registers {
  * Commands to our device. Make sure this is synced with the firmware
  */
 enum atspi_requests {
-	ATUSB_ID                        = 0x00,
+	ATUSB_ID			= 0x00,	/* system status/control grp */
 	ATUSB_BUILD,
 	ATUSB_RESET,
-	ATUSB_RF_RESET                  = 0x10,
+	ATUSB_RF_RESET			= 0x10,	/* debug/test group */
 	ATUSB_POLL_INT,
-	ATUSB_TEST,
-	ATUSB_REG_WRITE                 = 0x20,
+	ATUSB_TEST,			/* atusb-sil only */
+	ATUSB_TIMER,
+	ATUSB_GPIO,
+	ATUSB_SLP_TR,
+	ATUSB_GPIO_CLEANUP,
+	ATUSB_REG_WRITE			= 0x20,	/* transceiver group */
 	ATUSB_REG_READ,
 	ATUSB_BUF_WRITE,
 	ATUSB_BUF_READ,
 	ATUSB_SRAM_WRITE,
 	ATUSB_SRAM_READ,
+	ATUSB_SPI_WRITE			= 0x30,	/* SPI group */
+	ATUSB_SPI_READ1,
+	ATUSB_SPI_READ2,
 };
 
 /*
- * Direction bType   bRequest                wValue          wIndex  wLength
+ * Direction	bRequest		wValue		wIndex	wLength
  *
- * ->host    0xC0    ATUSB_ID                -               -       3
- * ->host    0xC0    ATUSB_BUILD             -               -       #bytes
- * host->    0x40    ATUSB_RESET             -               -       0
+ * ->host	ATUSB_ID		-		-	3
+ * ->host	ATUSB_BUILD		-		-	#bytes
+ * host->	ATUSB_RESET		-		-	0
  *
- * host->    0x40    ATUSB_RF_RESET          -               -       0
- * ->host    0xC0    ATUSB_POLL_INT          -               -       1
- * host->    0x40    ATUSB_TEST              -               -       0
+ * host->	ATUSB_RF_RESET		-		-	0
+ * ->host	ATUSB_POLL_INT		-		-	1
+ * host->	ATUSB_TEST		-		-	0
+ * ->host	ATUSB_TIMER		-		-	#bytes (6)
+ * ->host	ATUSB_GPIO		dir+data	mask+p#	3
+ * host->	ATUSB_SLP_TR		-		-	0
+ * host->	ATUSB_GPIO_CLEANUP	-		-	0
  *
- * host->    0x40    ATUSB_REG_WRITE         value           addr    0
- * ->host    0xC0    ATUSB_REG_READ          -               addr    1
- * host->    0x40    ATUSB_BUF_WRITE         -               -       #bytes
- * ->host    0xC0    ATUSB_BUF_READ          -               -       #bytes
- * host->    0x40    ATUSB_SRAM_WRITE        -               addr    #bytes
- * ->host    0xC0    ATUSB_SRAM_READ         -               addr    #bytes
+ * host->	ATUSB_REG_WRITE		value		addr	0
+ * ->host	ATUSB_REG_READ		-		addr	1
+ * host->	ATUSB_BUF_WRITE		-		-	#bytes
+ * ->host	ATUSB_BUF_READ		-		-	#bytes
+ * host->	ATUSB_SRAM_WRITE	-		addr	#bytes
+ * ->host	ATUSB_SRAM_READ		-		addr	#bytes
+ *
+ * host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes
+ * ->host	ATUSB_SPI_READ1		byte0		-	#bytes
+ * ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes
  */
 
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
