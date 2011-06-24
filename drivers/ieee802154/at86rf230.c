@@ -71,6 +71,7 @@ __at86rf230_write(struct at86rf230_local *lp, u8 addr, u8 data)
 	struct spi_transfer xfer = {
 		.len		= 2,
 		.tx_buf		= buf,
+		.rx_buf		= NULL,
 	};
 
 	buf[0] = (addr & CMD_REG_MASK) | CMD_REG | CMD_WRITE;
@@ -168,11 +169,13 @@ at86rf230_write_fbuf(struct at86rf230_local *lp, u8 *data, u8 len)
 	struct spi_transfer xfer_head = {
 		.len		= 2,
 		.tx_buf		= buf,
+		.rx_buf		= NULL,
 
 	};
 	struct spi_transfer xfer_buf = {
 		.len		= len,
 		.tx_buf		= data,
+		.rx_buf		= NULL,
 	};
 
 	mutex_lock(&lp->bmux);
@@ -216,6 +219,7 @@ at86rf230_read_fbuf(struct at86rf230_local *lp, u8 *data, u8 *len, u8 *lqi)
 	};
 	struct spi_transfer xfer_buf = {
 		.len		= 0,
+		.tx_buf		= NULL,
 		.rx_buf		= data,
 	};
 
@@ -495,7 +499,6 @@ static irqreturn_t at86rf230_isr(int irq, void *data)
 	struct at86rf230_local *lp = data;
 
 	dev_dbg(&lp->spi->dev, "IRQ!\n");
-
 	disable_irq_nosync(irq);
 	schedule_work(&lp->irqwork);
 
@@ -647,7 +650,7 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	const char *chip;
 	int supported = 0;
 
-	if (!spi->irq) {
+	if (spi->irq < 0) {
 		dev_err(&spi->dev, "no IRQ specified\n");
 		return -EINVAL;
 	}
