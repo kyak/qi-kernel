@@ -71,7 +71,6 @@ __at86rf230_write(struct at86rf230_local *lp, u8 addr, u8 data)
 	struct spi_transfer xfer = {
 		.len		= 2,
 		.tx_buf		= buf,
-		.rx_buf		= NULL,
 	};
 
 	buf[0] = (addr & CMD_REG_MASK) | CMD_REG | CMD_WRITE;
@@ -169,13 +168,11 @@ at86rf230_write_fbuf(struct at86rf230_local *lp, u8 *data, u8 len)
 	struct spi_transfer xfer_head = {
 		.len		= 2,
 		.tx_buf		= buf,
-		.rx_buf		= NULL,
 
 	};
 	struct spi_transfer xfer_buf = {
 		.len		= len,
 		.tx_buf		= data,
-		.rx_buf		= NULL,
 	};
 
 	mutex_lock(&lp->bmux);
@@ -219,7 +216,6 @@ at86rf230_read_fbuf(struct at86rf230_local *lp, u8 *data, u8 *len, u8 *lqi)
 	};
 	struct spi_transfer xfer_buf = {
 		.len		= 0,
-		.tx_buf		= NULL,
 		.rx_buf		= data,
 	};
 
