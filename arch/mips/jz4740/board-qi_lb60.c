@@ -37,6 +37,7 @@
 #include <linux/spi/at86rf230.h>
 
 #include <asm/mach-jz4740/platform.h>
+#include <asm/mach-jz4740/base.h>
 
 #include "clock.h"
 
@@ -306,19 +307,26 @@ static struct platform_device spigpio_device = {
 };
 
 /* atben 8:10 card */
-static struct spi_gpio_platform_data atben_platform_data = {
-	.sck = JZ_GPIO_PORTD(11),
-	.mosi = JZ_GPIO_PORTD(8),
-	.miso = JZ_GPIO_PORTD(10),
-	.num_chipselect = 1,
+static struct resource qi_lb60_atben_resources[] = {
+	{
+		.start	= JZ4740_GPIO_BASE_ADDR+0x300,
+		.end	= JZ4740_GPIO_BASE_ADDR+0x3ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		/* set start and end later */
+		.flags	= IORESOURCE_IRQ,
+	},
 };
 
 static struct platform_device qi_lb60_atben = {
-	.name = "spi_gpio",
+	.name = "spi_atben",
 	.id   = 2,
 	.dev = {
-		.platform_data = &atben_platform_data,
+//		.platform_data = &atben_platform_data,
 	},
+	.num_resources = ARRAY_SIZE(qi_lb60_atben_resources),
+	.resource = qi_lb60_atben_resources,
 };
 
 static void atben_reset(void *reset_data)
@@ -350,7 +358,8 @@ printk(KERN_ERR "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
 	msleep(10);	/* precharge caps */
 
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, 1 << 2 | 1 << 9);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0,
+	    MASK_nVDD | MASK_SLP_TR | MASK_SCLK);
 	msleep(10);
 }
 
@@ -527,7 +536,8 @@ static int __init qi_lb60_init_platform_devices(void)
 
 	jz4740_serial_device_register();
 
-	qi_lb60_spi_board_info[1].irq = gpio_to_irq(JZ_GPIO_PORTD(12));
+	qi_lb60_atben_resources[1].start = qi_lb60_atben_resources[1].end =
+	    gpio_to_irq(JZ_GPIO_PORTD(12));
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));
 
