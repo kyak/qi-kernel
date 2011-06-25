@@ -40,6 +40,9 @@ struct atben_prv {
 	struct resource		*ioarea;
 	int			gpio_irq;
 	int			slave_irq;
+	struct at86rf230_platform_data
+				platform_data;
+	/* copy platform_data so that we can adapt .reset_data */
 };
 
 
@@ -48,9 +51,11 @@ struct atben_prv {
 
 static void atben_reset(void *reset_data)
 {
+	struct atben_prv *prv = reset_data;
 	const int charge = nSEL | MOSI | SLP_TR | SCLK;
 	const int discharge = charge | IRQ | MISO;
 
+	dev_info(prv->dev, "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
 	jz_gpio_port_direction_output(JZ_GPIO_PORTD(0), discharge);
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
@@ -166,11 +171,12 @@ bad_req:
 /* ----- AT86RF230/1 driver attaching -------------------------------------- */
 
 
-static struct at86rf230_platform_data at86rf230_platform_data = {
+const static struct at86rf230_platform_data at86rf230_platform_data = {
 	.rstn	= -1,
 	.slp_tr	= JZ_GPIO_PORTD(9),
 	.dig2	= -1,
 	.reset	= atben_reset,
+	/* set .reset_data later */
 };
 
 static int atben_setup(struct spi_device *spi)
@@ -218,17 +224,17 @@ static struct irq_chip atben_irq_chip = {
 /* ----- SPI master creation/removal --------------------------------------- */
 
 
-static struct spi_board_info atben_board_info = {
-	.modalias	= "at86rf230",
-	.platform_data	= &at86rf230_platform_data,
-	/* set .irq later */
-	.chip_select	= 0,
-	.bus_num	= -1,
-	.max_speed_hz	= 8 * 1000 * 1000,
-};
-
 static int __devinit atben_probe(struct platform_device *pdev)
 {
+	struct spi_board_info board_info = {
+		.modalias	= "at86rf230",
+		.platform_data	= &at86rf230_platform_data,
+		/* set .irq later */
+		.chip_select	= 0,
+		.bus_num	= -1,
+		.max_speed_hz	= 8 * 1000 * 1000,
+	};
+
 	struct spi_master *master;
 	struct atben_prv *prv;
 	struct resource *regs;
@@ -306,12 +312,15 @@ static int __devinit atben_probe(struct platform_device *pdev)
 		goto out_irq;
 	}
 
-	atben_board_info.irq = prv->slave_irq;
+	prv->platform_data = at86rf230_platform_data;
+	prv->platform_data.reset_data = prv;
+	board_info.platform_data = &prv->platform_data;
+	board_info.irq = prv->slave_irq;
 
-	spi = spi_new_device(master, &atben_board_info);
+	spi = spi_new_device(master, &board_info);
 	if (!spi) {
 		dev_err(&pdev->dev, "can't create new device for %s\n",
-		    atben_board_info.modalias);
+		    board_info.modalias);
 		err = -ENXIO;
 		goto out_registered;
 	}
