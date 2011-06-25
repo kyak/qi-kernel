@@ -2,6 +2,7 @@
  * ATUSB driver 0.1
  *
  * Copyright (c) 2011 Richard Sharpe (realrichardsharpe@gmail.com)
+ * Copyright (c) 2011 Stefan Schmidt <stefan@datenfreihafen.org>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -16,6 +17,8 @@
 #include <linux/module.h>
 #include <linux/usb.h>
 
+#include <linux/spi/spi.h>
+#include <linux/spi/at86rf230.h>
 
 #define DRIVER_AUTHOR "Richard Sharpe, realrichardsharpe@gmail.com"
 #define DRIVER_DESC "ATUSB ben-wpan Driver"
@@ -48,6 +51,9 @@ struct atusb_local {
 	uint8_t ep0_atusb_minor;
 	uint8_t atusb_hw_type;
 	char atusb_build[ATUSB_BUILD_SIZE + 1];
+	struct spi_master *master;
+	struct spi_device *spi;
+	int slave_irq;
 };
 
 /*
@@ -179,6 +185,81 @@ static ssize_t atusb_show_build(struct device *dev,
 
 static DEVICE_ATTR(atusb_build, S_IRUGO, atusb_show_build, NULL);
 
+static int atusb_setup(struct spi_device *spi)
+{
+	struct spi_master *master = spi->master;
+	struct atusb_local *atusb = spi_master_get_devdata(master);
+
+	spi->irq = atusb->slave_irq;
+	return 0;
+}
+
+static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
+{
+	struct atusb_local *atusb = spi_master_get_devdata(spi->master);
+	struct spi_transfer *xfer;
+	struct spi_transfer *x[2];
+	int n;
+
+//printk(KERN_INFO "xfer, prv %p\n", prv);
+	 if (unlikely(list_empty(&msg->transfers))) {
+		dev_err(&atusb->udev->dev, "transfer is empty\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * Classify the request. This is just a proof of concept - we don't
+	 * need it in this driver.
+	 */
+	n = 0;
+	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
+		if (n == ARRAY_SIZE(x)) {
+			dev_err(&atusb->udev->dev, "too many transfers\n");
+			return -EINVAL;
+		}
+		x[n] = xfer;
+		n++;
+	}
+
+	if (!x[0]->tx_buf || x[0]->len != 2)
+		goto bad_req;
+	if (n == 1) {
+		if (x[0]->rx_buf) {
+			dev_dbg(&atusb->udev->dev, "read 1\n");
+		} else {
+			dev_dbg(&atusb->udev->dev, "write 2\n");
+		}
+	} else {
+		if (x[0]->rx_buf) {
+			if (x[1]->tx_buf || !x[1]->rx_buf)
+				goto bad_req;
+			dev_dbg(&atusb->udev->dev, "read 1+\n");
+		} else {
+			if (!x[1]->tx_buf ||x[1]->rx_buf)
+				goto bad_req;
+			dev_dbg(&atusb->udev->dev, "write 2+n\n");
+		}
+	}
+
+	msg->status = 0;
+	msg->actual_length = x[0]->len+(n == 2 ? x[1]->len : 0);
+	msg->complete(msg->context);
+
+	return 0;
+
+bad_req:
+	dev_err(&atusb->udev->dev, "unrecognized request:\n");
+	list_for_each_entry(xfer, &msg->transfers, transfer_list)
+		dev_err(&atusb->udev->dev, "%stx %srx len %u\n",
+		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
+		    xfer->len);
+	return -EINVAL;
+}
+
+static void atusb_cleanup(struct spi_device *spi)
+{
+}
+
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
@@ -274,23 +355,60 @@ out:
 	return retval;
 }
 
+struct at86rf230_platform_data at86rf230_platform_data = {
+	.rstn	= -1,
+//	.slp_tr	= JZ_GPIO_PORTD(9),
+	.dig2	= -1,
+//	.reset	= atben_reset,
+};
+
+struct spi_board_info atusb_spi_board_info[] = {
+	{
+		.modalias = "at86rf230",
+		.platform_data = &at86rf230_platform_data,
+//		.controller_data = (void *)JZ_GPIO_PORTD(13),
+		/* set .irq later */
+		.chip_select = 0,
+		.bus_num = 2,
+		.max_speed_hz = 8 * 1000 * 1000,
+	},
+	};
+
 static int atusb_probe(struct usb_interface *interface,
 			const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct atusb_local *atusb = NULL;
+	struct spi_master *master;
+	struct spi_device *spi;
 	int retval = -ENOMEM;
 
 	atusb = kzalloc(sizeof(struct atusb_local), GFP_KERNEL);
-	if (!atusb) {
-		dev_err(&interface->dev, "Out of memory\n");
-		goto error_mem;
-	}
+	if (!atusb)
+		return -ENOMEM;
 
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
 
+	master = spi_alloc_master(&atusb->udev->dev, sizeof(*atusb));
+	if (!master)
+		return -ENOMEM;
 
+	atusb = spi_master_get_devdata(master);
+
+	//atusb = spi_master_get_devdata(master);
+	atusb->master = master;
+	//platform_set_drvdata(pdev, master);
+
+	master->mode_bits	= SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+	master->bus_num		= 23;
+	master->num_chipselect	= 1;
+	master->setup		= atusb_setup;
+	master->transfer	= atusb_transfer;
+	master->cleanup		= atusb_cleanup;
+
+	spi = spi_new_device(master, atusb_spi_board_info);
+	atusb->spi = spi;
 
 	/*
 	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
@@ -343,8 +461,8 @@ error:
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
 	device_remove_file(&interface->dev, &dev_attr_atusb_build);
 	device_remove_file(&interface->dev, &dev_attr_atusb_id);
+	spi_master_put(atusb->master);
 	kfree(atusb);
-error_mem:
 	return retval;
 }
 
@@ -365,6 +483,9 @@ static void atusb_disconnect(struct usb_interface *interface)
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
 
+	spi_unregister_master(atusb->master);
+	spi_master_put(atusb->master);
+
 	kfree(atusb);
 
 	dev_info(&interface->dev, "ATUSB ben-wpan device now disconnected\n");
@@ -384,6 +505,7 @@ static int __init atusb_init(void)
 	retval = usb_register(&atusb_driver);
 	if (retval)
 		err("usb_register failed. Error number %d", retval);
+
 	return retval;
 }
 
