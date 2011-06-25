@@ -382,6 +382,10 @@ config SPI_NUC900
 	help
 	  SPI driver for Nuvoton NUC900 series ARM SoCs
 
+config SPI_ATUSB
+       tristate "Ben WPAN USB transceiver driver"
+       depends on USB && SPI
+
 #
 # Add new SPI master controllers in alphabetical order above this line
 #
