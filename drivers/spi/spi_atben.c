@@ -228,7 +228,6 @@ static int __devinit atben_probe(struct platform_device *pdev)
 {
 	struct spi_board_info board_info = {
 		.modalias	= "at86rf230",
-		.platform_data	= &at86rf230_platform_data,
 		/* set .irq later */
 		.chip_select	= 0,
 		.bus_num	= -1,
