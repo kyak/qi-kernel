@@ -53,6 +53,9 @@ struct atusb_local {
 	struct spi_master *master;
 	struct spi_device *spi;
 	int slave_irq;
+	struct at86rf230_platform_data
+				platform_data;
+	/* copy platform_data so that we can adapt .reset_data */
 };
 
 /*
@@ -159,10 +162,9 @@ static DEVICE_ATTR(rf_version_num, S_IRUGO, rf_show_version, NULL);
 
 static int atusb_setup(struct spi_device *spi)
 {
-	struct spi_master *master = spi->master;
-	struct atusb_local *atusb = spi_master_get_devdata(master);
+//	struct atusb_local *atusb = spi_master_get_devdata(master);
 
-	spi->irq = atusb->slave_irq;
+//	spi->irq = atusb->slave_irq;
 	return 0;
 }
 
@@ -348,28 +350,25 @@ out:
 	return retval;
 }
 
-struct at86rf230_platform_data at86rf230_platform_data = {
+const static struct at86rf230_platform_data at86rf230_platform_data = {
 	.rstn	= -1,
 //	.slp_tr	= JZ_GPIO_PORTD(9),
 	.dig2	= -1,
-//	.reset	= atben_reset,
+	.reset	= atben_reset,
+	/* set .reset_data later */
 };
-
-struct spi_board_info atusb_spi_board_info[] = {
-	{
-		.modalias = "at86rf230",
-		.platform_data = &at86rf230_platform_data,
-//		.controller_data = (void *)JZ_GPIO_PORTD(13),
-		/* set .irq later */
-		.chip_select = 0,
-		.bus_num = 2,
-		.max_speed_hz = 8 * 1000 * 1000,
-	},
-	};
 
 static int atusb_probe(struct usb_interface *interface,
 			const struct usb_device_id *id)
 {
+	struct spi_board_info board_info = {
+		.modalias = "at86rf230",
+		/* set .irq later */
+		.chip_select = 0,
+		.bus_num = 23,
+		.max_speed_hz = 8 * 1000 * 1000,
+	};
+
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct atusb_local *atusb = NULL;
 	struct spi_master *master;
@@ -389,7 +388,7 @@ static int atusb_probe(struct usb_interface *interface,
 	atusb = kzalloc(sizeof(struct atusb_local), GFP_KERNEL);
 	if (!atusb)
 		return -ENOMEM;
-#endif
+
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
 
@@ -408,18 +407,17 @@ static int atusb_probe(struct usb_interface *interface,
 	master->transfer	= atusb_transfer;
 	master->cleanup		= atusb_cleanup;
 
-	spi = spi_new_device(master, atusb_spi_board_info);
-	atusb->spi = spi;
+	retval = spi_register_master(master);
+	if (retval)
+		goto err_free;
 
-	/*
-	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
-	 * attaching to both interfaces
-	 */
-        if (interface == udev->actconfig->interface[1]) {
-                dev_info(&udev->dev,
-                         "Ignoring interface 1 reserved for DFU\n");
-                return -ENODEV;
-        }
+	atusb->platform_data = at86rf230_platform_data;
+	atusb->platform_data.reset_data = atusb;
+	board_info.platform_data = &atusb->platform_data;
+	board_info.irq = atusb->slave_irq;
+
+	spi = spi_new_device(master, &board_info);
+	atusb->spi = spi;
 
 	/*
 	 * Get the static info from the device and save it ...
@@ -432,8 +430,8 @@ static int atusb_probe(struct usb_interface *interface,
 		goto err_master;
 	}
 
-	dev_info(&udev->dev, "Firmware: %s\n", atusb->atusb_build);
-	dev_info(&udev->dev, "Major: %u, Minor: %u, HW Type: %u\n",
+	dev_info(&udev->dev, "Firmware: build %s\n", atusb->atusb_build);
+	dev_info(&udev->dev, "Firmware: major: %u, minor: %u, hardware type: %u\n",
 			atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
 			atusb->atusb_hw_type);
 	/*
@@ -447,20 +445,15 @@ static int atusb_probe(struct usb_interface *interface,
 	if (retval)
 		goto err_part;
 
-	retval = spi_register_master(master);
-	if (retval)
-		goto err_version;
-
 	dev_info(&interface->dev, "ATUSB ben-wpan device now attached\n");
 	return 0;
 
-err_version:
-	device_remove_file(&interface->dev, &dev_attr_rf_version_num);
 err_part:
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
 err_master:
 	spi_master_put(atusb->master);
-//	kfree(atusb);
+err_free:
+	kfree(atusb);
 	return retval;
 }
 
@@ -482,7 +475,7 @@ static void atusb_disconnect(struct usb_interface *interface)
 	spi_unregister_master(atusb->master);
 	spi_master_put(atusb->master);
 
-//	kfree(atusb);
+	kfree(atusb);
 
 	dev_info(&interface->dev, "ATUSB ben-wpan device now disconnected\n");
 }
