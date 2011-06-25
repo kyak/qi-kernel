@@ -261,25 +261,9 @@ bad_req:
 	return -EINVAL;
 }
 
-
-/* ----- AT86RF230/1 driver attaching -------------------------------------- */
-
-
-const static struct at86rf230_platform_data at86rf230_platform_data = {
-	.rstn	= -1,
-	.slp_tr	= JZ_GPIO_PORTD(9),
-	.dig2	= -1,
-	.reset	= atben_reset,
-	/* set .reset_data later */
-};
-
 static int atben_setup(struct spi_device *spi)
 {
 	return 0;
-}
-
-static void atben_cleanup(struct spi_device *spi)
-{
 }
 
 
@@ -318,6 +302,14 @@ static struct irq_chip atben_irq_chip = {
 /* ----- SPI master creation/removal --------------------------------------- */
 
 
+const static struct at86rf230_platform_data at86rf230_platform_data = {
+	.rstn	= -1,
+	.slp_tr	= JZ_GPIO_PORTD(9),
+	.dig2	= -1,
+	.reset	= atben_reset,
+	/* set .reset_data later */
+};
+
 static int __devinit atben_probe(struct platform_device *pdev)
 {
 	struct spi_board_info board_info = {
@@ -347,7 +339,6 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	master->num_chipselect	= 1;
 	master->setup		= atben_setup;
 	master->transfer	= atben_transfer;
-	master->cleanup		= atben_cleanup;
 
 	dev_dbg(prv->dev, "Setting up ATBEN SPI\n");
 
