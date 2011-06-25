@@ -188,47 +188,13 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 {
 	struct atben_prv *prv = spi_master_get_devdata(spi->master);
 	struct spi_transfer *xfer;
-	struct spi_transfer *x[2];
-	int n;
 
 	 if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(prv->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
 
-	/*
-	 * Classify the request. This is just a proof of concept - we don't
-	 * need it in this driver.
-	 */
-	n = 0;
-	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		if (n == ARRAY_SIZE(x)) {
-			dev_err(prv->dev, "too many transfers\n");
-			return -EINVAL;
-		}
-		x[n] = xfer;
-		n++;
-	}
-
-	if (!x[0]->tx_buf || x[0]->len != 2)
-		goto bad_req;
-	if (n == 1) {
-		if (x[0]->rx_buf) {
-			dev_dbg(prv->dev, "read 1\n");
-		} else {
-			dev_dbg(prv->dev, "write 2\n");
-		}
-	} else {
-		if (x[0]->rx_buf) {
-			if (x[1]->tx_buf || !x[1]->rx_buf)
-				goto bad_req;
-			dev_dbg(prv->dev, "read 1+\n");
-		} else {
-			if (!x[1]->tx_buf ||x[1]->rx_buf)
-				goto bad_req;
-			dev_dbg(prv->dev, "write 2+n\n");
-		}
-	}
+	msg->actual_length = 0;
 
 	writel(nSEL, PDDATC);
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
@@ -237,6 +203,8 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 
 		tx = xfer->tx_buf;
 		rx = xfer->rx_buf;
+		msg->actual_length += xfer->len;
+
 		if (!tx)
 			rx_only(prv, rx, xfer->len);
 		else if (!rx)
@@ -247,18 +215,9 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 	writel(nSEL, PDDATS);
 	
 	msg->status = 0;
-	msg->actual_length = x[0]->len+(n == 2 ? x[1]->len : 0);
 	msg->complete(msg->context);
 
 	return 0;
-
-bad_req:
-	dev_err(prv->dev, "unrecognized request:\n");
-	list_for_each_entry(xfer, &msg->transfers, transfer_list)
-		dev_err(prv->dev, "%stx %srx len %u\n",
-		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
-		    xfer->len);
-	return -EINVAL;
 }
 
 static int atben_setup(struct spi_device *spi)
