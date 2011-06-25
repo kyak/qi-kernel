@@ -16,8 +16,6 @@
 #include <linux/module.h>
 #include <linux/usb.h>
 
-#include <net/mac802154.h>
-#include <net/wpan-phy.h>
 
 #define DRIVER_AUTHOR "Richard Sharpe, realrichardsharpe@gmail.com"
 #define DRIVER_DESC "ATUSB ben-wpan Driver"
@@ -50,7 +48,6 @@ struct atusb_local {
 	uint8_t ep0_atusb_minor;
 	uint8_t atusb_hw_type;
 	char atusb_build[ATUSB_BUILD_SIZE + 1];
-	struct ieee802154_dev *dev;
 };
 
 /*
@@ -115,34 +112,6 @@ enum atspi_requests {
 
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
 #define ATUSB_TO_DEV (USB_TYPE_VENDOR | USB_DIR_OUT)
-
-static int atusb_xmit(struct ieee802154_dev *dev, struct sk_buff *skb) {
-	return 0;
-}
-
-static int atusb_channel(struct ieee802154_dev *dev, int page, int channel) {
-	return 0;
-}
-
-static void atusb_stop(struct ieee802154_dev *dev) {
-}
-
-static int atusb_start(struct ieee802154_dev *dev) {
-	return 0;
-}
-
-static int atusb_ed(struct ieee802154_dev *dev, u8 *level) {
-	return 0;
-}
-
-static struct ieee802154_ops atusb_ops = {
-	.owner = THIS_MODULE,
-	.xmit = atusb_xmit,
-	.ed = atusb_ed,
-	.set_channel = atusb_channel,
-	.start = atusb_start,
-	.stop = atusb_stop,
-};
 
 static ssize_t rf_show_part(struct device *dev,
 			struct device_attribute *attr,
@@ -310,7 +279,6 @@ static int atusb_probe(struct usb_interface *interface,
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct atusb_local *atusb = NULL;
-	struct ieee802154_dev *dev;
 	int retval = -ENOMEM;
 
 	atusb = kzalloc(sizeof(struct atusb_local), GFP_KERNEL);
@@ -322,17 +290,7 @@ static int atusb_probe(struct usb_interface *interface,
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
 
-	dev = ieee802154_alloc_device(sizeof(*udev), &atusb_ops);
-	if (!dev) {
-		dev_err(&interface->dev, "Out of memory\n");
-		goto error_mem;
-	}
 
-	atusb->dev = dev;
-	dev->extra_tx_headroom = 0;
-	/* We do support only 2.4 Ghz */
-	dev->phy->channels_supported[0] = 0x7FFF800;
-	dev->flags = IEEE802154_HW_OMIT_CKSUM;
 
 	/*
 	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
@@ -356,10 +314,6 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&udev->dev, "Firmware: %s\n", atusb->atusb_build);
-
-	retval = ieee802154_register_device(atusb->dev);
-	if (retval)
-		return retval;
 
 	/*
 	 * Create the sysfs files
@@ -407,9 +361,6 @@ static void atusb_disconnect(struct usb_interface *interface)
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
 	device_remove_file(&interface->dev, &dev_attr_atusb_build);
 	device_remove_file(&interface->dev, &dev_attr_atusb_id);
-
-	ieee802154_unregister_device(atusb->dev);
-	ieee802154_free_device(atusb->dev);
 
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
