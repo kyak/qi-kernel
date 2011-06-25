@@ -230,6 +230,17 @@ at86rf230_read_fbuf(struct at86rf230_local *lp, u8 *data, u8 *len, u8 *lqi)
 	status = spi_sync(lp->spi, &msg);
 	dev_vdbg(&lp->spi->dev, "status = %d\n", status);
 
+	if (buf[1] & 0x80) {
+		dev_err(&lp->spi->dev, "invalid PHR 0x%02x\n", buf[1]);
+		status = -EIO;
+		goto fail;
+	}
+	if (buf[1] >= *len) {
+		dev_err(&lp->spi->dev, "PHR 0x%02x >= buffer %d bytes\n",
+		    buf[1], *len);
+		status = -EMSGSIZE;
+		goto fail;
+	}
 	xfer_buf.len = *(buf + 1) + 1;
 	*len = buf[1];
 
@@ -253,6 +264,7 @@ at86rf230_read_fbuf(struct at86rf230_local *lp, u8 *data, u8 *len, u8 *lqi)
 			*lqi = data[lp->buf[1]];
 	}
 
+fail:
 	mutex_unlock(&lp->bmux);
 
 	return status;
@@ -418,7 +430,7 @@ err:
 static int at86rf230_rx(struct at86rf230_local *lp)
 {
 	u8 len = 128, lqi = 0;
-	int rc;
+	int rc, rc2;
 	struct sk_buff *skb;
 
 	skb = alloc_skb(len, GFP_KERNEL);
@@ -427,9 +439,11 @@ static int at86rf230_rx(struct at86rf230_local *lp)
 
 	/* FIXME: process return status */
 	rc = at86rf230_write_subreg(lp, SR_RX_PDT_DIS, 1);
-	rc = at86rf230_read_fbuf(lp, skb_put(skb, len), &len, &lqi);
+	rc2 = at86rf230_read_fbuf(lp, skb_put(skb, len), &len, &lqi);
 	rc = at86rf230_write_subreg(lp, SR_RX_SAFE_MODE, 1);
 	rc = at86rf230_write_subreg(lp, SR_RX_PDT_DIS, 0);
+	if (rc2 < 0)
+		goto err_fbuf;
 
 	if (len < 2)
 		goto err;
@@ -445,6 +459,7 @@ static int at86rf230_rx(struct at86rf230_local *lp)
 err:
 	pr_debug("%s: received frame is too small\n", __func__);
 
+err_fbuf:
 	kfree_skb(skb);
 	return -EINVAL;
 }
@@ -495,7 +510,6 @@ static irqreturn_t at86rf230_isr(int irq, void *data)
 	struct at86rf230_local *lp = data;
 
 	dev_dbg(&lp->spi->dev, "IRQ!\n");
-
 	disable_irq_nosync(irq);
 	schedule_work(&lp->irqwork);
 
@@ -647,7 +661,7 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	const char *chip;
 	int supported = 0;
 
-	if (!spi->irq) {
+	if (spi->irq < 0) {
 		dev_err(&spi->dev, "no IRQ specified\n");
 		return -EINVAL;
 	}
