@@ -78,12 +78,118 @@ static void atben_reset(void *reset_data)
 /* ----- SPI transfers ----------------------------------------------------- */
 
 
+static void rx_only(const struct atben_prv *prv, uint8_t *buf, int len)
+{
+	uint8_t v;
+
+	while (len--) {
+		writel(SCLK, PDDATS);
+		v = readl(PDPIN) & MISO ? 0x80 : 0;
+		writel(SCLK, PDDATC);
+
+		#define	DO_BIT(m)			\
+			writel(SCLK, PDDATS);		\
+			if (readl(PDPIN) & MISO)	\
+				v |= (m);		\
+			writel(SCLK, PDDATC)
+
+		DO_BIT(0x40);
+		DO_BIT(0x20);
+		DO_BIT(0x10);
+		DO_BIT(0x08);
+		DO_BIT(0x04);
+		DO_BIT(0x02);
+		DO_BIT(0x01);
+
+		#undef DO_BIT
+
+		*buf++ = v;
+	}
+}
+
+
+static void tx_only(const struct atben_prv *prv, const uint8_t *buf, int len)
+{
+	uint8_t tv;
+
+	while (len--) {
+		tv = *buf++;
+
+		if (tv & 0x80) {
+			writel(MOSI, PDDATS);
+			goto b6_1;
+		} else {
+			writel(MOSI, PDDATC);
+			goto b6_0;
+		}
+
+		#define	DO_BIT(m, this, next)				\
+			this##_1:					\
+				writel(SCLK, PDDATS);			\
+				if (tv & (m)) {				\
+					writel(SCLK, PDDATC);		\
+					goto next##_1;			\
+				} else {				\
+					writel(MOSI | SCLK, PDDATC);	\
+					goto next##_0;			\
+				}					\
+			this##_0:					\
+				writel(SCLK, PDDATS);			\
+				writel(SCLK, PDDATC);			\
+				if (tv & (m)) {				\
+					writel(MOSI, PDDATS);		\
+					goto next##_1;			\
+				} else {				\
+					goto next##_0;			\
+				}
+
+		DO_BIT(0x40, b6, b5);
+		DO_BIT(0x20, b5, b4);
+		DO_BIT(0x10, b4, b3);
+		DO_BIT(0x08, b3, b2);
+		DO_BIT(0x04, b2, b1);
+		DO_BIT(0x02, b1, b0);
+		DO_BIT(0x01, b0, done);
+
+		#undef DO_BIT
+
+done_1:
+done_0:
+		writel(SCLK, PDDATS);
+		writel(SCLK, PDDATC);
+		writel(SCLK, PDDATC);	/* delay to meet t5 timing */
+	}
+}
+
+
+static void bidir(const struct atben_prv *prv, const uint8_t *tx, uint8_t *rx,
+    int len)
+{
+	uint8_t mask, tv, rv;
+
+	while (len--) {
+		tv = *tx++;
+		for (mask = 0x80; mask; mask >>= 1) {
+			if (tv & mask)
+				writel(MOSI, PDDATS);
+			else
+				writel(MOSI, PDDATC);
+			writel(SCLK, PDDATS);
+			if (readl(PDPIN) & MISO)
+				rv |= mask;
+			writel(SCLK, PDDATC);
+		}
+		*rx++ = rv;
+	}
+}
+
+
 static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 {
 	struct atben_prv *prv = spi_master_get_devdata(spi->master);
 	struct spi_transfer *xfer;
 	struct spi_transfer *x[2];
-	int n, i;
+	int n;
 
 	 if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(prv->dev, "transfer is empty\n");
@@ -131,24 +237,12 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 
 		tx = xfer->tx_buf;
 		rx = xfer->rx_buf;
-		for (i = 0; i != xfer->len; i++) {
-			uint8_t mask, tv = 0, rv = 0;
-
-			if (tx)
-				tv = *tx++;
-			for (mask = 0x80; mask; mask >>= 1) {
-				if (tv & mask)
-					writel(MOSI, PDDATS);
-				else
-					writel(MOSI, PDDATC);
-				writel(SCLK, PDDATS);
-				if (readl(PDPIN) & MISO)
-		                        rv |= mask;
-				writel(SCLK, PDDATC);
-        		}
-			if (rx)
-				*rx++ = rv;
-		}
+		if (!tx)
+			rx_only(prv, rx, xfer->len);
+		else if (!rx)
+			tx_only(prv, tx, xfer->len);
+		else
+			bidir(prv, tx, rx, xfer->len);
 	}
 	writel(nSEL, PDDATS);
 	
