@@ -18,6 +18,8 @@
 #include <linux/spi/at86rf230.h>
 #include <asm/mach-jz4740/base.h>
 
+#include "../ieee802154/at86rf230.h"	/* dirty */
+
 
 enum {
 	VDD_OFF	= 1 << 2,	/* VDD disable, PD02 */
@@ -188,8 +190,10 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 {
 	struct atben_prv *prv = spi_master_get_devdata(spi->master);
 	struct spi_transfer *xfer;
+	const uint8_t *tx;
+	uint8_t *rx;
 
-	 if (unlikely(list_empty(&msg->transfers))) {
+	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(prv->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
@@ -198,9 +202,6 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 
 	writel(nSEL, PDDATC);
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		const uint8_t *tx;
-		uint8_t *rx;
-
 		tx = xfer->tx_buf;
 		rx = xfer->rx_buf;
 		msg->actual_length += xfer->len;
@@ -213,7 +214,23 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 			bidir(prv, tx, rx, xfer->len);
 	}
 	writel(nSEL, PDDATS);
-	
+
+	/*
+	 * The AT86RF230 driver sometimes requires a transceiver state
+	 * transition to be an interrupt barrier. This is the case after
+	 * writing FORCE_TX_ON to the TRX_CMD field in the TRX_STATE register.
+	 *
+	 * Since there is no other means of notification, we just decode the
+	 * transfer and do a bit of pattern matching.
+	 */
+	xfer = list_first_entry(&msg->transfers, struct spi_transfer,
+	    transfer_list);
+	tx = xfer->tx_buf;
+	if (tx && xfer->len == 2 &&
+	    tx[0] == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
+	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
+		synchronize_irq(prv->gpio_irq);
+
 	msg->status = 0;
 	msg->complete(msg->context);
 
