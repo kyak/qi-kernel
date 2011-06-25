@@ -42,7 +42,6 @@ MODULE_DEVICE_TABLE(usb, atusb_device_table);
 #define ATUSB_BUILD_SIZE 256
 struct atusb_local {
 	struct usb_device * udev;
-	unsigned int some_other_stuff;
 	/* The RF part info below */
 	uint8_t rf_part_num;
 	uint8_t rf_version_num;
@@ -354,12 +353,13 @@ static int atusb_probe(struct usb_interface *interface,
 	struct atusb_local *atusb = NULL;
 	struct spi_master *master;
 	struct spi_device *spi;
-	int retval = -ENOMEM;
+	int retval;
 
+#if 1
 	atusb = kzalloc(sizeof(struct atusb_local), GFP_KERNEL);
 	if (!atusb)
 		return -ENOMEM;
-
+#endif
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
 
@@ -367,11 +367,9 @@ static int atusb_probe(struct usb_interface *interface,
 	if (!master)
 		return -ENOMEM;
 
-	atusb = spi_master_get_devdata(master);
-
 	//atusb = spi_master_get_devdata(master);
+
 	atusb->master = master;
-	//platform_set_drvdata(pdev, master);
 
 	master->mode_bits	= SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
 	master->bus_num		= 23;
@@ -401,7 +399,7 @@ static int atusb_probe(struct usb_interface *interface,
 		dev_err(&interface->dev, "%s: Failed to get static info: %d\n",
 			__func__,
 			retval);
-		goto error;
+		goto err_master;
 	}
 
 	dev_info(&udev->dev, "Firmware: %s\n", atusb->atusb_build);
@@ -413,20 +411,26 @@ static int atusb_probe(struct usb_interface *interface,
 	 */
 	retval = device_create_file(&interface->dev, &dev_attr_rf_part_num);
 	if (retval)
-		goto error;
+		goto err_master;
 
 	retval = device_create_file(&interface->dev, &dev_attr_rf_version_num);
 	if (retval)
-		goto error;
+		goto err_part;
+
+	retval = spi_register_master(master);
+	if (retval)
+		goto err_version;
 
 	dev_info(&interface->dev, "ATUSB ben-wpan device now attached\n");
 	return 0;
 
-error:
+err_version:
 	device_remove_file(&interface->dev, &dev_attr_rf_version_num);
+err_part:
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
+err_master:
 	spi_master_put(atusb->master);
-	kfree(atusb);
+//	kfree(atusb);
 	return retval;
 }
 
@@ -448,7 +452,7 @@ static void atusb_disconnect(struct usb_interface *interface)
 	spi_unregister_master(atusb->master);
 	spi_master_put(atusb->master);
 
-	kfree(atusb);
+//	kfree(atusb);
 
 	dev_info(&interface->dev, "ATUSB ben-wpan device now disconnected\n");
 }
