@@ -15,6 +15,7 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/spi/spi.h>
+#include <linux/spi/at86rf230.h>
 
 
 enum {
@@ -40,6 +41,34 @@ struct atben_prv {
 	int			gpio_irq;
 	int			slave_irq;
 };
+
+
+/* ----- ATBEN reset ------------------------------------------------------- */
+
+
+static void atben_reset(void *reset_data)
+{
+	const int charge = nSEL | MOSI | SLP_TR | SCLK;
+	const int discharge = charge | IRQ | MISO;
+
+printk(KERN_ERR "atben_reset\n");
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
+	jz_gpio_port_direction_output(JZ_GPIO_PORTD(0), discharge);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
+	msleep(100);    /* let power drop */
+
+	/*
+	 * Hack: PD12/DAT2/IRQ is an active-high interrupt input, which is
+	 * indicated by setting its direction bit to 1. We thus must not
+	 * configure it as an "input".
+	 */
+	jz_gpio_port_direction_input(JZ_GPIO_PORTD(0), MISO);
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
+	msleep(10);     /* precharge caps */
+
+	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, VDD_OFF | SLP_TR | SCLK);
+	msleep(10);
+}
 
 
 /* ----- SPI transfers ----------------------------------------------------- */
@@ -139,12 +168,20 @@ bad_req:
 /* ----- AT86RF230/1 driver attaching -------------------------------------- */
 
 
+static struct at86rf230_platform_data at86rf230_platform_data = {
+	.rstn	= -1,
+	.slp_tr	= JZ_GPIO_PORTD(9),
+	.dig2	= -1,
+	.reset	= atben_reset,
+};
+
 static int atben_setup(struct spi_device *spi)
 {
 	struct spi_master *master = spi->master;
 	struct atben_prv *prv = spi_master_get_devdata(master);
 
 	spi->irq = prv->slave_irq;
+	spi->dev.platform_data = &at86rf230_platform_data;
 	return 0;
 }
 
