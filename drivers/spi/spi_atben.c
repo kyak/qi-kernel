@@ -42,22 +42,8 @@ struct atben_prv {
 };
 
 
-static irqreturn_t atben_irq(int irq, void *data)
-{
-	struct atben_prv *prv = data;
+/* ----- SPI transfers ----------------------------------------------------- */
 
-	generic_handle_irq(prv->slave_irq);
-	return IRQ_HANDLED;
-}
-
-static int atben_setup(struct spi_device *spi)
-{
-	struct spi_master *master = spi->master;
-	struct atben_prv *prv = spi_master_get_devdata(master);
-
-	spi->irq = prv->slave_irq;
-	return 0;
-}
 
 static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 {
@@ -149,8 +135,33 @@ bad_req:
 	return -EINVAL;
 }
 
+
+/* ----- AT86RF230/1 driver attaching -------------------------------------- */
+
+
+static int atben_setup(struct spi_device *spi)
+{
+	struct spi_master *master = spi->master;
+	struct atben_prv *prv = spi_master_get_devdata(master);
+
+	spi->irq = prv->slave_irq;
+	return 0;
+}
+
 static void atben_cleanup(struct spi_device *spi)
 {
+}
+
+
+/* ----- IRQ forwarding ---------------------------------------------------- */
+
+
+static irqreturn_t atben_irq(int irq, void *data)
+{
+	struct atben_prv *prv = data;
+
+	generic_handle_irq(prv->slave_irq);
+	return IRQ_HANDLED;
 }
 
 static void atben_irq_mask(struct irq_data *data)
@@ -172,6 +183,10 @@ static struct irq_chip atben_irq_chip = {
 	.irq_mask	= atben_irq_mask,
 	.irq_unmask	= atben_irq_unmask,
 };
+
+
+/* ----- SPI master creation/removal --------------------------------------- */
+
 
 static int __devinit atben_probe(struct platform_device *pdev)
 {
