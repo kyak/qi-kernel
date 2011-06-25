@@ -231,7 +231,7 @@ static struct spi_board_info atben_board_info = {
 	.controller_data = (void *)JZ_GPIO_PORTD(13),
 	/* set .irq later */
 	.chip_select = 0,
-	.bus_num = 2,
+	.bus_num = -1,
 	.max_speed_hz = 8 * 1000 * 1000,
 };
 
@@ -240,6 +240,7 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	struct spi_master *master;
 	struct atben_prv *prv;
 	struct resource *regs;
+	struct spi_device *spi;
 	int err;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*prv));
@@ -308,15 +309,27 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	}
 
 	err = spi_register_master(master);
-	if (!err) {
-		dev_info(prv->dev, "ready for mischief (IRQ %d -> %d)\n",
-		    prv->gpio_irq, prv->slave_irq);
-		return 0;
+	if (err) {
+		dev_err(prv->dev, "can't register master\n");
+		err = -ENXIO;
+		goto out_irq;
 	}
 
-	dev_err(prv->dev, "can't register master\n");
+	spi = spi_new_device(master, &atben_board_info);
+	if (!spi) {
+		dev_err(&pdev->dev, "can't create new device for %s\n",
+		    atben_board_info.modalias);
+		err = -ENXIO;
+		goto out_registered;
+	}
 
-	goto out_irq;
+	dev_info(&spi->dev, "ATBEN ready for mischief (IRQ %d -> IRQ %d)\n",
+	    prv->gpio_irq, prv->slave_irq);
+
+	return 0;
+
+out_registered:
+	spi_unregister_master(master);
 
 out_irq:
 	free_irq(prv->gpio_irq, prv);
@@ -388,7 +401,7 @@ static struct resource atben_resources[] = {
 
 static struct platform_device atben_device = {
 	.name = "spi_atben",
-	.id = 2,
+	.id = -1,
 	.num_resources = ARRAY_SIZE(atben_resources),
 	.resource = atben_resources,
 };
@@ -409,7 +422,6 @@ static int __init atben_init(void)
 {
 	int err;
 
-	spi_register_board_info(&atben_board_info, 1);
 	err = platform_device_register(&atben_device);
 	if (err)
 		return err;
