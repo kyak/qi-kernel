@@ -35,7 +35,6 @@ enum {
 
 
 struct atben_prv {
-	struct spi_master	*master;
 	struct device		*dev;
 	void __iomem		*regs;
 	struct resource		*ioarea;
@@ -52,7 +51,6 @@ static void atben_reset(void *reset_data)
 	const int charge = nSEL | MOSI | SLP_TR | SCLK;
 	const int discharge = charge | IRQ | MISO;
 
-printk(KERN_ERR "atben_reset\n");
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
 	jz_gpio_port_direction_output(JZ_GPIO_PORTD(0), discharge);
 	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
@@ -82,7 +80,6 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 	struct spi_transfer *x[2];
 	int n, i;
 
-//printk(KERN_INFO "xfer, prv %p\n", prv);
 	 if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(prv->dev, "transfer is empty\n");
 		return -EINVAL;
@@ -178,11 +175,6 @@ static struct at86rf230_platform_data at86rf230_platform_data = {
 
 static int atben_setup(struct spi_device *spi)
 {
-	struct spi_master *master = spi->master;
-	struct atben_prv *prv = spi_master_get_devdata(master);
-
-	spi->irq = prv->slave_irq;
-	spi->dev.platform_data = &at86rf230_platform_data;
 	return 0;
 }
 
@@ -227,12 +219,12 @@ static struct irq_chip atben_irq_chip = {
 
 
 static struct spi_board_info atben_board_info = {
-	.modalias = "at86rf230",
-	.controller_data = (void *)JZ_GPIO_PORTD(13),
+	.modalias	= "at86rf230",
+	.platform_data	= &at86rf230_platform_data,
 	/* set .irq later */
-	.chip_select = 0,
-	.bus_num = -1,
-	.max_speed_hz = 8 * 1000 * 1000,
+	.chip_select	= 0,
+	.bus_num	= -1,
+	.max_speed_hz	= 8 * 1000 * 1000,
 };
 
 static int __devinit atben_probe(struct platform_device *pdev)
@@ -248,7 +240,6 @@ static int __devinit atben_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	prv = spi_master_get_devdata(master);
-	prv->master = master;
 	prv->dev = &pdev->dev;
 	platform_set_drvdata(pdev, master);
 
@@ -314,6 +305,8 @@ static int __devinit atben_probe(struct platform_device *pdev)
 		err = -ENXIO;
 		goto out_irq;
 	}
+
+	atben_board_info.irq = prv->slave_irq;
 
 	spi = spi_new_device(master, &atben_board_info);
 	if (!spi) {
