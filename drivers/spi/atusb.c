@@ -158,21 +158,6 @@ static ssize_t rf_show_version(struct device *dev,
 
 static DEVICE_ATTR(rf_version_num, S_IRUGO, rf_show_version, NULL);
 
-static ssize_t atusb_show_id(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	struct usb_interface *intf = to_usb_interface(dev);
-	struct atusb_local *atusb = usb_get_intfdata(intf);
-
-	return sprintf(buf, "Major: %u, Minor: %u, HW Type: %u\n",
-			atusb->ep0_atusb_major,
-			atusb->ep0_atusb_minor,
-			atusb->atusb_hw_type);
-}
-
-static DEVICE_ATTR(atusb_id, S_IRUGO, atusb_show_id, NULL);
-
 static int atusb_setup(struct spi_device *spi)
 {
 	struct spi_master *master = spi->master;
@@ -420,15 +405,12 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&udev->dev, "Firmware: %s\n", atusb->atusb_build);
-
+	dev_info(&udev->dev, "Major: %u, Minor: %u, HW Type: %u\n",
+			atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
+			atusb->atusb_hw_type);
 	/*
 	 * Create the sysfs files
 	 */
-
-	retval = device_create_file(&interface->dev, &dev_attr_atusb_id);
-	if (retval)
-		goto error;
-
 	retval = device_create_file(&interface->dev, &dev_attr_rf_part_num);
 	if (retval)
 		goto error;
@@ -443,7 +425,6 @@ static int atusb_probe(struct usb_interface *interface,
 error:
 	device_remove_file(&interface->dev, &dev_attr_rf_version_num);
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
-	device_remove_file(&interface->dev, &dev_attr_atusb_id);
 	spi_master_put(atusb->master);
 	kfree(atusb);
 	return retval;
@@ -460,7 +441,6 @@ static void atusb_disconnect(struct usb_interface *interface)
 	 */
 	device_remove_file(&interface->dev, &dev_attr_rf_version_num);
 	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
-	device_remove_file(&interface->dev, &dev_attr_atusb_id);
 
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
