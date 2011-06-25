@@ -314,14 +314,6 @@ static struct spi_board_info qi_lb60_spi_board_info[] = {
 		.bus_num = 1,
 		.max_speed_hz = 30 * 1000,
 	},
-	{
-		.modalias = "at86rf230",
-		.controller_data = (void *)JZ_GPIO_PORTD(13),
-		/* set .irq later */
-		.chip_select = 0,
-		.bus_num = 2,
-		.max_speed_hz = 8 * 1000 * 1000,
-	},
 };
 
 /* Battery */

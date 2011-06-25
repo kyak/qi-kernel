@@ -226,6 +226,15 @@ static struct irq_chip atben_irq_chip = {
 /* ----- SPI master creation/removal --------------------------------------- */
 
 
+static struct spi_board_info atben_board_info = {
+	.modalias = "at86rf230",
+	.controller_data = (void *)JZ_GPIO_PORTD(13),
+	/* set .irq later */
+	.chip_select = 0,
+	.bus_num = 2,
+	.max_speed_hz = 8 * 1000 * 1000,
+};
+
 static int __devinit atben_probe(struct platform_device *pdev)
 {
 	struct spi_master *master;
@@ -400,6 +409,7 @@ static int __init atben_init(void)
 {
 	int err;
 
+	spi_register_board_info(&atben_board_info, 1);
 	err = platform_device_register(&atben_device);
 	if (err)
 		return err;
