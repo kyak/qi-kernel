@@ -232,6 +232,27 @@ static void atusb_cleanup(struct spi_device *spi)
 {
 }
 
+static void atben_reset(void *reset_data)
+{
+	int retval;
+	struct atusb_local *atusb = reset_data;
+
+	retval = usb_control_msg(atusb->udev,
+				usb_rcvctrlpipe(atusb->udev, 0),
+				ATUSB_RF_RESET,
+				ATUSB_TO_DEV,
+				0,
+				0,
+				NULL,
+				1, /* 0? */
+				1000);
+	if (retval < 0) {
+		dev_dbg(&atusb->udev->dev,
+			"%s: error doing reset retval = %d\n",
+			__func__, retval);
+	}
+}
+
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
