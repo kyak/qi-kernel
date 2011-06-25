@@ -376,7 +376,16 @@ static int atusb_probe(struct usb_interface *interface,
 	struct spi_device *spi;
 	int retval;
 
-#if 1
+	/*
+	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
+	 * attaching to both interfaces
+	 */
+        if (interface == udev->actconfig->interface[1]) {
+                dev_info(&udev->dev,
+                         "Ignoring interface 1 reserved for DFU\n");
+                return -ENODEV;
+        }
+
 	atusb = kzalloc(sizeof(struct atusb_local), GFP_KERNEL);
 	if (!atusb)
 		return -ENOMEM;
