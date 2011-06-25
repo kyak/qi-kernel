@@ -16,6 +16,7 @@
 #include <linux/delay.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/at86rf230.h>
+#include <asm/mach-jz4740/base.h>
 
 
 enum {
@@ -364,14 +365,55 @@ static struct platform_driver atben_driver = {
 	.remove		= __devexit_p(atben_remove),
 };
 
+static struct resource atben_resources[] = {
+	{
+		.start  = JZ4740_GPIO_BASE_ADDR+0x300,
+		.end    = JZ4740_GPIO_BASE_ADDR+0x3ff,
+		.flags  = IORESOURCE_MEM,
+	},
+	{
+		/* set start and end later */
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device atben_device = {
+	.name = "spi_atben",
+	.id = 2,
+	.num_resources = ARRAY_SIZE(atben_resources),
+	.resource = atben_resources,
+};
+
+/*
+ * Registering the platform device just to probe it immediately afterwards
+ * seems a little circuitous. Need to see if there's a better way.
+ *
+ * What we actually should do is this:
+ * - in module init, register the device
+ * - maybe probe as well, but keep the device also if the probe fails
+ *   (due to a conflicting driver already occupying the 8:10 slot)
+ * - have a means for user space to kick off driver probing, e.g., when
+ *   anything about the 8:10 slot changes
+ */
+
 static int __init atben_init(void)
 {
+	int err;
+
+	err = platform_device_register(&atben_device);
+	if (err)
+		return err;
+
+	atben_resources[1].start = atben_resources[1].end =
+	    gpio_to_irq(JZ_GPIO_PORTD(12));
+
 	return platform_driver_probe(&atben_driver, atben_probe);
 }
 
 static void __exit atben_exit(void)
 {
 	platform_driver_unregister(&atben_driver);
+	platform_device_unregister(&atben_device);
 }
 
 module_init(atben_init);
