@@ -300,7 +300,7 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	struct atben_prv *prv;
 	struct resource *regs;
 	struct spi_device *spi;
-	int err;
+	int err = -ENXIO;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*prv));
 	if (!master)
@@ -328,14 +328,12 @@ static int __devinit atben_probe(struct platform_device *pdev)
                                         pdev->name);
 	if (!prv->ioarea) {
 		dev_err(prv->dev, "can't request ioarea\n");
-		err = -ENXIO;
 		goto out_master;
 	}
 
 	prv->regs = ioremap(regs->start, resource_size(regs));
 	if (!prv->regs) {
 		dev_err(prv->dev, "can't ioremap\n");
-		err = -ENXIO;
 		goto out_ioarea;
 	}
 
@@ -349,7 +347,6 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	prv->slave_irq = irq_alloc_desc(numa_node_id());
 	if (prv->slave_irq < 0) {
 		dev_err(prv->dev, "can't allocate slave irq\n");
-		err = -ENXIO;
 		goto out_regs;
 	}
 
@@ -361,14 +358,12 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	    pdev->name, prv);
 	if (err) {
 		dev_err(prv->dev, "can't allocate GPIO irq\n");
-		err = -ENXIO;
 		goto out_slave_irq;
 	}
 
 	err = spi_register_master(master);
 	if (err) {
 		dev_err(prv->dev, "can't register master\n");
-		err = -ENXIO;
 		goto out_irq;
 	}
 
