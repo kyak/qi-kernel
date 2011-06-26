@@ -43,6 +43,8 @@
 struct at86rf230_local {
 	struct spi_device *spi;
 	int rstn, slp_tr, dig2;
+	void (*reset)(void *reset_data);
+	void *reset_data;
 
 	u8 part;
 	u8 vers;
@@ -617,6 +619,8 @@ static int at86rf230_fill_data(struct spi_device *spi)
 		lp->rstn = pdata->rstn;
 		lp->slp_tr = pdata->slp_tr;
 		lp->dig2 = pdata->dig2;
+		lp->reset = pdata->reset;
+		lp->reset_data = pdata->reset_data;
 
 		return 0;
 	}
@@ -635,6 +639,8 @@ static int at86rf230_fill_data(struct spi_device *spi)
 	lp->slp_tr = of_get_gpio_flags(np, 1, &gpio_flags);
 	lp->dig2 = of_get_gpio_flags(np, 2, &gpio_flags);
 
+	lp->reset = NULL;
+
 	return 0;
 }
 #else
@@ -651,6 +657,8 @@ static int at86rf230_fill_data(struct spi_device *spi)
 	lp->rstn = pdata->rstn;
 	lp->slp_tr = pdata->slp_tr;
 	lp->dig2 = pdata->dig2;
+	lp->reset = pdata->reset;
+	lp->reset_data = pdata->reset_data;
 
 	return 0;
 }
@@ -696,9 +704,11 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	if (rc)
 		goto err_fill;
 
-	rc = gpio_request(lp->rstn, "rstn");
-	if (rc)
-		goto err_rstn;
+	if (gpio_is_valid(lp->rstn)) {
+		rc = gpio_request(lp->rstn, "rstn");
+		if (rc)
+			goto err_rstn;
+	}
 
 	if (gpio_is_valid(lp->slp_tr)) {
 		rc = gpio_request(lp->slp_tr, "slp_tr");
@@ -706,9 +716,11 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 			goto err_slp_tr;
 	}
 
-	rc = gpio_direction_output(lp->rstn, 1);
-	if (rc)
-		goto err_gpio_dir;
+	if (gpio_is_valid(lp->rstn)) {
+		rc = gpio_direction_output(lp->rstn, 1);
+		if (rc)
+			goto err_gpio_dir;
+	}
 
 	if (gpio_is_valid(lp->slp_tr)) {
 		rc = gpio_direction_output(lp->slp_tr, 0);
@@ -717,11 +729,15 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	}
 
 	/* Reset */
-	msleep(1);
-	gpio_set_value(lp->rstn, 0);
-	msleep(1);
-	gpio_set_value(lp->rstn, 1);
-	msleep(1);
+	if (lp->reset)
+		lp->reset(lp->reset_data);
+	else {
+		msleep(1);
+		gpio_set_value(lp->rstn, 0);
+		msleep(1);
+		gpio_set_value(lp->rstn, 1);
+		msleep(1);
+	}
 
 	rc = at86rf230_read_subreg(lp, SR_MAN_ID_0, &man_id_0);
 	if (rc)
@@ -790,7 +806,8 @@ err_gpio_dir:
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
 err_slp_tr:
-	gpio_free(lp->rstn);
+	if (gpio_is_valid(lp->rstn))
+		gpio_free(lp->rstn);
 err_rstn:
 err_fill:
 	spi_set_drvdata(spi, NULL);
@@ -815,7 +832,8 @@ static int __devexit at86rf230_remove(struct spi_device *spi)
 
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
-	gpio_free(lp->rstn);
+	if (gpio_is_valid(lp->rstn))
+		gpio_free(lp->rstn);
 
 	spi_set_drvdata(spi, NULL);
 	mutex_destroy(&lp->bmux);
