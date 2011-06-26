@@ -392,8 +392,8 @@ out_irq:
 	free_irq(prv->gpio_irq, prv);
 
 out_slave_irq:
-	set_irq_chip_data(prv->slave_irq, NULL);
 	set_irq_chained_handler(prv->slave_irq, NULL);
+	set_irq_chip_data(prv->slave_irq, NULL);
 	irq_free_desc(prv->slave_irq);
 
 out_regs:
@@ -421,8 +421,8 @@ static int __devexit atben_remove(struct platform_device *pdev)
 
 	free_irq(prv->gpio_irq, prv);
 
-	set_irq_chip_data(prv->slave_irq, NULL);
 	set_irq_chained_handler(prv->slave_irq, NULL);
+	set_irq_chip_data(prv->slave_irq, NULL);
 	irq_free_desc(prv->slave_irq);
 
 	iounmap(prv->regs);
