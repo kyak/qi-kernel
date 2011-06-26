@@ -18,6 +18,8 @@
 #include <linux/spi/at86rf230.h>
 #include <asm/mach-jz4740/base.h>
 
+#include "../ieee802154/at86rf230.h"	/* dirty */
+
 
 enum {
 	VDD_OFF	= 1 << 2,	/* VDD disable, PD02 */
@@ -188,55 +190,22 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 {
 	struct atben_prv *prv = spi_master_get_devdata(spi->master);
 	struct spi_transfer *xfer;
-	struct spi_transfer *x[2];
-	int n;
+	const uint8_t *tx;
+	uint8_t *rx;
 
-	 if (unlikely(list_empty(&msg->transfers))) {
+	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(prv->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
 
-	/*
-	 * Classify the request. This is just a proof of concept - we don't
-	 * need it in this driver.
-	 */
-	n = 0;
-	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		if (n == ARRAY_SIZE(x)) {
-			dev_err(prv->dev, "too many transfers\n");
-			return -EINVAL;
-		}
-		x[n] = xfer;
-		n++;
-	}
-
-	if (!x[0]->tx_buf || x[0]->len != 2)
-		goto bad_req;
-	if (n == 1) {
-		if (x[0]->rx_buf) {
-			dev_dbg(prv->dev, "read 1\n");
-		} else {
-			dev_dbg(prv->dev, "write 2\n");
-		}
-	} else {
-		if (x[0]->rx_buf) {
-			if (x[1]->tx_buf || !x[1]->rx_buf)
-				goto bad_req;
-			dev_dbg(prv->dev, "read 1+\n");
-		} else {
-			if (!x[1]->tx_buf ||x[1]->rx_buf)
-				goto bad_req;
-			dev_dbg(prv->dev, "write 2+n\n");
-		}
-	}
+	msg->actual_length = 0;
 
 	writel(nSEL, PDDATC);
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		const uint8_t *tx;
-		uint8_t *rx;
-
 		tx = xfer->tx_buf;
 		rx = xfer->rx_buf;
+		msg->actual_length += xfer->len;
+
 		if (!tx)
 			rx_only(prv, rx, xfer->len);
 		else if (!rx)
@@ -245,20 +214,27 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 			bidir(prv, tx, rx, xfer->len);
 	}
 	writel(nSEL, PDDATS);
-	
+
+	/*
+	 * The AT86RF230 driver sometimes requires a transceiver state
+	 * transition to be an interrupt barrier. This is the case after
+	 * writing FORCE_TX_ON to the TRX_CMD field in the TRX_STATE register.
+	 *
+	 * Since there is no other means of notification, we just decode the
+	 * transfer and do a bit of pattern matching.
+	 */
+	xfer = list_first_entry(&msg->transfers, struct spi_transfer,
+	    transfer_list);
+	tx = xfer->tx_buf;
+	if (tx && xfer->len == 2 &&
+	    tx[0] == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
+	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
+		synchronize_irq(prv->gpio_irq);
+
 	msg->status = 0;
-	msg->actual_length = x[0]->len+(n == 2 ? x[1]->len : 0);
 	msg->complete(msg->context);
 
 	return 0;
-
-bad_req:
-	dev_err(prv->dev, "unrecognized request:\n");
-	list_for_each_entry(xfer, &msg->transfers, transfer_list)
-		dev_err(prv->dev, "%stx %srx len %u\n",
-		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
-		    xfer->len);
-	return -EINVAL;
 }
 
 static int atben_setup(struct spi_device *spi)
@@ -324,7 +300,7 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	struct atben_prv *prv;
 	struct resource *regs;
 	struct spi_device *spi;
-	int err;
+	int err = -ENXIO;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*prv));
 	if (!master)
@@ -352,14 +328,12 @@ static int __devinit atben_probe(struct platform_device *pdev)
                                         pdev->name);
 	if (!prv->ioarea) {
 		dev_err(prv->dev, "can't request ioarea\n");
-		err = -ENXIO;
 		goto out_master;
 	}
 
 	prv->regs = ioremap(regs->start, resource_size(regs));
 	if (!prv->regs) {
 		dev_err(prv->dev, "can't ioremap\n");
-		err = -ENXIO;
 		goto out_ioarea;
 	}
 
@@ -373,7 +347,6 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	prv->slave_irq = irq_alloc_desc(numa_node_id());
 	if (prv->slave_irq < 0) {
 		dev_err(prv->dev, "can't allocate slave irq\n");
-		err = -ENXIO;
 		goto out_regs;
 	}
 
@@ -385,14 +358,12 @@ static int __devinit atben_probe(struct platform_device *pdev)
 	    pdev->name, prv);
 	if (err) {
 		dev_err(prv->dev, "can't allocate GPIO irq\n");
-		err = -ENXIO;
 		goto out_slave_irq;
 	}
 
 	err = spi_register_master(master);
 	if (err) {
 		dev_err(prv->dev, "can't register master\n");
-		err = -ENXIO;
 		goto out_irq;
 	}
 
