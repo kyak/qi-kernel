@@ -34,9 +34,9 @@
 #include <linux/regulator/machine.h>
 
 #include <linux/leds_pwm.h>
-#include <linux/spi/at86rf230.h>
 
 #include <asm/mach-jz4740/platform.h>
+#include <asm/mach-jz4740/base.h>
 
 #include "clock.h"
 
@@ -305,62 +305,6 @@ static struct platform_device spigpio_device = {
 	},
 };
 
-/* atben 8:10 card */
-static struct spi_gpio_platform_data atben_platform_data = {
-	.sck = JZ_GPIO_PORTD(11),
-	.mosi = JZ_GPIO_PORTD(8),
-	.miso = JZ_GPIO_PORTD(10),
-	.num_chipselect = 1,
-};
-
-static struct platform_device qi_lb60_atben = {
-	.name = "spi_gpio",
-	.id   = 2,
-	.dev = {
-		.platform_data = &atben_platform_data,
-	},
-};
-
-static void atben_reset(void *reset_data)
-{
-	enum {
-		MASK_IRQ	= 1 << 12,
-		MASK_nSEL	= 1 << 13,
-		MASK_MOSI	= 1 << 8,
-		MASK_nVDD	= 1 << 2,
-		MASK_SLP_TR	= 1 << 9,
-		MASK_MISO	= 1 << 10,
-		MASK_SCLK	= 1 << 11,
-	};
-	const int charge = MASK_nSEL | MASK_MOSI | MASK_SLP_TR | MASK_SCLK;
-	const int discharge = charge | MASK_IRQ | MASK_MISO;
-
-printk(KERN_ERR "atben_reset\n");
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 1 << 2, 1 << 2);
-	jz_gpio_port_direction_output(JZ_GPIO_PORTD(0), discharge);
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, discharge);
-	msleep(100);	/* let power drop */
-
-	/*
- 	 * Hack: PD12/DAT2/IRQ is an active-high interrupt input, which is
-	 * indicated by setting its direction bit to 1. We thus must not
-	 * configure it as an "input".
-	 */
-	jz_gpio_port_direction_input(JZ_GPIO_PORTD(0), MASK_MISO);
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), charge, charge);
-	msleep(10);	/* precharge caps */
-
-	jz_gpio_port_set_value(JZ_GPIO_PORTD(0), 0, 1 << 2 | 1 << 9);
-	msleep(10);
-}
-
-static struct at86rf230_platform_data at86rf230_platform_data = {
-	.rstn	= -1,
-	.slp_tr	= JZ_GPIO_PORTD(9),
-	.dig2	= -1,
-	.reset	= atben_reset,
-};
-
 /* SPI */
 static struct spi_board_info qi_lb60_spi_board_info[] = {
 	{
@@ -369,15 +313,6 @@ static struct spi_board_info qi_lb60_spi_board_info[] = {
 		.chip_select = 0,
 		.bus_num = 1,
 		.max_speed_hz = 30 * 1000,
-	},
-	{
-		.modalias = "at86rf230",
-		.platform_data = &at86rf230_platform_data,
-		.controller_data = (void *)JZ_GPIO_PORTD(13),
-		/* set .irq later */
-		.chip_select = 0,
-		.bus_num = 2,
-		.max_speed_hz = 8 * 1000 * 1000,
 	},
 };
 
@@ -500,7 +435,6 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&qi_lb60_gpio_keys,
 	&qi_lb60_pwm_beeper,
 	&qi_lb60_charger_device,
-	&qi_lb60_atben,
 };
 
 static void __init board_gpio_setup(void)
@@ -527,7 +461,6 @@ static int __init qi_lb60_init_platform_devices(void)
 
 	jz4740_serial_device_register();
 
-	qi_lb60_spi_board_info[1].irq = gpio_to_irq(JZ_GPIO_PORTD(12));
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));
 
