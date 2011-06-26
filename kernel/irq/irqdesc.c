@@ -109,6 +109,7 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return radix_tree_lookup(&irq_desc_tree, irq);
 }
+EXPORT_SYMBOL_GPL(irq_to_desc);
 
 static void delete_irq_desc(unsigned int irq)
 {
@@ -273,6 +274,7 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return (irq < NR_IRQS) ? irq_desc + irq : NULL;
 }
+EXPORT_SYMBOL_GPL(irq_to_desc);
 
 struct irq_desc *irq_to_desc_alloc_node(unsigned int irq, int node)
 {
@@ -327,6 +329,7 @@ void irq_free_descs(unsigned int from, unsigned int cnt)
 	bitmap_clear(allocated_irqs, from, cnt);
 	mutex_unlock(&sparse_irq_lock);
 }
+EXPORT_SYMBOL_GPL(irq_free_descs);
 
 /**
  * irq_alloc_descs - allocate and initialize a range of irq descriptors
@@ -364,6 +367,7 @@ err:
 	mutex_unlock(&sparse_irq_lock);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(irq_alloc_descs);
 
 /**
  * irq_reserve_irqs - mark irqs allocated

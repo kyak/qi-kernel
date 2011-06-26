@@ -748,6 +748,7 @@ set_irq_chip_and_handler(unsigned int irq, struct irq_chip *chip,
 	set_irq_chip(irq, chip);
 	__set_irq_handler(irq, handle, 0, NULL);
 }
+EXPORT_SYMBOL_GPL(set_irq_chip_and_handler);
 
 void
 set_irq_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
