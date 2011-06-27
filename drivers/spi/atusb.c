@@ -1,7 +1,7 @@
 /*
  * ATUSB driver 0.1
  *
- * Copyright (c) 2011 Richard Sharpe (realrichardsharpe@gmail.com)
+ * Copyright (c) 2011 Richard Sharpe <realrichardsharpe@gmail.com>
  * Copyright (c) 2011 Stefan Schmidt <stefan@datenfreihafen.org>
  *
  * This program is free software; you can redistribute it and/or
@@ -19,9 +19,6 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/at86rf230.h>
-
-#define DRIVER_AUTHOR "Richard Sharpe, realrichardsharpe@gmail.com"
-#define DRIVER_DESC "ATUSB ben-wpan Driver"
 
 #define VENDOR_ID     0x20b7
 #define PRODUCT_ID    0x1540
@@ -506,6 +503,7 @@ static void __exit atusb_exit(void)
 module_init (atusb_init);
 module_exit (atusb_exit);
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_AUTHOR("Richard Sharpe <realrichardsharpe@gmail.com>, Stefan Schmidt \
+		<stefan@datenfreihafen.org>");
+MODULE_DESCRIPTION( "ATUSB ben-wpan Driver");
 MODULE_LICENSE("GPL");
