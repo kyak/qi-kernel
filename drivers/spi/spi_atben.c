@@ -308,7 +308,7 @@ static int __devinit atben_probe(struct platform_device *pdev)
 
 	prv = spi_master_get_devdata(master);
 	prv->dev = &pdev->dev;
-	platform_set_drvdata(pdev, master);
+	platform_set_drvdata(pdev, spi_master_get(master));
 
 	master->mode_bits	= SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
 	master->bus_num		= pdev->id;
