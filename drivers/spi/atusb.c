@@ -51,8 +51,15 @@ struct atusb_local {
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
+	struct urb *ctrl_urb;
+	spinlock_t		err_lock;		/* lock for errors */
+	size_t			bulk_in_filled;		/* number of bytes in the buffer */
+	bool			ongoing_read;		/* a read is going on */
+	bool			processed_urb;		/* indicates we haven't processed the urb */
+	struct completion	bulk_in_completion;	/* to wait for an ongoing read */
+	unsigned char *buffer;
 };
-#if 0
+#if 1
 /*
  * RF Registers FIXME: To be removed
  */
@@ -155,13 +162,38 @@ static ssize_t rf_show_version(struct device *dev,
 
 static DEVICE_ATTR(rf_version_num, S_IRUGO, rf_show_version, NULL);
 #endif
+static void atusb_usb_cb(struct urb *urb)
+{
+	struct atusb_local *atusb;
+
+	atusb = urb->context;
+
+	spin_lock(&atusb->err_lock);
+	/* sync/async unlink faults aren't errors */
+	if (urb->status) {
+		if (!(urb->status == -ENOENT ||
+		    urb->status == -ECONNRESET ||
+		    urb->status == -ESHUTDOWN))
+			dev_err(&atusb->udev->dev, "nonzero write bulk status received: %d",
+			    urb->status);
+
+	} else {
+		atusb->bulk_in_filled = urb->actual_length;
+	}
+	atusb->ongoing_read = 0;
+	spin_unlock(&atusb->err_lock);
+
+	complete(&atusb->bulk_in_completion);
+	usb_free_urb(atusb->ctrl_urb);
+}
+
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
-	unsigned char *buffer;
+	struct usb_ctrlrequest *req;
 
-	buffer = kmalloc(3, GFP_KERNEL);
-	if (!buffer) {
+	atusb->buffer = kmalloc(3, GFP_KERNEL);
+	if (!atusb->buffer) {
 		dev_err(&atusb->udev->dev, "out of memory\n");
 		retval = -ENOMEM;
 		goto out;
@@ -224,28 +256,44 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 		goto out_free;
 	}
 
-	retval = usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_ID,
-				ATUSB_FROM_DEV,
-				0x00,
-				0x00,
-				buffer,
-				3,
-				1000);
+	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!atusb->ctrl_urb) {
+		retval = -ENOMEM;
+	}
+	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
+        req->bRequest = ATUSB_ID;
+        req->bRequestType = ATUSB_FROM_DEV;
+        req->wValue = cpu_to_le16(0x00);
+        req->wIndex = cpu_to_le16(0x00);
+        req->wLength = cpu_to_le16(3);
 
-	if (retval == 3) {
-		atusb->ep0_atusb_major = buffer[0];
-		atusb->ep0_atusb_minor = buffer[1];
-		atusb->atusb_hw_type   = buffer[2];
-		retval = 0;
-	} else
-		dev_dbg(&atusb->udev->dev, "%s: retval = %d\n",
-			__func__,
+	/* send the data out the bulk port */
+	usb_fill_control_urb(atusb->ctrl_urb,
+			atusb->udev,
+			usb_rcvbulkpipe(atusb->udev, 0),
+			(unsigned char *)req,
+			atusb->buffer,
+			3,
+			atusb_usb_cb,
+			atusb);
+
+	/* tell everybody to leave the URB alone */
+	spin_lock_irq(&atusb->err_lock);
+	atusb->ongoing_read = 1;
+	spin_unlock_irq(&atusb->err_lock);
+
+	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	if (retval < 0) {
+		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
-
+		retval = (retval == -ENOMEM) ? retval : -EIO;
+		spin_lock_irq(&atusb->err_lock);
+		atusb->ongoing_read = 0;
+		spin_unlock_irq(&atusb->err_lock);
+	}
+	kfree(req);
 out_free:
-	kfree(buffer);
+	kfree(atusb->buffer);
 out:
 	return retval;
 }
@@ -388,7 +436,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	msg->complete(msg->context);
 
 	return 0;
-
+#if 0
 bad_req:
 	dev_info(&atusb->udev->dev, "unrecognized request:\n");
 	list_for_each_entry(xfer, &msg->transfers, transfer_list)
@@ -396,13 +444,14 @@ bad_req:
 		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
 		    xfer->len);
 	return -EINVAL;
+#endif
 }
 
 static int atusb_setup(struct spi_device *spi)
 {
 	return 0;
 }
-
+#if 0
 static irqreturn_t atusb_irq(int irq, void *data)
 {
 	struct atusb_local *atusb = data;
@@ -410,7 +459,7 @@ static irqreturn_t atusb_irq(int irq, void *data)
 	generic_handle_irq(atusb->slave_irq);
 	return IRQ_HANDLED;
 }
-
+#endif
 static void atusb_irq_mask(struct irq_data *data)
 {
 //	struct atben_local *atusb = irq_data_get_irq_chip_data(data);
@@ -472,6 +521,9 @@ static int atusb_probe(struct usb_interface *interface,
 
 	atusb = spi_master_get_devdata(master);
 
+	spin_lock_init(&atusb->err_lock);
+	init_completion(&atusb->bulk_in_completion);
+
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
 
@@ -528,6 +580,10 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&udev->dev, "Firmware: build %s\n", atusb->atusb_build);
+	wait_for_completion(&atusb->bulk_in_completion);
+	atusb->ep0_atusb_major = atusb->buffer[0];
+	atusb->ep0_atusb_minor = atusb->buffer[1];
+	atusb->atusb_hw_type   = atusb->buffer[2];
 	dev_info(&udev->dev, "Firmware: major: %u, minor: %u, hardware type: %u\n",
 			atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
 			atusb->atusb_hw_type);
