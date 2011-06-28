@@ -308,7 +308,7 @@ static int __devinit atben_probe(struct platform_device *pdev)
 
 	prv = spi_master_get_devdata(master);
 	prv->dev = &pdev->dev;
-	platform_set_drvdata(pdev, master);
+	platform_set_drvdata(pdev, spi_master_get(master));
 
 	master->mode_bits	= SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
 	master->bus_num		= pdev->id;
@@ -392,8 +392,8 @@ out_irq:
 	free_irq(prv->gpio_irq, prv);
 
 out_slave_irq:
-	set_irq_chip_data(prv->slave_irq, NULL);
 	set_irq_chained_handler(prv->slave_irq, NULL);
+	set_irq_chip_data(prv->slave_irq, NULL);
 	irq_free_desc(prv->slave_irq);
 
 out_regs:
@@ -421,8 +421,8 @@ static int __devexit atben_remove(struct platform_device *pdev)
 
 	free_irq(prv->gpio_irq, prv);
 
-	set_irq_chip_data(prv->slave_irq, NULL);
 	set_irq_chained_handler(prv->slave_irq, NULL);
+	set_irq_chip_data(prv->slave_irq, NULL);
 	irq_free_desc(prv->slave_irq);
 
 	iounmap(prv->regs);
