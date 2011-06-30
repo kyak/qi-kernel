@@ -44,7 +44,7 @@ struct atusb_local {
 	uint8_t ep0_atusb_major;
 	uint8_t ep0_atusb_minor;
 	uint8_t atusb_hw_type;
-	char atusb_build[ATUSB_BUILD_SIZE + 1];
+	unsigned char *atusb_build;
 	struct spi_master *master;
 	int slave_irq;
 	int usb_irq;
@@ -56,7 +56,7 @@ struct atusb_local {
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
 	bool			ongoing_read;		/* a read is going on */
 	bool			processed_urb;		/* indicates we haven't processed the urb */
-	struct completion	bulk_in_completion;	/* to wait for an ongoing read */
+	struct completion	urb_completion;	/* to wait for an ongoing read */
 	unsigned char *buffer;
 };
 #if 1
@@ -182,9 +182,7 @@ static void atusb_usb_cb(struct urb *urb)
 	}
 	atusb->ongoing_read = 0;
 	spin_unlock(&atusb->err_lock);
-
-	complete(&atusb->bulk_in_completion);
-	usb_free_urb(atusb->ctrl_urb);
+	complete(&atusb->urb_completion);
 }
 
 static int atusb_get_static_info(struct atusb_local *atusb)
@@ -192,11 +190,16 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 	int retval;
 	struct usb_ctrlrequest *req;
 
-	atusb->buffer = kmalloc(3, GFP_KERNEL);
+	atusb->buffer = kzalloc(3, GFP_KERNEL);
 	if (!atusb->buffer) {
 		dev_err(&atusb->udev->dev, "out of memory\n");
 		retval = -ENOMEM;
-		goto out;
+	}
+
+	atusb->atusb_build = kzalloc(ATUSB_BUILD_SIZE+1, GFP_KERNEL);
+	if (!atusb->buffer) {
+		dev_err(&atusb->udev->dev, "out of memory\n");
+		retval = -ENOMEM;
 	}
 #if 0
 	/*
@@ -239,23 +242,6 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 	/*
 	 * Get a couple of the ATMega Firmware values as well
 	 */
-	retval = usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_BUILD,
-				ATUSB_FROM_DEV,
-				0x00,
-				0x00,
-				atusb->atusb_build,
-				ATUSB_BUILD_SIZE+1,
-				1000);
-	if (retval < 0) {
-		dev_dbg(&atusb->udev->dev,
-			"%s: error getting BUILD: retval = %d\n",
-			__func__,
-			retval);
-		goto out_free;
-	}
-
 	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!atusb->ctrl_urb) {
 		retval = -ENOMEM;
@@ -267,7 +253,6 @@ static int atusb_get_static_info(struct atusb_local *atusb)
         req->wIndex = cpu_to_le16(0x00);
         req->wLength = cpu_to_le16(3);
 
-	/* send the data out the bulk port */
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
 			usb_rcvbulkpipe(atusb->udev, 0),
@@ -277,24 +262,47 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 			atusb_usb_cb,
 			atusb);
 
-	/* tell everybody to leave the URB alone */
-	spin_lock_irq(&atusb->err_lock);
-	atusb->ongoing_read = 1;
-	spin_unlock_irq(&atusb->err_lock);
+	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	if (retval < 0) {
+		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
+			retval);
+		retval = (retval == -ENOMEM) ? retval : -EIO;
+	}
+	wait_for_completion_interruptible(&atusb->urb_completion);
+	INIT_COMPLETION(atusb->urb_completion);
+	usb_free_urb(atusb->ctrl_urb);
+	kfree(req);
+
+	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!atusb->ctrl_urb) {
+		retval = -ENOMEM;
+	}
+	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
+        req->bRequest = ATUSB_BUILD;
+        req->bRequestType = ATUSB_FROM_DEV;
+        req->wValue = cpu_to_le16(0x00);
+        req->wIndex = cpu_to_le16(0x00);
+        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1); /* Either size length is wrong... */
+
+	usb_fill_control_urb(atusb->ctrl_urb,
+			atusb->udev,
+			usb_rcvbulkpipe(atusb->udev, 0),
+			(unsigned char *)req,
+			atusb->atusb_build,
+			ATUSB_BUILD_SIZE+1, /* ... or size length is wrong */
+			atusb_usb_cb,
+			atusb);
 
 	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
 	if (retval < 0) {
 		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
-		spin_lock_irq(&atusb->err_lock);
-		atusb->ongoing_read = 0;
-		spin_unlock_irq(&atusb->err_lock);
 	}
+	wait_for_completion_interruptible(&atusb->urb_completion);
+	usb_free_urb(atusb->ctrl_urb);
 	kfree(req);
-out_free:
-	kfree(atusb->buffer);
-out:
+
 	return retval;
 }
 
@@ -326,7 +334,6 @@ static void atben_reset(void *reset_data)
 
 static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len)
 {
-	//uint8_t value = 0;
 	dev_info(&atusb->udev->dev, "atusb_read1: tx = %i\n", *tx);
 	usb_control_msg(atusb->udev,
 				usb_rcvctrlpipe(atusb->udev, 0),
@@ -431,7 +438,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
 		synchronize_irq(atusb->gpio_irq);
 #endif
-	dev_info(&atusb->udev->dev, "atusb_transfer: tx = %i, rx = %i\n", *tx, *rx);
+//	dev_info(&atusb->udev->dev, "atusb_transfer: tx = %i, rx = %i\n", *tx, *rx);
 	msg->status = 0;
 	msg->complete(msg->context);
 
@@ -502,7 +509,6 @@ static int atusb_probe(struct usb_interface *interface,
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct atusb_local *atusb = NULL;
 	struct spi_master *master;
-//	struct spi_device *spi;
 	int retval;
 
 	/*
@@ -522,7 +528,7 @@ static int atusb_probe(struct usb_interface *interface,
 	atusb = spi_master_get_devdata(master);
 
 	spin_lock_init(&atusb->err_lock);
-	init_completion(&atusb->bulk_in_completion);
+	init_completion(&atusb->urb_completion);
 
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
@@ -580,14 +586,14 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&udev->dev, "Firmware: build %s\n", atusb->atusb_build);
-	wait_for_completion(&atusb->bulk_in_completion);
 	atusb->ep0_atusb_major = atusb->buffer[0];
 	atusb->ep0_atusb_minor = atusb->buffer[1];
 	atusb->atusb_hw_type   = atusb->buffer[2];
 	dev_info(&udev->dev, "Firmware: major: %u, minor: %u, hardware type: %u\n",
-			atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
-			atusb->atusb_hw_type);
+		atusb->ep0_atusb_major, atusb->ep0_atusb_minor, atusb->atusb_hw_type);
 
+	kfree(atusb->buffer);
+	kfree(atusb->atusb_build);
 #if 0
 	/*
 	 * Create the sysfs files
