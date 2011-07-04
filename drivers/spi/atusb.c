@@ -54,9 +54,8 @@ struct atusb_local {
 	struct urb *ctrl_urb;
 	spinlock_t		err_lock;		/* lock for errors */
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
-	bool			ongoing_read;		/* a read is going on */
 	bool			processed_urb;		/* indicates we haven't processed the urb */
-	struct completion	urb_completion;	/* to wait for an ongoing read */
+	struct completion	urb_completion;
 	unsigned char *buffer;
 };
 #if 1
@@ -180,7 +179,6 @@ static void atusb_usb_cb(struct urb *urb)
 	} else {
 		atusb->bulk_in_filled = urb->actual_length;
 	}
-	atusb->ongoing_read = 0;
 	spin_unlock(&atusb->err_lock);
 	complete(&atusb->urb_completion);
 }
@@ -334,7 +332,10 @@ static void atben_reset(void *reset_data)
 
 static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len)
 {
+	int retval;
+	struct usb_ctrlrequest *req;
 	dev_info(&atusb->udev->dev, "atusb_read1: tx = %i\n", *tx);
+#if 0
 	usb_control_msg(atusb->udev,
 				usb_rcvctrlpipe(atusb->udev, 0),
 				ATUSB_SPI_READ1,
@@ -345,6 +346,40 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 				1,
 				1000);
 	printk("USB SPI response: %i\n", *rx);
+#endif
+#if 1
+	INIT_COMPLETION(atusb->urb_completion);
+	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!atusb->ctrl_urb) {
+		retval = -ENOMEM;
+	}
+	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
+        req->bRequest = ATUSB_SPI_READ1;
+        req->bRequestType = ATUSB_FROM_DEV;
+        req->wValue = cpu_to_le16(*tx);
+        req->wIndex = cpu_to_le16(0x00);
+        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
+
+	usb_fill_control_urb(atusb->ctrl_urb,
+			atusb->udev,
+			usb_rcvbulkpipe(atusb->udev, 0),
+			(unsigned char *)req,
+			rx,
+			ATUSB_BUILD_SIZE+1, /* ... or size length is wrong */
+			atusb_usb_cb,
+			atusb);
+
+	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	if (retval < 0) {
+		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
+			retval);
+		retval = (retval == -ENOMEM) ? retval : -EIO;
+	}
+	wait_for_completion(&atusb->urb_completion);
+	//wait_for_completion_interruptible(&atusb->urb_completion);
+	usb_free_urb(atusb->ctrl_urb);
+	kfree(req);
+#endif
 }
 
 #if 0
@@ -365,7 +400,8 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	const uint8_t *tx;
 	uint8_t *rx;
 
-	 if (unlikely(list_empty(&msg->transfers))) {
+	dev_info(&atusb->udev->dev, "Entered atusb_transfer\n");
+	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(&atusb->udev->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
