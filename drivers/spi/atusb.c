@@ -38,8 +38,6 @@ MODULE_DEVICE_TABLE(usb, atusb_device_table);
 #define ATUSB_BUILD_SIZE 256
 struct atusb_local {
 	struct usb_device * udev;
-	uint8_t rf_part_num; // To be removed
-	uint8_t rf_version_num; // To be removed
 	/* The interface to the RF part info, if applicable */
 	uint8_t ep0_atusb_major;
 	uint8_t ep0_atusb_minor;
@@ -58,15 +56,7 @@ struct atusb_local {
 	struct completion	urb_completion;
 	unsigned char *buffer;
 };
-#if 1
-/*
- * RF Registers FIXME: To be removed
- */
-enum rf_registers {
-	RF_PART_NUM_REG			= 0x1c,
-	RF_VERSION_NUM_REG		= 0x1d
-};
-#endif
+
 /*
  * Commands to our device. Make sure this is synced with the firmware
  */
@@ -121,46 +111,7 @@ enum atspi_requests {
 
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
 #define ATUSB_TO_DEV (USB_TYPE_VENDOR | USB_DIR_OUT)
-#if 0
-static ssize_t rf_show_part(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	struct usb_interface *intf = to_usb_interface(dev);
-	struct atusb_local *atusb = usb_get_intfdata(intf);
-	char *chip;
 
-	switch(atusb->rf_part_num) {
-	case 2:
-		chip = "AT86RF230";
-		break;
-	case 3:
-		chip = "AT86RF231";
-		break;
-	default:
-		chip = "Unknown";
-	}
-
-	return snprintf(buf, PAGE_SIZE, "%s (%u)\n", chip, atusb->rf_part_num);
-}
-
-static DEVICE_ATTR(rf_part_num, S_IRUGO, rf_show_part, NULL);
-
-static ssize_t rf_show_version(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	struct usb_interface *intf = to_usb_interface(dev);
-	struct atusb_local *atusb = usb_get_intfdata(intf);
-
-	return sprintf(buf, "%s\n",
-			(atusb->rf_version_num == 1) ?
-				"Rev A" : (atusb->rf_version_num == 2) ?
-					"Rev B" : "Unknown");
-}
-
-static DEVICE_ATTR(rf_version_num, S_IRUGO, rf_show_version, NULL);
-#endif
 static void atusb_usb_cb(struct urb *urb)
 {
 	struct atusb_local *atusb;
@@ -199,44 +150,7 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 		dev_err(&atusb->udev->dev, "out of memory\n");
 		retval = -ENOMEM;
 	}
-#if 0
-	/*
-	 * Get the FP part id and version num
-	 */
-	retval = usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_REG_READ,
-				ATUSB_FROM_DEV,
-				0x00,
-				RF_PART_NUM_REG,
-				&atusb->rf_part_num,
-				1,
-				1000);
-	if (retval < 0) {
-		dev_dbg(&atusb->udev->dev,
-			"%s: error getting BUILD: retval = %d\n",
-			__func__,
-			retval);
-		goto out_free;
-	}
 
-	retval = usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_REG_READ,
-				ATUSB_FROM_DEV,
-				0x00,
-				RF_VERSION_NUM_REG,
-				&atusb->rf_version_num,
-				1,
-				1000);
-	if (retval < 0) {
-		dev_dbg(&atusb->udev->dev,
-			"%s: error getting BUILD: retval = %d\n",
-			__func__,
-			retval);
-		goto out_free;
-	}
-#endif
 	/*
 	 * Get a couple of the ATMega Firmware values as well
 	 */
@@ -630,22 +544,9 @@ static int atusb_probe(struct usb_interface *interface,
 
 	kfree(atusb->buffer);
 	kfree(atusb->atusb_build);
-#if 0
-	/*
-	 * Create the sysfs files
-	 */
-	retval = device_create_file(&interface->dev, &dev_attr_rf_part_num);
-	if (retval)
-		goto err_master;
-
-	retval = device_create_file(&interface->dev, &dev_attr_rf_version_num);
-	if (retval)
-		goto err_part;
 #endif
 	return 0;
 
-//err_part:
-//	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
 err_master:
 	spi_master_put(atusb->master);
 err_slave_irq:
@@ -662,13 +563,6 @@ static void atusb_disconnect(struct usb_interface *interface)
 	struct atusb_local *atusb = usb_get_intfdata(interface);
 	struct spi_master *master = atusb->master;
 
-#if 0
-	/*
-	 * Remove sys files
-	 */
-	device_remove_file(&interface->dev, &dev_attr_rf_version_num);
-	device_remove_file(&interface->dev, &dev_attr_rf_part_num);
-#endif
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
 
