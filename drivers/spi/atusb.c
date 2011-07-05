@@ -30,18 +30,13 @@
 #define VENDOR_ID     0x20b7
 #define PRODUCT_ID    0x1540
 
-/*
- * The devices we work with ...
- */
+/* The devices we work with */
 static const struct usb_device_id atusb_device_table[] = {
 	{ USB_DEVICE(VENDOR_ID, PRODUCT_ID) },
 	{ },
 };
 MODULE_DEVICE_TABLE(usb, atusb_device_table);
 
-/*
- * Our device ...
- */
 #define ATUSB_BUILD_SIZE 256
 struct atusb_local {
 	struct usb_device * udev;
@@ -62,9 +57,7 @@ struct atusb_local {
 	unsigned char *buffer;
 };
 
-/*
- * Commands to our device. Make sure this is synced with the firmware
- */
+/* Commands to our device. Make sure this is synced with the firmware */
 enum atspi_requests {
 	ATUSB_ID			= 0x00,	/* system status/control grp */
 	ATUSB_BUILD,
@@ -170,9 +163,7 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 		retval = -ENOMEM;
 	}
 
-	/*
-	 * Get a couple of the ATMega Firmware values as well
-	 */
+	/* Get a couple of the ATMega Firmware values */
 	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!atusb->ctrl_urb) {
 		retval = -ENOMEM;
@@ -213,14 +204,14 @@ static int atusb_get_static_info(struct atusb_local *atusb)
         req->bRequestType = ATUSB_FROM_DEV;
         req->wValue = cpu_to_le16(0x00);
         req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1); /* Either size length is wrong... */
+        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
 			usb_rcvbulkpipe(atusb->udev, 0),
 			(unsigned char *)req,
 			atusb->atusb_build,
-			ATUSB_BUILD_SIZE+1, /* ... or size length is wrong */
+			ATUSB_BUILD_SIZE+1,
 			atusb_usb_cb,
 			atusb);
 
@@ -324,7 +315,7 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			usb_rcvbulkpipe(atusb->udev, 0),
 			(unsigned char *)req,
 			0,
-			0, /* ... or size length is wrong */
+			0,
 			atusb_read1_cb,
 			msg);
 
@@ -352,9 +343,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		return -EINVAL;
 	}
 
-	/*
-	 * Classify the request.
-	 */
+	/* Classify the request */
 	n = 0;
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
 		if (n == ARRAY_SIZE(x)) {
@@ -541,9 +530,7 @@ static int atusb_probe(struct usb_interface *interface,
 
 	dev_info(&atusb->spi->dev, "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
 
-	/*
-	 * Get the static info from the device and save it ...
-	 */
+	/* Get the static info from the device and save it */
 	retval = atusb_get_static_info(atusb);
 	if (retval) {
 		dev_info(&interface->dev, "%s: Failed to get static info: %d\n",
@@ -575,7 +562,6 @@ err_free:
 
 static void atusb_disconnect(struct usb_interface *interface)
 {
-	/* atben should come out of master devdata */
 	struct atusb_local *atusb = usb_get_intfdata(interface);
 	struct spi_master *master = atusb->master;
 
