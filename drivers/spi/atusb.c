@@ -262,7 +262,7 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	int retval;
 	struct usb_ctrlrequest *req;
 
-	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", *tx);
+	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx[0]);
 	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!atusb->ctrl_urb) {
 		retval = -ENOMEM;
@@ -271,7 +271,7 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
         req->bRequest = ATUSB_SPI_READ1;
         req->bRequestType = ATUSB_FROM_DEV;
-        req->wValue = cpu_to_le16(*tx);
+        req->wValue = cpu_to_le16(tx[0]);
         req->wIndex = cpu_to_le16(0x00);
         req->wLength = cpu_to_le16(0x01);
 
@@ -304,7 +304,8 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	int retval;
 	struct usb_ctrlrequest *req;
 
-	dev_info(&atusb->udev->dev, "atusb_write: tx = 0x%x\n", *tx);
+	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx[0]);
+	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx[1]);
 	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!atusb->ctrl_urb) {
 		retval = -ENOMEM;
@@ -312,17 +313,17 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	/* host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes */
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
         req->bRequest = ATUSB_SPI_WRITE;
-        req->bRequestType = ATUSB_FROM_DEV;
+        req->bRequestType = ATUSB_TO_DEV;
         req->wValue = cpu_to_le16(tx[0]);
         req->wIndex = cpu_to_le16(tx[1]);
-        req->wLength = cpu_to_le16(0x02);
+        req->wLength = cpu_to_le16(0x0);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
 			usb_rcvbulkpipe(atusb->udev, 0),
 			(unsigned char *)req,
-			rx,
-			0x02, /* ... or size length is wrong */
+			0,
+			0, /* ... or size length is wrong */
 			atusb_read1_cb,
 			msg);
 
