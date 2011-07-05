@@ -273,14 +273,14 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
         req->bRequestType = ATUSB_FROM_DEV;
         req->wValue = cpu_to_le16(*tx);
         req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(0x02);
+        req->wLength = cpu_to_le16(0x01);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
 			usb_rcvbulkpipe(atusb->udev, 0),
 			(unsigned char *)req,
-			rx,
-			0x02, /* ... or size length is wrong */
+			rx+1,
+			0x01,
 			atusb_read1_cb,
 			msg);
 
