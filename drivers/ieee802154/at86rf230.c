@@ -74,18 +74,18 @@ __at86rf230_write(struct at86rf230_local *lp, u8 addr, u8 data)
 
 	buf[0] = (addr & CMD_REG_MASK) | CMD_REG | CMD_WRITE;
 	buf[1] = data;
-	dev_vdbg(&lp->spi->dev, "buf[0] = %02x\n", buf[0]);
-	dev_vdbg(&lp->spi->dev, "buf[1] = %02x\n", buf[1]);
+	dev_info(&lp->spi->dev, "write buf[0] = %02x\n", buf[0]);
+	dev_info(&lp->spi->dev, "write buf[1] = %02x\n", buf[1]);
 	spi_message_init(&msg);
 	spi_message_add_tail(&xfer, &msg);
 
 	status = spi_sync(lp->spi, &msg);
-	dev_vdbg(&lp->spi->dev, "status = %d\n", status);
+	dev_info(&lp->spi->dev, "write status = %d\n", status);
 	if (msg.status)
 		status = msg.status;
-	dev_vdbg(&lp->spi->dev, "status = %d\n", status);
-	dev_vdbg(&lp->spi->dev, "buf[0] = %02x\n", buf[0]);
-	dev_vdbg(&lp->spi->dev, "buf[1] = %02x\n", buf[1]);
+	dev_info(&lp->spi->dev, "write status = %d\n", status);
+	dev_info(&lp->spi->dev, "write buf[0] = %02x\n", buf[0]);
+	dev_info(&lp->spi->dev, "write buf[1] = %02x\n", buf[1]);
 
 	return status;
 }
@@ -105,17 +105,17 @@ __at86rf230_read_subreg(struct at86rf230_local *lp,
 
 	buf[0] = (addr & CMD_REG_MASK) | CMD_REG;
 	buf[1] = 0xff;
-	dev_vdbg(&lp->spi->dev, "buf[0] = %02x\n", buf[0]);
+	dev_info(&lp->spi->dev, "buf[0] = 0x%02x\n", buf[0]);
 	spi_message_init(&msg);
 	spi_message_add_tail(&xfer, &msg);
 
 	status = spi_sync(lp->spi, &msg);
-	dev_vdbg(&lp->spi->dev, "status = %d\n", status);
+	dev_info(&lp->spi->dev, "status = %d\n", status);
 	if (msg.status)
 		status = msg.status;
-	dev_vdbg(&lp->spi->dev, "status = %d\n", status);
-	dev_vdbg(&lp->spi->dev, "buf[0] = %02x\n", buf[0]);
-	dev_vdbg(&lp->spi->dev, "buf[1] = %02x\n", buf[1]);
+	dev_info(&lp->spi->dev, "status = %d\n", status);
+	dev_info(&lp->spi->dev, "buf[0] = 0x%02x\n", buf[0]);
+	dev_info(&lp->spi->dev, "buf[1] = 0x%02x\n", buf[1]);
 
 	if (status == 0)
 		*data = buf[1];
@@ -784,12 +784,12 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	rc = at86rf230_hw_init(lp);
 	if (rc)
 		goto err_gpio_dir;
-
+#if 0
 	rc = request_irq(spi->irq, at86rf230_isr, IRQF_SHARED,
 			dev_name(&spi->dev), lp);
 	if (rc)
 		goto err_gpio_dir;
-
+#endif
 	dev_dbg(&spi->dev, "registered at86rf230\n");
 
 	rc = ieee802154_register_device(lp->dev);
@@ -799,9 +799,9 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	return rc;
 
 err_irq:
-	disable_irq(spi->irq);
-	flush_work(&lp->irqwork);
-	free_irq(spi->irq, lp);
+//	disable_irq(spi->irq);
+//	flush_work(&lp->irqwork);
+//	free_irq(spi->irq, lp);
 err_gpio_dir:
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
@@ -825,16 +825,17 @@ static int __devexit at86rf230_remove(struct spi_device *spi)
 	 * disable_irq ? -- wa
 	 */
 	ieee802154_unregister_device(lp->dev);
-
+#if 0
 	disable_irq(spi->irq);
 	flush_work(&lp->irqwork);
 	free_irq(spi->irq, lp);
-
+#endif
 	if (gpio_is_valid(lp->slp_tr))
 		gpio_free(lp->slp_tr);
 	if (gpio_is_valid(lp->rstn))
 		gpio_free(lp->rstn);
 
+	//if (spi)
 	spi_set_drvdata(spi, NULL);
 	mutex_destroy(&lp->bmux);
 	ieee802154_free_device(lp->dev);
