@@ -55,6 +55,7 @@ struct atusb_local {
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
 	struct completion	urb_completion;
 	unsigned char *buffer;
+	struct spi_message *msg;
 };
 
 /* Commands to our device. Make sure this is synced with the firmware */
@@ -130,8 +131,8 @@ static void atusb_usb_cb(struct urb *urb)
 
 static void atusb_read1_cb(struct urb *urb)
 {
-	struct spi_message *msg;
-	msg = urb->context;
+	struct atusb_local *atusb;
+	atusb = urb->context;
 
 	if (urb->status) {
 		if (!(urb->status == -ENOENT ||
@@ -143,8 +144,10 @@ static void atusb_read1_cb(struct urb *urb)
 		printk("Async USB succeeded with length %i\n", urb->actual_length);
 	}
 
-	msg->status = 0;
-	msg->complete(msg->context);
+	atusb->msg->status = 0;
+	atusb->msg->complete(atusb->msg->context);
+
+	usb_free_urb(atusb->ctrl_urb);
 }
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
@@ -249,7 +252,7 @@ static void atben_reset(void *reset_data)
 	}
 }
 
-static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len, struct spi_message *msg)
+static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len)
 {
 	int retval;
 	struct usb_ctrlrequest *req;
@@ -274,7 +277,7 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			rx+1,
 			0x01,
 			atusb_read1_cb,
-			msg);
+			atusb);
 
 	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
 	if (retval < 0) {
@@ -282,7 +285,6 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
 	}
-	usb_free_urb(atusb->ctrl_urb);
 	kfree(req);
 }
 
@@ -291,7 +293,7 @@ static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
 	/* ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes */
 }
 
-static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len, struct spi_message *msg)
+static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len)
 {
 	int retval;
 	struct usb_ctrlrequest *req;
@@ -317,7 +319,7 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			0,
 			0,
 			atusb_read1_cb,
-			msg);
+			atusb);
 
 	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
 	if (retval < 0) {
@@ -325,7 +327,6 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
 	}
-	usb_free_urb(atusb->ctrl_urb);
 	kfree(req);
 }
 
@@ -342,6 +343,8 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		dev_err(&atusb->udev->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
+
+	atusb->msg = msg;
 
 	/* Classify the request */
 	n = 0;
@@ -364,13 +367,13 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			tx = x[0]->tx_buf;
 			rx = x[0]->rx_buf;
 			msg->actual_length += x[0]->len;
-			atusb_read1(atusb, tx, rx, x[0]->len, msg);
+			atusb_read1(atusb, tx, rx, x[0]->len);
 		} else {
 			dev_info(&atusb->udev->dev, "write 2\n");
 			tx = x[0]->tx_buf;
 			rx = x[0]->rx_buf;
 			msg->actual_length += x[0]->len;
-			atusb_write(atusb, tx, rx, x[0]->len, msg);
+			atusb_write(atusb, tx, rx, x[0]->len);
 		}
 	} else {
 		if (x[0]->rx_buf) {
