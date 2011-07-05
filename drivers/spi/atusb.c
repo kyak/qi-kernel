@@ -421,8 +421,6 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
 		synchronize_irq(atusb->gpio_irq);
 #endif
-//	dev_info(&atusb->udev->dev, "atusb_transfer: tx = %i, rx = %i\n", *tx, *rx);
-
 	return 0;
 
 bad_req:
@@ -553,7 +551,7 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&atusb->spi->dev, "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
-#if 1
+
 	/*
 	 * Get the static info from the device and save it ...
 	 */
@@ -573,8 +571,7 @@ static int atusb_probe(struct usb_interface *interface,
 		atusb->ep0_atusb_major, atusb->ep0_atusb_minor, atusb->atusb_hw_type);
 
 	kfree(atusb->buffer);
-	kfree(atusb->atusb_build);
-#endif
+
 	return 0;
 
 err_master:
@@ -592,6 +589,8 @@ static void atusb_disconnect(struct usb_interface *interface)
 	/* atben should come out of master devdata */
 	struct atusb_local *atusb = usb_get_intfdata(interface);
 	struct spi_master *master = atusb->master;
+
+	kfree(atusb->atusb_build);
 
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
