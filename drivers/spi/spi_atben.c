@@ -11,7 +11,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/spi/spi.h>
@@ -40,8 +39,6 @@ struct atben_prv {
 	struct device		*dev;
 	void __iomem		*regs;
 	struct resource		*ioarea;
-	int			gpio_irq;
-	int			slave_irq;
 	struct at86rf230_platform_data
 				platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
@@ -215,22 +212,6 @@ static int atben_transfer(struct spi_device *spi, struct spi_message *msg)
 	}
 	writel(nSEL, PDDATS);
 
-	/*
-	 * The AT86RF230 driver sometimes requires a transceiver state
-	 * transition to be an interrupt barrier. This is the case after
-	 * writing FORCE_TX_ON to the TRX_CMD field in the TRX_STATE register.
-	 *
-	 * Since there is no other means of notification, we just decode the
-	 * transfer and do a bit of pattern matching.
-	 */
-	xfer = list_first_entry(&msg->transfers, struct spi_transfer,
-	    transfer_list);
-	tx = xfer->tx_buf;
-	if (tx && xfer->len == 2 &&
-	    tx[0] == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
-	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
-		synchronize_irq(prv->gpio_irq);
-
 	msg->status = 0;
 	msg->complete(msg->context);
 
@@ -241,38 +222,6 @@ static int atben_setup(struct spi_device *spi)
 {
 	return 0;
 }
-
-
-/* ----- IRQ forwarding ---------------------------------------------------- */
-
-
-static irqreturn_t atben_irq(int irq, void *data)
-{
-	struct atben_prv *prv = data;
-
-	generic_handle_irq(prv->slave_irq);
-	return IRQ_HANDLED;
-}
-
-static void atben_irq_mask(struct irq_data *data)
-{
-	struct atben_prv *prv = irq_data_get_irq_chip_data(data);
-
-	disable_irq_nosync(prv->gpio_irq);
-}
-
-static void atben_irq_unmask(struct irq_data *data)
-{
-	struct atben_prv *prv = irq_data_get_irq_chip_data(data);
-
-	enable_irq(prv->gpio_irq);
-}
-
-static struct irq_chip atben_irq_chip = {
-	.name		= "atben-slave",
-	.irq_mask	= atben_irq_mask,
-	.irq_unmask	= atben_irq_unmask,
-};
 
 
 /* ----- SPI master creation/removal --------------------------------------- */
@@ -337,40 +286,22 @@ static int __devinit atben_probe(struct platform_device *pdev)
 		goto out_ioarea;
 	}
 
-	prv->gpio_irq = platform_get_irq(pdev, 0);
-	if (prv->gpio_irq < 0) {
+	board_info.irq = platform_get_irq(pdev, 0);
+	if (board_info.irq < 0) {
 		dev_err(prv->dev, "can't get GPIO irq\n");
 		err = -ENOENT;
 		goto out_regs;
 	}
 
-	prv->slave_irq = irq_alloc_desc(numa_node_id());
-	if (prv->slave_irq < 0) {
-		dev_err(prv->dev, "can't allocate slave irq\n");
-		goto out_regs;
-	}
-
-	set_irq_chip_data(prv->slave_irq, prv);
-	set_irq_chip_and_handler(prv->slave_irq, &atben_irq_chip,
-	    handle_level_irq);
-
-	err = request_irq(prv->gpio_irq, atben_irq, IRQF_DISABLED,
-	    pdev->name, prv);
-	if (err) {
-		dev_err(prv->dev, "can't allocate GPIO irq\n");
-		goto out_slave_irq;
-	}
-
 	err = spi_register_master(master);
 	if (err) {
 		dev_err(prv->dev, "can't register master\n");
-		goto out_irq;
+		goto out_regs;
 	}
 
 	prv->platform_data = at86rf230_platform_data;
 	prv->platform_data.reset_data = prv;
 	board_info.platform_data = &prv->platform_data;
-	board_info.irq = prv->slave_irq;
 
 	spi = spi_new_device(master, &board_info);
 	if (!spi) {
@@ -380,21 +311,13 @@ static int __devinit atben_probe(struct platform_device *pdev)
 		goto out_registered;
 	}
 
-	dev_info(&spi->dev, "ATBEN ready for mischief (IRQ %d -> IRQ %d)\n",
-	    prv->gpio_irq, prv->slave_irq);
+	dev_info(&spi->dev, "ATBEN ready for mischief (IRQ %d)\n",
+	    board_info.irq);
 
 	return 0;
 
 out_registered:
 	spi_unregister_master(master);
-
-out_irq:
-	free_irq(prv->gpio_irq, prv);
-
-out_slave_irq:
-	set_irq_chained_handler(prv->slave_irq, NULL);
-	set_irq_chip_data(prv->slave_irq, NULL);
-	irq_free_desc(prv->slave_irq);
 
 out_regs:
 	iounmap(prv->regs);
@@ -418,12 +341,6 @@ static int __devexit atben_remove(struct platform_device *pdev)
 // restore GPIOs
 
 	spi_unregister_master(master);
-
-	free_irq(prv->gpio_irq, prv);
-
-	set_irq_chained_handler(prv->slave_irq, NULL);
-	set_irq_chip_data(prv->slave_irq, NULL);
-	irq_free_desc(prv->slave_irq);
 
 	iounmap(prv->regs);
 
