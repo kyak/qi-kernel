@@ -134,6 +134,24 @@ static void atusb_usb_cb(struct urb *urb)
 	complete(&atusb->urb_completion);
 }
 
+static void atusb_read1_cb(struct urb *urb)
+{
+	struct spi_message *msg;
+	msg = urb->context;
+
+	if (urb->status) {
+		if (!(urb->status == -ENOENT ||
+		    urb->status == -ECONNRESET ||
+		    urb->status == -ESHUTDOWN))
+			printk("Async USB failed with error %i\n", urb->status);
+
+	} else {
+		printk("Async USB succeeded with length %i\n", urb->actual_length);
+	}
+//	printk("RX buffer %i\n", msg->transfers->rx_buf);
+	msg->status = 0;
+	msg->complete(msg->context);
+}
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
@@ -238,50 +256,33 @@ static void atben_reset(void *reset_data)
 			__func__, retval);
 	}
 }
-/*
- * host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes
- * ->host	ATUSB_SPI_READ1		byte0		-	#bytes
- * ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes
-*/
 
-static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len)
+static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len, struct spi_message *msg)
 {
 	int retval;
 	struct usb_ctrlrequest *req;
-	dev_info(&atusb->udev->dev, "atusb_read1: tx = %i\n", *tx);
-#if 0
-	usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_SPI_READ1,
-				ATUSB_FROM_DEV,
-				*tx,
-				0,
-				(void *) rx, //(void *) &value
-				1,
-				1000);
-	printk("USB SPI response: %i\n", *rx);
-#endif
-#if 1
-	INIT_COMPLETION(atusb->urb_completion);
+
+	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", *tx);
 	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!atusb->ctrl_urb) {
 		retval = -ENOMEM;
 	}
+	/* ->host	ATUSB_SPI_READ1		byte0		-	#bytes */
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
         req->bRequest = ATUSB_SPI_READ1;
         req->bRequestType = ATUSB_FROM_DEV;
         req->wValue = cpu_to_le16(*tx);
         req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
+        req->wLength = cpu_to_le16(0x02);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
 			usb_rcvbulkpipe(atusb->udev, 0),
 			(unsigned char *)req,
 			rx,
-			ATUSB_BUILD_SIZE+1, /* ... or size length is wrong */
-			atusb_usb_cb,
-			atusb);
+			0x02, /* ... or size length is wrong */
+			atusb_read1_cb,
+			msg);
 
 	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
 	if (retval < 0) {
@@ -289,40 +290,68 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
 	}
-	wait_for_completion(&atusb->urb_completion);
-	//wait_for_completion_interruptible(&atusb->urb_completion);
 	usb_free_urb(atusb->ctrl_urb);
 	kfree(req);
-#endif
 }
 
-#if 0
 static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
 {
+	/* ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes */
 }
 
-static void atusb_write(struct atusb_local *atusb, uint8_t *buf, int len)
+static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *rx, int len, struct spi_message *msg)
 {
+	int retval;
+	struct usb_ctrlrequest *req;
+
+	dev_info(&atusb->udev->dev, "atusb_write: tx = 0x%x\n", *tx);
+	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!atusb->ctrl_urb) {
+		retval = -ENOMEM;
+	}
+	/* host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes */
+	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
+        req->bRequest = ATUSB_SPI_WRITE;
+        req->bRequestType = ATUSB_FROM_DEV;
+        req->wValue = cpu_to_le16(tx[0]);
+        req->wIndex = cpu_to_le16(tx[1]);
+        req->wLength = cpu_to_le16(0x02);
+
+	usb_fill_control_urb(atusb->ctrl_urb,
+			atusb->udev,
+			usb_rcvbulkpipe(atusb->udev, 0),
+			(unsigned char *)req,
+			rx,
+			0x02, /* ... or size length is wrong */
+			atusb_read1_cb,
+			msg);
+
+	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	if (retval < 0) {
+		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
+			retval);
+		retval = (retval == -ENOMEM) ? retval : -EIO;
+	}
+	usb_free_urb(atusb->ctrl_urb);
+	kfree(req);
 }
-#endif
+
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 {
 	struct atusb_local *atusb = spi_master_get_devdata(spi->master);
 	struct spi_transfer *xfer;
-//	struct spi_transfer *x[2];
-//	int n;
+	struct spi_transfer *x[2];
+	int n;
 	const uint8_t *tx;
 	uint8_t *rx;
 
-	dev_info(&atusb->udev->dev, "Entered atusb_transfer\n");
 	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(&atusb->udev->dev, "transfer is empty\n");
 		return -EINVAL;
 	}
-#if 0
+
 	/*
-	 * Classify the request. This is just a proof of concept - we don't
-	 * need it in this driver.
+	 * Classify the request.
 	 */
 	n = 0;
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
@@ -331,17 +360,27 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			return -EINVAL;
 		}
 		x[n] = xfer;
-		dev_info(&atusb->udev->dev, "%s transfer %i\n", __func__, n);
+		//dev_info(&atusb->udev->dev, "%s transfer %i\n", __func__, n);
 		n++;
 	}
+
+	msg->actual_length = 0;
 
 	if (!x[0]->tx_buf || x[0]->len != 2)
 		goto bad_req;
 	if (n == 1) {
 		if (x[0]->rx_buf) {
 			dev_info(&atusb->udev->dev, "read 1\n");
+			tx = x[0]->tx_buf;
+			rx = x[0]->rx_buf;
+			msg->actual_length += x[0]->len;
+			atusb_read1(atusb, tx, rx, x[0]->len, msg);
 		} else {
 			dev_info(&atusb->udev->dev, "write 2\n");
+			tx = x[0]->tx_buf;
+			rx = x[0]->rx_buf;
+			msg->actual_length += x[0]->len;
+			atusb_write(atusb, tx, rx, x[0]->len, msg);
 		}
 	} else {
 		if (x[0]->rx_buf) {
@@ -354,23 +393,16 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			dev_info(&atusb->udev->dev, "write 2+n\n");
 		}
 	}
-#endif
+#if 0
 	msg->actual_length = 0;
 
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
 		tx = xfer->tx_buf;
 		rx = xfer->rx_buf;
 		msg->actual_length += xfer->len;
-#if 0
-		if (!tx)
-			rx_only(prv, rx, xfer->len);
-		else if (!rx)
-			tx_only(prv, tx, xfer->len);
-		else
-			bidir(prv, tx, rx, xfer->len);
-#endif
-			atusb_read1(atusb, tx, rx, xfer->len);
+		atusb_read1(atusb, tx, rx, xfer->len, msg);
 	}
+#endif
 #if 0
 	/*
 	 * The AT86RF230 driver sometimes requires a transceiver state
@@ -389,11 +421,9 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		synchronize_irq(atusb->gpio_irq);
 #endif
 //	dev_info(&atusb->udev->dev, "atusb_transfer: tx = %i, rx = %i\n", *tx, *rx);
-	msg->status = 0;
-	msg->complete(msg->context);
 
 	return 0;
-#if 0
+
 bad_req:
 	dev_info(&atusb->udev->dev, "unrecognized request:\n");
 	list_for_each_entry(xfer, &msg->transfers, transfer_list)
@@ -401,7 +431,6 @@ bad_req:
 		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
 		    xfer->len);
 	return -EINVAL;
-#endif
 }
 
 static int atusb_setup(struct spi_device *spi)
@@ -502,7 +531,7 @@ static int atusb_probe(struct usb_interface *interface,
 	set_irq_chip_and_handler(atusb->slave_irq, &atusb_irq_chip,
 	    handle_level_irq);
 
-	/* FIXME preapre USB IRQ */
+	/* FIXME prepare USB IRQ */
 
 	retval = spi_register_master(master);
 	if (retval < 0) {
@@ -523,7 +552,7 @@ static int atusb_probe(struct usb_interface *interface,
 	}
 
 	dev_info(&atusb->spi->dev, "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
-
+#if 1
 	/*
 	 * Get the static info from the device and save it ...
 	 */
