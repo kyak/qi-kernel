@@ -10,6 +10,13 @@
  *
  */
 
+/*
+ * - Why do some async reads fail?
+ * - Implement buffer and sram read write
+ * - Why does address setting not work?
+ * - Implement IRQ handling
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -50,9 +57,7 @@ struct atusb_local {
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
 	struct urb *ctrl_urb;
-	spinlock_t		err_lock;		/* lock for errors */
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
-	bool			processed_urb;		/* indicates we haven't processed the urb */
 	struct completion	urb_completion;
 	unsigned char *buffer;
 };
@@ -115,11 +120,8 @@ enum atspi_requests {
 static void atusb_usb_cb(struct urb *urb)
 {
 	struct atusb_local *atusb;
-
 	atusb = urb->context;
 
-	spin_lock(&atusb->err_lock);
-	/* sync/async unlink faults aren't errors */
 	if (urb->status) {
 		if (!(urb->status == -ENOENT ||
 		    urb->status == -ECONNRESET ||
@@ -130,7 +132,6 @@ static void atusb_usb_cb(struct urb *urb)
 	} else {
 		atusb->bulk_in_filled = urb->actual_length;
 	}
-	spin_unlock(&atusb->err_lock);
 	complete(&atusb->urb_completion);
 }
 
@@ -148,7 +149,7 @@ static void atusb_read1_cb(struct urb *urb)
 	} else {
 		printk("Async USB succeeded with length %i\n", urb->actual_length);
 	}
-//	printk("RX buffer %i\n", msg->transfers->rx_buf);
+
 	msg->status = 0;
 	msg->complete(msg->context);
 }
@@ -361,7 +362,6 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			return -EINVAL;
 		}
 		x[n] = xfer;
-		//dev_info(&atusb->udev->dev, "%s transfer %i\n", __func__, n);
 		n++;
 	}
 
@@ -394,16 +394,6 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			dev_info(&atusb->udev->dev, "write 2+n\n");
 		}
 	}
-#if 0
-	msg->actual_length = 0;
-
-	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-		tx = xfer->tx_buf;
-		rx = xfer->rx_buf;
-		msg->actual_length += xfer->len;
-		atusb_read1(atusb, tx, rx, xfer->len, msg);
-	}
-#endif
 #if 0
 	/*
 	 * The AT86RF230 driver sometimes requires a transceiver state
@@ -505,7 +495,6 @@ static int atusb_probe(struct usb_interface *interface,
 
 	atusb = spi_master_get_devdata(master);
 
-	spin_lock_init(&atusb->err_lock);
 	init_completion(&atusb->urb_completion);
 
 	atusb->udev = usb_get_dev(udev);
