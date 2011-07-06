@@ -375,7 +375,15 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			tx = x[0]->tx_buf;
 			rx = x[0]->rx_buf;
 			msg->actual_length += x[0]->len;
-			atusb_write(atusb, tx, rx, x[0]->len);
+			/*
+			 * Don't take our clock away !! ;-)
+			 */
+			if (tx[0] == (CMD_REG | CMD_WRITE | RG_TRX_CTRL_0)) {
+				msg->status = 0;
+				msg->complete(msg->context);
+			} else {
+				atusb_write(atusb, tx, rx, x[0]->len);
+			}
 		}
 	} else {
 		if (x[0]->rx_buf) {
