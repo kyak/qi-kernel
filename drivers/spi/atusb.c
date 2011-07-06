@@ -494,13 +494,14 @@ static int atusb_get_and_show_build(struct atusb_local *atusb)
 	retval = usb_control_msg(dev,
 	    usb_rcvctrlpipe(atusb->udev, 0),
 	    ATUSB_BUILD, ATUSB_FROM_DEV, 0, 0,
-	    build, ATUSB_BUILD_SIZE+1, 1000);
+	    build, ATUSB_BUILD_SIZE, 1000);
 	if (retval < 0) {
 		dev_info(&dev->dev,
 		    "failed submitting urb for ATUSB_BUILD, error %d", retval);
 		return retval == -ENOMEM ? retval : -EIO;
 	}
 
+	build[retval] = 0;
 	dev_info(&dev->dev, "Firmware: build %s\n", build);
 
 	return 0;
