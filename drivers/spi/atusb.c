@@ -18,6 +18,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/jiffies.h>
+#include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/usb.h>
 #include <linux/spi/spi.h>
@@ -47,6 +49,7 @@ struct atusb_local {
 	struct urb *irq_urb;
 	uint8_t irq_buf;		/* scratch space */
 	struct tasklet_struct task;	/* interrupt delivery tasklet */
+	struct timer_list timer;	/* delay, for interrupt synch */
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
@@ -152,6 +155,28 @@ static void atusb_ctrl_cb(struct urb *urb)
 	atusb_async_finish(urb);
 }
 
+static void atusb_timer(unsigned long data)
+{
+	struct urb *urb = (void *) data;
+
+	printk(KERN_INFO "atusb_timer\n");
+	atusb_async_finish(urb);
+}
+
+static void atusb_ctrl_cb_delayed(struct urb *urb)
+{
+	struct atusb_local *atusb = urb->context;
+
+	if (atusb_async_errchk(urb))
+		atusb_async_finish(urb);
+	else {
+		BUG_ON(timer_pending(&atusb->timer));
+		atusb->timer.expires = jiffies+msecs_to_jiffies(10);
+		atusb->timer.data = (unsigned long) urb;
+		add_timer(&atusb->timer);
+	}
+}
+
 static void atusb_read_fb_cb(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
@@ -242,11 +267,26 @@ static int atusb_read_fb(struct atusb_local *atusb,
 static int atusb_write(struct atusb_local *atusb,
     uint8_t tx0, uint8_t tx1, const uint8_t *tx, int len)
 {
+	usb_complete_t cb = atusb_ctrl_cb;
+
 	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx0);
 	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx1);
+
+	/*
+	 * The AT86RF230 driver sometimes requires a transceiver state
+	 * transition to be an interrupt barrier. This is the case after
+	 * writing FORCE_TX_ON to the TRX_CMD field in the TRX_STATE register.
+	 *
+	 * Since there is no other means of notification, we just decode the
+	 * transfer and do a bit of pattern matching.
+	 */
+	if (tx0 == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
+	    (tx1 & 0x1f) == STATE_FORCE_TX_ON)
+		cb = atusb_ctrl_cb_delayed;
+
 	return submit_control_msg(atusb,
 	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
-	    (uint8_t *) tx, len, atusb_ctrl_cb, atusb);
+	    (uint8_t *) tx, len, cb, atusb);
 }
 
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
@@ -318,23 +358,6 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			    x[1]->tx_buf, x[1]->len);
 		}
 	}
-#if 0
-	/*
-	 * The AT86RF230 driver sometimes requires a transceiver state
-	 * transition to be an interrupt barrier. This is the case after
-	 * writing FORCE_TX_ON to the TRX_CMD field in the TRX_STATE register.
-	 *
-	 * Since there is no other means of notification, we just decode the
-	 * transfer and do a bit of pattern matching.
-	 */
-	xfer = list_first_entry(&msg->transfers, struct spi_transfer,
-	    transfer_list);
-	tx = xfer->tx_buf;
-	if (tx && xfer->len == 2 &&
-	    tx[0] == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
-	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
-		synchronize_irq(atusb->gpio_irq);
-#endif
 	return retval;
 
 bad_req:
@@ -588,6 +611,9 @@ static int atusb_probe(struct usb_interface *interface,
 	board_info.platform_data = &atusb->platform_data;
 	board_info.irq = atusb->slave_irq;
 
+	init_timer(&atusb->timer);
+	atusb->timer.function = atusb_timer;
+
 	tasklet_init(&atusb->task, atusb_tasklet, (unsigned long) atusb);
 	tasklet_disable(&atusb->task);
 	atusb_arm_interrupt(atusb);
@@ -637,6 +663,8 @@ static void atusb_disconnect(struct usb_interface *interface)
 	/* @@@ this needs some extra protecion - wa */
 	if (atusb->irq_urb)
 		usb_kill_urb(atusb->irq_urb);
+
+	BUG_ON(timer_pending(&atusb->timer));
 
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
