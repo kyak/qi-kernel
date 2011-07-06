@@ -19,7 +19,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
-#include <linux/atomic.h>
 #include <linux/usb.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/at86rf230.h>
@@ -47,8 +46,7 @@ struct atusb_local {
 	int slave_irq;
 	struct urb *irq_urb;
 	uint8_t irq_buf;		/* scratch space */
-	atomic_t pending;		/* pending interrupts */
-	atomic_t masked;		/* masking levels */
+	struct tasklet_struct task;	/* interrupt delivery tasklet */
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
@@ -357,29 +355,11 @@ static int atusb_setup(struct spi_device *spi)
 /* ----- Interrupt handling ------------------------------------------------ */
 
 
-static void atusb_do_irq(struct atusb_local *atusb);
-
-static void atusb_irq_enable(struct atusb_local *atusb)
+static void atusb_tasklet(unsigned long data)
 {
-	printk(KERN_INFO "atusb_irq_enable\n");
-	if (atomic_dec_return(&atusb->masked))
-		return;
-	if (!atomic_add_unless(&atusb->pending, -1, 0))
-		return;
-	/* @@@ probably racy around here.
-	   need to think this through some more - wa */
-	atusb_do_irq(atusb);
-}
+	struct atusb_local *atusb = (void *) data;
 
-static void atusb_do_irq(struct atusb_local *atusb)
-{
-	printk(KERN_INFO "atusb_do_irq\n");
-	if (atomic_inc_return(&atusb->masked) == 1)
-		generic_handle_irq(atusb->slave_irq);
-	else
-		atomic_set(&atusb->pending, 1);
-	printk(KERN_INFO "atusb_do_irq out\n");
-	atusb_irq_enable(atusb);
+	generic_handle_irq(atusb->slave_irq);
 }
 
 static void atusb_irq(struct urb *urb)
@@ -389,7 +369,7 @@ static void atusb_irq(struct urb *urb)
 	printk(KERN_INFO "atusb_irq (%d)\n", urb->status);
 	usb_free_urb(urb);
 	atusb->irq_urb = NULL;
-	atusb_do_irq(atusb);
+	tasklet_schedule(&atusb->task);
 }
 
 static int atusb_arm_interrupt(struct atusb_local *atusb)
@@ -436,7 +416,7 @@ static void atusb_irq_mask(struct irq_data *data)
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
 	printk(KERN_INFO "atusb_irq_mask\n");
-	atomic_inc(&atusb->masked);
+	tasklet_disable_nosync(&atusb->task);
 }
 
 static void atusb_irq_unmask(struct irq_data *data)
@@ -444,7 +424,7 @@ static void atusb_irq_unmask(struct irq_data *data)
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
 	printk(KERN_INFO "atusb_irq_unmask\n");
-	atusb_irq_enable(atusb);
+	tasklet_enable(&atusb->task);
 }
 
 static struct irq_chip atusb_irq_chip = {
@@ -607,8 +587,7 @@ static int atusb_probe(struct usb_interface *interface,
 	board_info.platform_data = &atusb->platform_data;
 	board_info.irq = atusb->slave_irq;
 
-	atomic_set(&atusb->masked, 0);
-	atomic_set(&atusb->pending, 0);
+	tasklet_init(&atusb->task, atusb_tasklet, (unsigned long) atusb);
 	atusb_arm_interrupt(atusb);
 
 	atusb->spi = spi_new_device(master, &board_info);
