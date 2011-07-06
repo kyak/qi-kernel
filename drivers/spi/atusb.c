@@ -149,6 +149,7 @@ static void atusb_read1_cb(struct urb *urb)
 
 	usb_free_urb(atusb->ctrl_urb);
 }
+
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
@@ -172,11 +173,11 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 		retval = -ENOMEM;
 	}
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-        req->bRequest = ATUSB_ID;
-        req->bRequestType = ATUSB_FROM_DEV;
-        req->wValue = cpu_to_le16(0x00);
-        req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(3);
+	req->bRequest = ATUSB_ID;
+	req->bRequestType = ATUSB_FROM_DEV;
+	req->wValue = cpu_to_le16(0x00);
+	req->wIndex = cpu_to_le16(0x00);
+	req->wLength = cpu_to_le16(3);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
@@ -203,11 +204,11 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 		retval = -ENOMEM;
 	}
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-        req->bRequest = ATUSB_BUILD;
-        req->bRequestType = ATUSB_FROM_DEV;
-        req->wValue = cpu_to_le16(0x00);
-        req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
+	req->bRequest = ATUSB_BUILD;
+	req->bRequestType = ATUSB_FROM_DEV;
+	req->wValue = cpu_to_le16(0x00);
+	req->wIndex = cpu_to_le16(0x00);
+	req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
@@ -231,7 +232,7 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 	return retval;
 }
 
-static void atben_reset(void *reset_data)
+static void atusb_reset(void *reset_data)
 {
 	int retval;
 	struct atusb_local *atusb = reset_data;
@@ -264,11 +265,11 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	}
 	/* ->host	ATUSB_SPI_READ1		byte0		-	#bytes */
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-        req->bRequest = ATUSB_SPI_READ1;
-        req->bRequestType = ATUSB_FROM_DEV;
-        req->wValue = cpu_to_le16(tx[0]);
-        req->wIndex = cpu_to_le16(0x00);
-        req->wLength = cpu_to_le16(0x01);
+	req->bRequest = ATUSB_SPI_READ1;
+	req->bRequestType = ATUSB_FROM_DEV;
+	req->wValue = cpu_to_le16(tx[0]);
+	req->wIndex = cpu_to_le16(0x00);
+	req->wLength = cpu_to_le16(0x01);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
@@ -306,11 +307,11 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 	}
 	/* host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes */
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-        req->bRequest = ATUSB_SPI_WRITE;
-        req->bRequestType = ATUSB_TO_DEV;
-        req->wValue = cpu_to_le16(tx[0]);
-        req->wIndex = cpu_to_le16(tx[1]);
-        req->wLength = cpu_to_le16(0x0);
+	req->bRequest = ATUSB_SPI_WRITE;
+	req->bRequestType = ATUSB_TO_DEV;
+	req->wValue = cpu_to_le16(tx[0]);
+	req->wIndex = cpu_to_le16(tx[1]);
+	req->wLength = cpu_to_le16(0x0);
 
 	usb_fill_control_urb(atusb->ctrl_urb,
 			atusb->udev,
@@ -451,7 +452,7 @@ struct at86rf230_platform_data at86rf230_platform_data = {
 	.rstn	= -1,
 	.slp_tr	= -1,
 	.dig2	= -1,
-	.reset	= atben_reset,
+	.reset	= atusb_reset,
 	/* set .reset_data later */
 };
 
@@ -475,11 +476,11 @@ static int atusb_probe(struct usb_interface *interface,
 	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
 	 * attaching to both interfaces
 	 */
-        if (interface == udev->actconfig->interface[1]) {
-                dev_info(&udev->dev,
-                         "Ignoring interface 1 reserved for DFU\n");
-                return -ENODEV;
-        }
+	if (interface == udev->actconfig->interface[1]) {
+		dev_info(&udev->dev,
+			"Ignoring interface 1 reserved for DFU\n");
+		return -ENODEV;
+	}
 
 	master = spi_alloc_master(&udev->dev, sizeof(*atusb));
 	if (!master)
@@ -590,29 +591,15 @@ void atusb_release(struct device *dev)
 }
 
 static struct usb_driver atusb_driver = {
-	.name         = "atusb_ben-wpan",
-	.probe        = atusb_probe,
-	.disconnect = atusb_disconnect,
-	.id_table   = atusb_device_table,
+	.name		= "atusb_ben-wpan",
+	.probe		= atusb_probe,
+	.disconnect	= atusb_disconnect,
+	.id_table	= atusb_device_table,
 };
-#if 0
-static struct resource atusb_resources[] = {
-	{
-		.start  = JZ4740_GPIO_BASE_ADDR+0x300,
-		.end    = JZ4740_GPIO_BASE_ADDR+0x3ff,
-		.flags  = IORESOURCE_MEM,
-	},
-	{
-		/* set start and end later */
-		.flags  = IORESOURCE_IRQ,
-	},
-};
-#endif
+
 static struct platform_device atusb_device = {
 	.name = "spi_atusb",
 	.id = -1,
-//	.num_resources = ARRAY_SIZE(atben_resources),
-//	.resource = atben_resources,
 	.dev.release = atusb_release,
 };
 
@@ -623,9 +610,6 @@ static int __init atusb_init(void)
 	retval = platform_device_register(&atusb_device);
 	if (retval)
 		return retval;
-
-//	atusb_resources[1].start = atusb_resources[1].end =
-//	    gpio_to_irq(JZ_GPIO_PORTD(12));
 
 	return usb_register(&atusb_driver);
 }
