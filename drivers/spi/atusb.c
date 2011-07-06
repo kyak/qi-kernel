@@ -263,6 +263,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	int n;
 	const uint8_t *tx;
 	uint8_t *rx;
+	int len;
 
 	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(&atusb->udev->dev, "transfer is empty\n");
@@ -284,20 +285,20 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 
 	msg->actual_length = 0;
 
-	if (!x[0]->tx_buf || x[0]->len != 2)
+	tx = x[0]->tx_buf;
+	rx = x[0]->rx_buf;
+	len = x[0]->len;
+
+	if (!tx || len != 2)
 		goto bad_req;
 	if (n == 1) {
-		if (x[0]->rx_buf) {
+		if (rx) {
 			dev_info(&atusb->udev->dev, "read 1\n");
-			tx = x[0]->tx_buf;
-			rx = x[0]->rx_buf;
-			msg->actual_length += x[0]->len;
-			atusb_read1(atusb, tx[0], rx+1, x[0]->len-1);
+			msg->actual_length += len;
+			atusb_read1(atusb, tx[0], rx+1, len-1);
 		} else {
 			dev_info(&atusb->udev->dev, "write 2\n");
-			tx = x[0]->tx_buf;
-			rx = x[0]->rx_buf;
-			msg->actual_length += x[0]->len;
+			msg->actual_length += len;
 			/*
 			 * Don't take our clock away !! ;-)
 			 */
