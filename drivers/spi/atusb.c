@@ -608,7 +608,15 @@ static int atusb_probe(struct usb_interface *interface,
 	return 0;
 
 err_master:
-	/* @@@ kill interrupt URB */
+	/*
+	 * If we come here from a partially successful driver initialization,
+	 * we don't really know how much it has done. In particular, it may
+	 * have triggered an interrupt and thus removed the interrupt URB and
+	 * maybe scheduled the tasklet.
+	 */
+	tasklet_disable(&atusb->task);
+	if (atusb->irq_urb)
+		usb_kill_urb(atusb->irq_urb);
 	spi_master_put(atusb->master);
 err_slave_irq:
 	set_irq_chained_handler(atusb->slave_irq, NULL);
@@ -623,7 +631,11 @@ static void atusb_disconnect(struct usb_interface *interface)
 	struct atusb_local *atusb = usb_get_intfdata(interface);
 	struct spi_master *master = atusb->master;
 
-	/* @@@ kill interrupt URB */
+	tasklet_disable(&atusb->task);
+	/* @@@ this needs some extra protecion - wa */
+	if (atusb->irq_urb)
+		usb_kill_urb(atusb->irq_urb);
+
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
 
