@@ -54,7 +54,7 @@ struct atusb_local {
 	struct urb *ctrl_urb;
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
 	struct completion	urb_completion;
-	unsigned char *buffer;
+	unsigned char buffer[3];
 	struct spi_message *msg;
 };
 
@@ -136,12 +136,6 @@ static void atusb_read1_cb(struct urb *urb)
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
-
-	atusb->buffer = kzalloc(3, GFP_KERNEL);
-	if (!atusb->buffer) {
-		dev_err(&atusb->udev->dev, "out of memory\n");
-		retval = -ENOMEM;
-	}
 
 	atusb->atusb_build = kzalloc(ATUSB_BUILD_SIZE+1, GFP_KERNEL);
 	if (!atusb->atusb_build) {
@@ -484,8 +478,6 @@ static int atusb_probe(struct usb_interface *interface,
 	atusb->atusb_hw_type   = atusb->buffer[2];
 	dev_info(&udev->dev, "Firmware: major: %u, minor: %u, hardware type: %u\n",
 		atusb->ep0_atusb_major, atusb->ep0_atusb_minor, atusb->atusb_hw_type);
-
-	kfree(atusb->buffer);
 
 	return 0;
 
