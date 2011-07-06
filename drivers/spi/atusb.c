@@ -121,7 +121,8 @@ static void atusb_ctrl_cb(struct urb *urb)
 			printk("Async USB failed with error %i\n", urb->status);
 		msg->actual_length = 0;
 	} else {
-		printk("Async USB succeeded with length %i\n", urb->actual_length);
+		printk("Async USB succeeded with length %i\n",
+		    urb->actual_length);
 	}
 
 	msg->status = urb->status;
@@ -145,7 +146,8 @@ static void atusb_read_fb_cb(struct urb *urb)
 			printk("Async USB failed with error %i\n", urb->status);
 		msg->actual_length = 0;
 	} else {
-		printk("Async USB succeeded with length %i\n", urb->actual_length);
+		printk("Async USB succeeded with length %i\n",
+		    urb->actual_length);
 		BUG_ON(!urb->actual_length);
 		xfer = list_first_entry(&msg->transfers, struct spi_transfer,
 		    transfer_list);
@@ -532,7 +534,8 @@ static int atusb_probe(struct usb_interface *interface,
 		goto err_master;
 	}
 
-	dev_info(&atusb->spi->dev, "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
+	dev_info(&atusb->spi->dev,
+	    "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
 
 	if (atusb_get_and_show_revision(atusb) < 0)
 		goto err_master;
@@ -610,5 +613,5 @@ module_exit (atusb_exit);
 
 MODULE_AUTHOR("Richard Sharpe <realrichardsharpe@gmail.com>, Stefan Schmidt \
 		<stefan@datenfreihafen.org>");
-MODULE_DESCRIPTION( "ATUSB ben-wpan Driver");
+MODULE_DESCRIPTION("ATUSB ben-wpan Driver");
 MODULE_LICENSE("GPL");
