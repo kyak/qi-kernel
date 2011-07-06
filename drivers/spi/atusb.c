@@ -44,12 +44,9 @@ struct atusb_local {
 	uint8_t atusb_hw_type;
 	struct spi_master *master;
 	int slave_irq;
-	int usb_irq;
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
-	size_t			bulk_in_filled;		/* number of bytes in the buffer */
-	struct completion	urb_completion;
 //	unsigned char buffer[3];
 	unsigned char buffer[260];	/* XXL, just in case */
 	struct spi_message *msg;
@@ -468,8 +465,6 @@ static int atusb_probe(struct usb_interface *interface,
 		return -ENOMEM;
 
 	atusb = spi_master_get_devdata(master);
-
-	init_completion(&atusb->urb_completion);
 
 	atusb->udev = usb_get_dev(udev);
 	usb_set_intfdata(interface, atusb);
