@@ -11,9 +11,7 @@
  */
 
 /*
- * - Why do some async reads fail?
  * - Implement buffer and sram read write
- * - Why does address setting not work?
  * - Implement IRQ handling
  */
 
