@@ -403,14 +403,6 @@ static int atusb_arm_interrupt(struct atusb_local *atusb)
 	return retval;
 }
 
-static void atusb_irq_ack(struct irq_data *data)
-{
-	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
-
-	printk(KERN_INFO "atusb_irq_ack\n");
-	atusb_arm_interrupt(atusb);
-}
-
 static void atusb_irq_mask(struct irq_data *data)
 {
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
@@ -425,6 +417,14 @@ static void atusb_irq_unmask(struct irq_data *data)
 
 	printk(KERN_INFO "atusb_irq_unmask\n");
 	tasklet_enable(&atusb->task);
+}
+
+static void atusb_irq_ack(struct irq_data *data)
+{
+	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
+
+	printk(KERN_INFO "atusb_irq_ack\n");
+	atusb_arm_interrupt(atusb);
 }
 
 static struct irq_chip atusb_irq_chip = {
@@ -588,6 +588,7 @@ static int atusb_probe(struct usb_interface *interface,
 	board_info.irq = atusb->slave_irq;
 
 	tasklet_init(&atusb->task, atusb_tasklet, (unsigned long) atusb);
+	tasklet_disable(&atusb->task);
 	atusb_arm_interrupt(atusb);
 
 	if (atusb_get_and_show_revision(atusb) < 0)

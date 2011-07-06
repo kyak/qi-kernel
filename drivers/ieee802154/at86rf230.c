@@ -796,10 +796,6 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	if (rc)
 		goto err_irq;
 
-{
-uint8_t val;
-at86rf230_read_subreg(lp, RG_IRQ_STATUS, 0xff, 0, &val);
-}
 	return rc;
 
 err_irq:
