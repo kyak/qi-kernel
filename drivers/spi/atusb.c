@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
+#include <linux/atomic.h>
 #include <linux/usb.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/at86rf230.h>
@@ -44,6 +45,10 @@ struct atusb_local {
 	uint8_t atusb_hw_type;
 	struct spi_master *master;
 	int slave_irq;
+	struct urb *irq_urb;
+	uint8_t irq_buf;		/* scratch space */
+	atomic_t pending;		/* pending interrupts */
+	atomic_t masked;		/* masking levels */
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
@@ -352,33 +357,101 @@ static int atusb_setup(struct spi_device *spi)
 /* ----- Interrupt handling ------------------------------------------------ */
 
 
-#if 0
-static irqreturn_t atusb_irq(int irq, void *data)
-{
-	struct atusb_local *atusb = data;
+static void atusb_do_irq(struct atusb_local *atusb);
 
-	generic_handle_irq(atusb->slave_irq);
-	return IRQ_HANDLED;
+static void atusb_irq_enable(struct atusb_local *atusb)
+{
+	printk(KERN_INFO "atusb_irq_enable\n");
+	if (atomic_dec_return(&atusb->masked))
+		return;
+	if (!atomic_add_unless(&atusb->pending, -1, 0))
+		return;
+	/* @@@ probably racy around here.
+	   need to think this through some more - wa */
+	atusb_do_irq(atusb);
 }
-#endif
+
+static void atusb_do_irq(struct atusb_local *atusb)
+{
+	printk(KERN_INFO "atusb_do_irq\n");
+	if (atomic_inc_return(&atusb->masked) == 1)
+		generic_handle_irq(atusb->slave_irq);
+	else
+		atomic_set(&atusb->pending, 1);
+	printk(KERN_INFO "atusb_do_irq out\n");
+	atusb_irq_enable(atusb);
+}
+
+static void atusb_irq(struct urb *urb)
+{
+	struct atusb_local *atusb = urb->context;
+
+	printk(KERN_INFO "atusb_irq (%d)\n", urb->status);
+	usb_free_urb(urb);
+	atusb->irq_urb = NULL;
+	atusb_do_irq(atusb);
+}
+
+static int atusb_arm_interrupt(struct atusb_local *atusb)
+{
+	struct usb_device *dev = atusb->udev;
+	struct urb *urb;
+	int retval = -ENOMEM;
+
+	BUG_ON(atusb->irq_urb);
+
+	printk(KERN_INFO "atusb_arm_interrupt\n");
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb) {
+		dev_err(&dev->dev,
+		    "atusb_arm_interrupt: usb_alloc_urb failed\n");
+		return -ENOMEM;
+	}
+
+	usb_fill_bulk_urb(urb, dev, usb_rcvbulkpipe(dev, 1),
+	    &atusb->irq_buf, 1, atusb_irq, atusb);
+	atusb->irq_urb = urb;
+	retval = usb_submit_urb(urb, GFP_KERNEL);
+	if (!retval)
+		return 0;
+
+	dev_err(&dev->dev, "failed submitting bulk urb, error %d", retval);
+	retval = retval == -ENOMEM ? retval : -EIO;
+
+	usb_free_urb(urb);
+
+	return retval;
+}
+
+static void atusb_irq_ack(struct irq_data *data)
+{
+	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
+
+	printk(KERN_INFO "atusb_irq_ack\n");
+	atusb_arm_interrupt(atusb);
+}
+
 static void atusb_irq_mask(struct irq_data *data)
 {
-//	struct atben_local *atusb = irq_data_get_irq_chip_data(data);
+	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
-//	disable_irq_nosync(atusb->usb_irq);
+	printk(KERN_INFO "atusb_irq_mask\n");
+	atomic_inc(&atusb->masked);
 }
 
 static void atusb_irq_unmask(struct irq_data *data)
 {
-//	struct atben_local *atusb = irq_data_get_irq_chip_data(data);
+	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
-//	enable_irq(atusb->usb_irq);
+	printk(KERN_INFO "atusb_irq_unmask\n");
+	atusb_irq_enable(atusb);
 }
 
 static struct irq_chip atusb_irq_chip = {
 	.name		= "atusb-slave",
 	.irq_mask	= atusb_irq_mask,
 	.irq_unmask	= atusb_irq_unmask,
+	.irq_ack	= atusb_irq_ack,
 };
 
 
@@ -534,6 +607,10 @@ static int atusb_probe(struct usb_interface *interface,
 	board_info.platform_data = &atusb->platform_data;
 	board_info.irq = atusb->slave_irq;
 
+	atomic_set(&atusb->masked, 0);
+	atomic_set(&atusb->pending, 0);
+	atusb_arm_interrupt(atusb);
+
 	atusb->spi = spi_new_device(master, &board_info);
 	if (!atusb->spi) {
 		dev_info(&udev->dev, "can't create new device for %s\n",
@@ -552,6 +629,7 @@ static int atusb_probe(struct usb_interface *interface,
 	return 0;
 
 err_master:
+	/* @@@ kill interrupt URB */
 	spi_master_put(atusb->master);
 err_slave_irq:
 	set_irq_chained_handler(atusb->slave_irq, NULL);
@@ -566,6 +644,7 @@ static void atusb_disconnect(struct usb_interface *interface)
 	struct atusb_local *atusb = usb_get_intfdata(interface);
 	struct spi_master *master = atusb->master;
 
+	/* @@@ kill interrupt URB */
 	usb_set_intfdata(interface, NULL);
 	usb_put_dev(atusb->udev);
 
