@@ -49,7 +49,6 @@ struct atusb_local {
 	struct at86rf230_platform_data platform_data;
 	/* copy platform_data so that we can adapt .reset_data */
 	struct spi_device *spi;
-	struct urb *ctrl_urb;
 	size_t			bulk_in_filled;		/* number of bytes in the buffer */
 	struct completion	urb_completion;
 //	unsigned char buffer[3];
@@ -220,6 +219,7 @@ static int submit_control_msg(struct atusb_local *atusb,
 {
 	struct usb_device *dev = atusb->udev;
 	struct usb_ctrlrequest *req;
+	struct urb *ctrl_urb;
 	int retval = -ENOMEM;
 
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
@@ -232,23 +232,23 @@ static int submit_control_msg(struct atusb_local *atusb,
 	req->wIndex = cpu_to_le16(index);
 	req->wLength = cpu_to_le16(size);
 
-	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!atusb->ctrl_urb)
+	ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!ctrl_urb)
 		goto out_nourb;
 
-	usb_fill_control_urb(atusb->ctrl_urb, dev,
+	usb_fill_control_urb(ctrl_urb, dev,
 	    requesttype == ATUSB_FROM_DEV ?
 	      usb_rcvctrlpipe(dev, 0) : usb_sndctrlpipe(dev, 0),
 	    (unsigned char *) req, data, size, complete_fn, context);
 
-	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	retval = usb_submit_urb(ctrl_urb, GFP_KERNEL);
 	if (!retval)
 		return 0;
 	dev_info(&dev->dev, "failed submitting read urb, error %d",
 		retval);
 	retval = retval == -ENOMEM ? retval : -EIO;
 
-	usb_free_urb(atusb->ctrl_urb);
+	usb_free_urb(ctrl_urb);
 out_nourb:
 	kfree(req);
 
