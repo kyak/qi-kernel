@@ -232,7 +232,7 @@ static int submit_control_msg(struct atusb_local *atusb,
 {
 	struct usb_device *dev = atusb->udev;
 	struct usb_ctrlrequest *req;
-	struct urb *ctrl_urb;
+	struct urb *urb;
 	int retval = -ENOMEM;
 
 	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
@@ -245,23 +245,23 @@ static int submit_control_msg(struct atusb_local *atusb,
 	req->wIndex = cpu_to_le16(index);
 	req->wLength = cpu_to_le16(size);
 
-	ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!ctrl_urb)
+	urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!urb)
 		goto out_nourb;
 
-	usb_fill_control_urb(ctrl_urb, dev,
+	usb_fill_control_urb(urb, dev,
 	    requesttype == ATUSB_FROM_DEV ?
 	      usb_rcvctrlpipe(dev, 0) : usb_sndctrlpipe(dev, 0),
 	    (unsigned char *) req, data, size, complete_fn, context);
 
-	retval = usb_submit_urb(ctrl_urb, GFP_KERNEL);
+	retval = usb_submit_urb(urb, GFP_KERNEL);
 	if (!retval)
 		return 0;
 	dev_info(&dev->dev, "failed submitting read urb, error %d",
 		retval);
 	retval = retval == -ENOMEM ? retval : -EIO;
 
-	usb_free_urb(ctrl_urb);
+	usb_free_urb(urb);
 out_nourb:
 	kfree(req);
 
