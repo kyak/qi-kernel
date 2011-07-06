@@ -108,7 +108,7 @@ enum atspi_requests {
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
 #define ATUSB_TO_DEV (USB_TYPE_VENDOR | USB_DIR_OUT)
 
-static void atusb_read1_cb(struct urb *urb)
+static void atusb_ctrl_cb(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
 	struct spi_message *msg = atusb->msg;
@@ -275,7 +275,7 @@ static int atusb_read1(struct atusb_local *atusb,
 	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx);
 	return submit_control_msg(atusb,
 	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx, 0,
-	    rx, 1, atusb_read1_cb, atusb);
+	    rx, 1, atusb_ctrl_cb, atusb);
 }
 
 static int atusb_read_fb(struct atusb_local *atusb,
@@ -294,7 +294,7 @@ static int atusb_write(struct atusb_local *atusb,
 	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx1);
 	return submit_control_msg(atusb,
 	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
-	    (uint8_t *) tx, len, atusb_read1_cb, atusb);
+	    (uint8_t *) tx, len, atusb_ctrl_cb, atusb);
 }
 
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
