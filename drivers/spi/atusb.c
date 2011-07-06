@@ -105,6 +105,10 @@ enum atspi_requests {
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
 #define ATUSB_TO_DEV (USB_TYPE_VENDOR | USB_DIR_OUT)
 
+
+/* ----- Control transfers ------------------------------------------------- */
+
+
 static void atusb_ctrl_cb(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
@@ -159,70 +163,6 @@ static void atusb_read_fb_cb(struct urb *urb)
 	usb_free_urb(urb);
 }
 
-static int atusb_get_and_show_revision(struct atusb_local *atusb)
-{
-	struct usb_device *dev = atusb->udev;
-	int retval;
-
-	/* Get a couple of the ATMega Firmware values */
-	retval = usb_control_msg(dev,
-	    usb_rcvctrlpipe(dev, 0),
-	    ATUSB_ID, ATUSB_FROM_DEV, 0, 0,
-	    atusb->buffer, 3, 1000);
-	if (retval < 0) {
-		dev_info(&dev->dev,
-		    "failed submitting urb for ATUSB_ID, error %d", retval);
-		return retval == -ENOMEM ? retval : -EIO;
-	}
-
-	atusb->ep0_atusb_major = atusb->buffer[0];
-	atusb->ep0_atusb_minor = atusb->buffer[1];
-	atusb->atusb_hw_type   = atusb->buffer[2];
-	dev_info(&dev->dev,
-	    "Firmware: major: %u, minor: %u, hardware type: %u\n",
-	    atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
-	    atusb->atusb_hw_type);
-
-	return 0;
-}
-
-static int atusb_get_and_show_build(struct atusb_local *atusb)
-{
-	struct usb_device *dev = atusb->udev;
-	char build[ATUSB_BUILD_SIZE+1];
-	int retval;
-
-	retval = usb_control_msg(dev,
-	    usb_rcvctrlpipe(atusb->udev, 0),
-	    ATUSB_BUILD, ATUSB_FROM_DEV, 0, 0,
-	    build, ATUSB_BUILD_SIZE+1, 1000);
-	if (retval < 0) {
-		dev_info(&dev->dev,
-		    "failed submitting urb for ATUSB_BUILD, error %d", retval);
-		return retval == -ENOMEM ? retval : -EIO;
-	}
-
-	dev_info(&dev->dev, "Firmware: build %s\n", build);
-
-	return 0;
-}
-
-static void atusb_reset(void *reset_data)
-{
-	int retval;
-	struct atusb_local *atusb = reset_data;
-
-	retval = usb_control_msg(atusb->udev,
-	    usb_rcvctrlpipe(atusb->udev, 0),
-	    ATUSB_RF_RESET, ATUSB_TO_DEV, 0, 0,
-	    NULL, 0, 1000);
-	if (retval < 0) {
-		dev_info(&atusb->udev->dev,
-			"%s: error doing reset retval = %d\n",
-			__func__, retval);
-	}
-}
-
 static int submit_control_msg(struct atusb_local *atusb,
     __u8 request, __u8 requesttype, __u16 value, __u16 index,
     void *data, __u16 size, usb_complete_t complete_fn, void *context)
@@ -264,6 +204,9 @@ out_nourb:
 
 	return retval;
 }
+
+
+/* ----- SPI transfers ----------------------------------------------------- */
 
 
 static int atusb_read1(struct atusb_local *atusb,
@@ -395,6 +338,11 @@ static int atusb_setup(struct spi_device *spi)
 {
 	return 0;
 }
+
+
+/* ----- Interrupt handling ------------------------------------------------ */
+
+
 #if 0
 static irqreturn_t atusb_irq(int irq, void *data)
 {
@@ -423,6 +371,82 @@ static struct irq_chip atusb_irq_chip = {
 	.irq_mask	= atusb_irq_mask,
 	.irq_unmask	= atusb_irq_unmask,
 };
+
+
+/* ----- Transceiver reset ------------------------------------------------- */
+
+
+static void atusb_reset(void *reset_data)
+{
+	int retval;
+	struct atusb_local *atusb = reset_data;
+
+	retval = usb_control_msg(atusb->udev,
+	    usb_rcvctrlpipe(atusb->udev, 0),
+	    ATUSB_RF_RESET, ATUSB_TO_DEV, 0, 0,
+	    NULL, 0, 1000);
+	if (retval < 0) {
+		dev_info(&atusb->udev->dev,
+			"%s: error doing reset retval = %d\n",
+			__func__, retval);
+	}
+}
+
+
+/* ----- Firmware version information -------------------------------------- */
+
+
+static int atusb_get_and_show_revision(struct atusb_local *atusb)
+{
+	struct usb_device *dev = atusb->udev;
+	int retval;
+
+	/* Get a couple of the ATMega Firmware values */
+	retval = usb_control_msg(dev,
+	    usb_rcvctrlpipe(dev, 0),
+	    ATUSB_ID, ATUSB_FROM_DEV, 0, 0,
+	    atusb->buffer, 3, 1000);
+	if (retval < 0) {
+		dev_info(&dev->dev,
+		    "failed submitting urb for ATUSB_ID, error %d", retval);
+		return retval == -ENOMEM ? retval : -EIO;
+	}
+
+	atusb->ep0_atusb_major = atusb->buffer[0];
+	atusb->ep0_atusb_minor = atusb->buffer[1];
+	atusb->atusb_hw_type   = atusb->buffer[2];
+	dev_info(&dev->dev,
+	    "Firmware: major: %u, minor: %u, hardware type: %u\n",
+	    atusb->ep0_atusb_major, atusb->ep0_atusb_minor,
+	    atusb->atusb_hw_type);
+
+	return 0;
+}
+
+static int atusb_get_and_show_build(struct atusb_local *atusb)
+{
+	struct usb_device *dev = atusb->udev;
+	char build[ATUSB_BUILD_SIZE+1];
+	int retval;
+
+	retval = usb_control_msg(dev,
+	    usb_rcvctrlpipe(atusb->udev, 0),
+	    ATUSB_BUILD, ATUSB_FROM_DEV, 0, 0,
+	    build, ATUSB_BUILD_SIZE+1, 1000);
+	if (retval < 0) {
+		dev_info(&dev->dev,
+		    "failed submitting urb for ATUSB_BUILD, error %d", retval);
+		return retval == -ENOMEM ? retval : -EIO;
+	}
+
+	dev_info(&dev->dev, "Firmware: build %s\n", build);
+
+	return 0;
+}
+
+
+/* ----- Setup ------------------------------------------------------------- */
+
 
 struct at86rf230_platform_data at86rf230_platform_data = {
 	.rstn	= -1,
