@@ -287,11 +287,6 @@ static int atusb_read_fb(struct atusb_local *atusb,
 	    atusb->buffer, len+1, atusb_read_fb_cb, atusb);
 }
 
-static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
-{
-	/* ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes */
-}
-
 static int atusb_write(struct atusb_local *atusb,
     uint8_t tx0, uint8_t tx1, const uint8_t *tx, int len)
 {
