@@ -109,27 +109,44 @@ enum atspi_requests {
 /* ----- Control transfers ------------------------------------------------- */
 
 
-static void atusb_ctrl_cb(struct urb *urb)
+static int atusb_async_errchk(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
 	struct spi_message *msg = atusb->msg;
+	struct usb_device *dev = atusb->udev;
 
-	if (urb->status) {
-		if (!(urb->status == -ENOENT ||
-		    urb->status == -ECONNRESET ||
-		    urb->status == -ESHUTDOWN))
-			printk("Async USB failed with error %i\n", urb->status);
-		msg->actual_length = 0;
-	} else {
-		printk("Async USB succeeded with length %i\n",
+	if (!urb->status) {
+		dev_dbg(&dev->dev, "atusb_async_errchk OK len %d\n",
 		    urb->actual_length);
+		return 0;
 	}
+	
+	if (urb->status != -ENOENT && urb->status != -ECONNRESET &&
+	    urb->status != -ESHUTDOWN)
+		dev_info(&dev->dev, "atusb_async_errchk FAIL error %d\n",
+		    urb->status);
+
+	msg->actual_length = 0;
+
+	return urb->status;
+}
+
+static void atusb_async_finish(struct urb *urb)
+{
+	struct atusb_local *atusb = urb->context;
+	struct spi_message *msg = atusb->msg;
 
 	msg->status = urb->status;
 	msg->complete(msg->context);
 
 	kfree(urb->setup_packet);
 	usb_free_urb(urb);
+}
+
+static void atusb_ctrl_cb(struct urb *urb)
+{
+	atusb_async_errchk(urb);
+	atusb_async_finish(urb);
 }
 
 static void atusb_read_fb_cb(struct urb *urb)
@@ -139,30 +156,20 @@ static void atusb_read_fb_cb(struct urb *urb)
 	const struct spi_transfer *xfer;
 	uint8_t *rx;
 
-	if (urb->status) {
-		if (!(urb->status == -ENOENT ||
-		    urb->status == -ECONNRESET ||
-		    urb->status == -ESHUTDOWN))
-			printk("Async USB failed with error %i\n", urb->status);
-		msg->actual_length = 0;
-	} else {
-		printk("Async USB succeeded with length %i\n",
-		    urb->actual_length);
+	if (!atusb_async_errchk(urb)) {
 		BUG_ON(!urb->actual_length);
+
 		xfer = list_first_entry(&msg->transfers, struct spi_transfer,
 		    transfer_list);
 		rx = xfer->rx_buf;
 		rx[1] = atusb->buffer[0];
+
 		xfer = list_entry(xfer->transfer_list.next,
 		    struct spi_transfer, transfer_list);
 		memcpy(xfer->rx_buf, atusb->buffer+1, urb->actual_length-1);
 	}
 
-	msg->status = urb->status;
-	msg->complete(msg->context);
-
-	kfree(urb->setup_packet);
-	usb_free_urb(urb);
+	atusb_async_finish(urb);
 }
 
 static int submit_control_msg(struct atusb_local *atusb,
