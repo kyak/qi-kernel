@@ -417,12 +417,14 @@ static int atusb_probe(struct usb_interface *interface,
 	int retval;
 
 	/*
-	 * Interface 1 is used for DFU. Ignore it in this driver to avoid
-	 * attaching to both interfaces
+	 * Ignore all interfaces used for DFU, i.e., everything while in the
+	 * boot loader, and interface #1 when in the application.
 	 */
-	if (interface == udev->actconfig->interface[1]) {
+	if (interface->cur_altsetting->desc.bInterfaceClass !=
+	    USB_CLASS_VENDOR_SPEC) {
 		dev_info(&udev->dev,
-			"Ignoring interface 1 reserved for DFU\n");
+			"Ignoring interface with class 0x%02x\n",
+			interface->cur_altsetting->desc.bInterfaceClass);
 		return -ENODEV;
 	}
 
