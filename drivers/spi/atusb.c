@@ -15,10 +15,10 @@
  * - check URB killing in atusb_disconnect for races
  * - switch from bulk to interrupt endpoint
  * - implement buffer read without extra copy
- * - decrease debug chatter
  * - harmonize indentation style
  * - mv atusb.c ../ieee802.15.4/spi_atusb.c, or maybe atrf_atusb.c or such
  * - check module load/unload
+ * - review dev_* severity levels
  */
 
 #include <linux/kernel.h>
@@ -165,7 +165,7 @@ static void atusb_timer(unsigned long data)
 {
 	struct urb *urb = (void *) data;
 
-	printk(KERN_INFO "atusb_timer\n");
+	dev_vdbg(&urb->dev->dev, "atusb_timer\n");
 	atusb_async_finish(urb);
 }
 
@@ -237,7 +237,7 @@ static int submit_control_msg(struct atusb_local *atusb,
 	retval = usb_submit_urb(urb, GFP_KERNEL);
 	if (!retval)
 		return 0;
-	dev_info(&dev->dev, "failed submitting read urb, error %d",
+	dev_warn(&dev->dev, "failed submitting read urb, error %d",
 		retval);
 	retval = retval == -ENOMEM ? retval : -EIO;
 
@@ -255,7 +255,7 @@ out_nourb:
 static int atusb_read1(struct atusb_local *atusb,
     uint8_t tx, uint8_t *rx, int len)
 {
-	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx);
+	dev_dbg(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx);
 	return submit_control_msg(atusb,
 	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx, 0,
 	    rx, 1, atusb_ctrl_cb, atusb);
@@ -264,7 +264,7 @@ static int atusb_read1(struct atusb_local *atusb,
 static int atusb_read_fb(struct atusb_local *atusb,
     uint8_t tx, uint8_t *rx0, uint8_t *rx, int len)
 {
-	dev_info(&atusb->udev->dev, "atusb_read_fb: tx = 0x%x\n", tx);
+	dev_dbg(&atusb->udev->dev, "atusb_read_fb: tx = 0x%x\n", tx);
 	return submit_control_msg(atusb,
 	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx, 0,
 	    atusb->buffer, len+1, atusb_read_fb_cb, atusb);
@@ -275,8 +275,8 @@ static int atusb_write(struct atusb_local *atusb,
 {
 	usb_complete_t cb = atusb_ctrl_cb;
 
-	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx0);
-	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx1);
+	dev_dbg(&atusb->udev->dev,
+	    "atusb_write: tx0 = 0x%x tx1 = 0x%x\n", tx0, tx1);
 
 	/*
 	 * The AT86RF230 driver sometimes requires a transceiver state
@@ -317,7 +317,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	n = 0;
 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
 		if (n == ARRAY_SIZE(x)) {
-			dev_info(&atusb->udev->dev, "too many transfers\n");
+			dev_err(&atusb->udev->dev, "too many transfers\n");
 			return -EINVAL;
 		}
 		x[n] = xfer;
@@ -334,10 +334,10 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		goto bad_req;
 	if (n == 1) {
 		if (rx) {
-			dev_info(&atusb->udev->dev, "read 1\n");
+			dev_dbg(&atusb->udev->dev, "read 1\n");
 			retval = atusb_read1(atusb, tx[0], rx+1, len-1);
 		} else {
-			dev_info(&atusb->udev->dev, "write 2\n");
+			dev_dbg(&atusb->udev->dev, "write 2\n");
 			/*
 			 * Don't take our clock away !! ;-)
 			 */
@@ -353,13 +353,13 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		if (x[0]->rx_buf) {
 			if (x[1]->tx_buf || !x[1]->rx_buf)
 				goto bad_req;
-			dev_info(&atusb->udev->dev, "read 1+\n");
+			dev_dbg(&atusb->udev->dev, "read 1+\n");
 			retval = atusb_read_fb(atusb, tx[0], rx+1,
 			    x[1]->rx_buf, x[1]->len);
 		} else {
 			if (!x[1]->tx_buf ||x[1]->rx_buf)
 				goto bad_req;
-			dev_info(&atusb->udev->dev, "write 2+n\n");
+			dev_dbg(&atusb->udev->dev, "write 2+n\n");
 			retval = atusb_write(atusb, tx[0], tx[1],
 			    x[1]->tx_buf, x[1]->len);
 		}
@@ -367,9 +367,9 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	return retval;
 
 bad_req:
-	dev_info(&atusb->udev->dev, "unrecognized request:\n");
+	dev_err(&atusb->udev->dev, "unrecognized request:\n");
 	list_for_each_entry(xfer, &msg->transfers, transfer_list)
-		dev_info(&atusb->udev->dev, "%stx %srx len %u\n",
+		dev_err(&atusb->udev->dev, "%stx %srx len %u\n",
 		    xfer->tx_buf ? "" : "!", xfer->rx_buf ? " " : "!",
 		    xfer->len);
 	return -EINVAL;
@@ -395,7 +395,7 @@ static void atusb_irq(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
 
-	printk(KERN_INFO "atusb_irq (%d)\n", urb->status);
+	dev_dbg(&urb->dev->dev, "atusb_irq (%d)\n", urb->status);
 	usb_free_urb(urb);
 	atusb->irq_urb = NULL;
 	tasklet_schedule(&atusb->task);
@@ -409,7 +409,7 @@ static int atusb_arm_interrupt(struct atusb_local *atusb)
 
 	BUG_ON(atusb->irq_urb);
 
-	printk(KERN_INFO "atusb_arm_interrupt\n");
+	dev_vdbg(&dev->dev, "atusb_arm_interrupt\n");
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
 		dev_err(&dev->dev,
@@ -436,7 +436,7 @@ static void atusb_irq_mask(struct irq_data *data)
 {
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
-	printk(KERN_INFO "atusb_irq_mask\n");
+	dev_vdbg(&atusb->udev->dev, "atusb_irq_mask\n");
 	tasklet_disable_nosync(&atusb->task);
 }
 
@@ -444,7 +444,7 @@ static void atusb_irq_unmask(struct irq_data *data)
 {
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
-	printk(KERN_INFO "atusb_irq_unmask\n");
+	dev_vdbg(&atusb->udev->dev, "atusb_irq_unmask\n");
 	tasklet_enable(&atusb->task);
 }
 
@@ -452,7 +452,7 @@ static void atusb_irq_ack(struct irq_data *data)
 {
 	struct atusb_local *atusb = irq_data_get_irq_chip_data(data);
 
-	printk(KERN_INFO "atusb_irq_ack\n");
+	dev_vdbg(&atusb->udev->dev, "atusb_irq_ack\n");
 	atusb_arm_interrupt(atusb);
 }
 
@@ -477,7 +477,7 @@ static void atusb_reset(void *reset_data)
 	    ATUSB_RF_RESET, ATUSB_TO_DEV, 0, 0,
 	    NULL, 0, 1000);
 	if (retval < 0) {
-		dev_info(&atusb->udev->dev,
+		dev_err(&atusb->udev->dev,
 			"%s: error doing reset retval = %d\n",
 			__func__, retval);
 	}
@@ -525,7 +525,7 @@ static int atusb_get_and_show_build(struct atusb_local *atusb)
 	    ATUSB_BUILD, ATUSB_FROM_DEV, 0, 0,
 	    build, ATUSB_BUILD_SIZE, 1000);
 	if (retval < 0) {
-		dev_info(&dev->dev,
+		dev_err(&dev->dev,
 		    "failed submitting urb for ATUSB_BUILD, error %d\n",
 		    retval);
 		return retval == -ENOMEM ? retval : -EIO;
@@ -571,7 +571,7 @@ static int atusb_probe(struct usb_interface *interface,
 	 */
 	if (interface->cur_altsetting->desc.bInterfaceClass !=
 	    USB_CLASS_VENDOR_SPEC) {
-		dev_info(&udev->dev,
+		dev_dbg(&udev->dev,
 			"Ignoring interface with class 0x%02x\n",
 			interface->cur_altsetting->desc.bInterfaceClass);
 		return -ENODEV;
@@ -596,7 +596,7 @@ static int atusb_probe(struct usb_interface *interface,
 
 	atusb->slave_irq = irq_alloc_desc(numa_node_id());
 	if (atusb->slave_irq < 0) {
-		dev_info(&udev->dev, "can't allocate slave irq\n");
+		dev_err(&udev->dev, "can't allocate slave irq\n");
 		retval = -ENXIO;
 		goto err_free;
 	}
@@ -609,7 +609,7 @@ static int atusb_probe(struct usb_interface *interface,
 
 	retval = spi_register_master(master);
 	if (retval < 0) {
-		dev_info(&udev->dev, "can't register spi master\n");
+		dev_err(&udev->dev, "can't register spi master\n");
 		goto err_slave_irq;
 	}
 
@@ -632,7 +632,7 @@ static int atusb_probe(struct usb_interface *interface,
 
 	atusb->spi = spi_new_device(master, &board_info);
 	if (!atusb->spi) {
-		dev_info(&udev->dev, "can't create new device for %s\n",
+		dev_err(&udev->dev, "can't create new device for %s\n",
 		    board_info.modalias);
 		goto err_master;
 	}
