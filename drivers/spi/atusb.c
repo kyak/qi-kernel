@@ -590,6 +590,11 @@ static int atusb_probe(struct usb_interface *interface,
 	tasklet_init(&atusb->task, atusb_tasklet, (unsigned long) atusb);
 	atusb_arm_interrupt(atusb);
 
+	if (atusb_get_and_show_revision(atusb) < 0)
+		goto err_master;
+	if (atusb_get_and_show_build(atusb) < 0)
+		goto err_master;
+
 	atusb->spi = spi_new_device(master, &board_info);
 	if (!atusb->spi) {
 		dev_info(&udev->dev, "can't create new device for %s\n",
@@ -599,11 +604,6 @@ static int atusb_probe(struct usb_interface *interface,
 
 	dev_info(&atusb->spi->dev,
 	    "ATUSB ready for mischief (IRQ %d)\n", board_info.irq);
-
-	if (atusb_get_and_show_revision(atusb) < 0)
-		goto err_master;
-	if (atusb_get_and_show_build(atusb) < 0)
-		goto err_master;
 
 	return 0;
 
