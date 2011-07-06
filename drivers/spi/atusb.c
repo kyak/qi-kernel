@@ -232,12 +232,12 @@ out_nourb:
 
 
 static void atusb_read1(struct atusb_local *atusb,
-    const uint8_t *tx, uint8_t *rx, int len)
+    uint8_t tx, uint8_t *rx, int len)
 {
-	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx[0]);
+	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx);
 	submit_control_msg(atusb,
-	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx[0], 0,
-	    rx+1, 1, atusb_read1_cb, atusb);
+	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx, 0,
+	    rx, 1, atusb_read1_cb, atusb);
 }
 
 static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
@@ -246,13 +246,13 @@ static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
 }
 
 static void atusb_write(struct atusb_local *atusb,
-    const uint8_t *tx, uint8_t *rx, int len)
+    uint8_t tx0, uint8_t tx1, uint8_t *tx, int len)
 {
-	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx[0]);
-	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx[1]);
+	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx0);
+	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx1);
 	submit_control_msg(atusb,
-	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx[0], tx[1],
-	    NULL, 0, atusb_read1_cb, atusb);
+	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
+	    tx, len, atusb_read1_cb, atusb);
 }
 
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
@@ -292,7 +292,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 			tx = x[0]->tx_buf;
 			rx = x[0]->rx_buf;
 			msg->actual_length += x[0]->len;
-			atusb_read1(atusb, tx, rx, x[0]->len);
+			atusb_read1(atusb, tx[0], rx+1, x[0]->len-1);
 		} else {
 			dev_info(&atusb->udev->dev, "write 2\n");
 			tx = x[0]->tx_buf;
@@ -305,7 +305,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 				msg->status = 0;
 				msg->complete(msg->context);
 			} else {
-				atusb_write(atusb, tx, rx, x[0]->len);
+				atusb_write(atusb, tx[0], tx[1], NULL, 0);
 			}
 		}
 	} else {
