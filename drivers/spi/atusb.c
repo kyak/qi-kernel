@@ -111,24 +111,6 @@ enum atspi_requests {
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
 #define ATUSB_TO_DEV (USB_TYPE_VENDOR | USB_DIR_OUT)
 
-static void atusb_usb_cb(struct urb *urb)
-{
-	struct atusb_local *atusb;
-	atusb = urb->context;
-
-	if (urb->status) {
-		if (!(urb->status == -ENOENT ||
-		    urb->status == -ECONNRESET ||
-		    urb->status == -ESHUTDOWN))
-			dev_err(&atusb->udev->dev, "nonzero write bulk status received: %d",
-			    urb->status);
-
-	} else {
-		atusb->bulk_in_filled = urb->actual_length;
-	}
-	complete(&atusb->urb_completion);
-}
-
 static void atusb_read1_cb(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
@@ -154,7 +136,6 @@ static void atusb_read1_cb(struct urb *urb)
 static int atusb_get_static_info(struct atusb_local *atusb)
 {
 	int retval;
-	struct usb_ctrlrequest *req;
 
 	atusb->buffer = kzalloc(3, GFP_KERNEL);
 	if (!atusb->buffer) {
@@ -163,72 +144,31 @@ static int atusb_get_static_info(struct atusb_local *atusb)
 	}
 
 	atusb->atusb_build = kzalloc(ATUSB_BUILD_SIZE+1, GFP_KERNEL);
-	if (!atusb->buffer) {
+	if (!atusb->atusb_build) {
 		dev_err(&atusb->udev->dev, "out of memory\n");
 		retval = -ENOMEM;
 	}
 
 	/* Get a couple of the ATMega Firmware values */
-	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!atusb->ctrl_urb) {
-		retval = -ENOMEM;
-	}
-	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-	req->bRequest = ATUSB_ID;
-	req->bRequestType = ATUSB_FROM_DEV;
-	req->wValue = cpu_to_le16(0x00);
-	req->wIndex = cpu_to_le16(0x00);
-	req->wLength = cpu_to_le16(3);
-
-	usb_fill_control_urb(atusb->ctrl_urb,
-			atusb->udev,
-			usb_rcvbulkpipe(atusb->udev, 0),
-			(unsigned char *)req,
-			atusb->buffer,
-			3,
-			atusb_usb_cb,
-			atusb);
-
-	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	retval = usb_control_msg(atusb->udev,
+	    usb_rcvctrlpipe(atusb->udev, 0),
+	    ATUSB_ID, ATUSB_FROM_DEV, 0, 0,
+	    atusb->buffer, 3, 1000);
 	if (retval < 0) {
 		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
 	}
-	wait_for_completion_interruptible(&atusb->urb_completion);
-	INIT_COMPLETION(atusb->urb_completion);
-	usb_free_urb(atusb->ctrl_urb);
-	kfree(req);
 
-	atusb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!atusb->ctrl_urb) {
-		retval = -ENOMEM;
-	}
-	req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
-	req->bRequest = ATUSB_BUILD;
-	req->bRequestType = ATUSB_FROM_DEV;
-	req->wValue = cpu_to_le16(0x00);
-	req->wIndex = cpu_to_le16(0x00);
-	req->wLength = cpu_to_le16(ATUSB_BUILD_SIZE+1);
-
-	usb_fill_control_urb(atusb->ctrl_urb,
-			atusb->udev,
-			usb_rcvbulkpipe(atusb->udev, 0),
-			(unsigned char *)req,
-			atusb->atusb_build,
-			ATUSB_BUILD_SIZE+1,
-			atusb_usb_cb,
-			atusb);
-
-	retval = usb_submit_urb(atusb->ctrl_urb, GFP_KERNEL);
+	retval = usb_control_msg(atusb->udev,
+	    usb_rcvctrlpipe(atusb->udev, 0),
+	    ATUSB_BUILD, ATUSB_FROM_DEV, 0, 0,
+	    atusb->atusb_build, ATUSB_BUILD_SIZE+1, 1000);
 	if (retval < 0) {
 		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
 	}
-	wait_for_completion_interruptible(&atusb->urb_completion);
-	usb_free_urb(atusb->ctrl_urb);
-	kfree(req);
 
 	return retval;
 }
@@ -239,14 +179,9 @@ static void atusb_reset(void *reset_data)
 	struct atusb_local *atusb = reset_data;
 
 	retval = usb_control_msg(atusb->udev,
-				usb_rcvctrlpipe(atusb->udev, 0),
-				ATUSB_RF_RESET,
-				ATUSB_TO_DEV,
-				0,
-				0,
-				NULL,
-				0,
-				1000);
+	    usb_rcvctrlpipe(atusb->udev, 0),
+	    ATUSB_RF_RESET, ATUSB_TO_DEV, 0, 0,
+	    NULL, 0, 1000);
 	if (retval < 0) {
 		dev_info(&atusb->udev->dev,
 			"%s: error doing reset retval = %d\n",
@@ -545,7 +480,7 @@ static int atusb_probe(struct usb_interface *interface,
 
 	/* Get the static info from the device and save it */
 	retval = atusb_get_static_info(atusb);
-	if (retval) {
+	if (retval < 0) {
 		dev_info(&interface->dev, "%s: Failed to get static info: %d\n",
 			__func__,
 			retval);
