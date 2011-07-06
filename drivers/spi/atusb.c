@@ -131,8 +131,8 @@ static void atusb_usb_cb(struct urb *urb)
 
 static void atusb_read1_cb(struct urb *urb)
 {
-	struct atusb_local *atusb;
-	atusb = urb->context;
+	struct atusb_local *atusb = urb->context;
+	struct spi_message *msg = atusb->msg;
 
 	if (urb->status) {
 		if (!(urb->status == -ENOENT ||
@@ -144,10 +144,11 @@ static void atusb_read1_cb(struct urb *urb)
 		printk("Async USB succeeded with length %i\n", urb->actual_length);
 	}
 
-	atusb->msg->status = 0;
-	atusb->msg->complete(atusb->msg->context);
+	msg->status = 0;
+	msg->complete(msg->context);
 
-	usb_free_urb(atusb->ctrl_urb);
+	kfree(urb->setup_packet);
+	usb_free_urb(urb);
 }
 
 static int atusb_get_static_info(struct atusb_local *atusb)
@@ -285,8 +286,8 @@ static void atusb_read1(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
+		kfree(req);
 	}
-	kfree(req);
 }
 
 static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
@@ -327,8 +328,8 @@ static void atusb_write(struct atusb_local *atusb, const uint8_t *tx, uint8_t *r
 		dev_info(&atusb->udev->dev, "failed submitting read urb, error %d",
 			retval);
 		retval = (retval == -ENOMEM) ? retval : -EIO;
+		kfree(req);
 	}
-	kfree(req);
 }
 
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
