@@ -121,12 +121,12 @@ static void atusb_read1_cb(struct urb *urb)
 		    urb->status == -ECONNRESET ||
 		    urb->status == -ESHUTDOWN))
 			printk("Async USB failed with error %i\n", urb->status);
-
+		msg->actual_length = 0;
 	} else {
 		printk("Async USB succeeded with length %i\n", urb->actual_length);
 	}
 
-	msg->status = 0;
+	msg->status = urb->status;
 	msg->complete(msg->context);
 
 	kfree(urb->setup_packet);
@@ -231,11 +231,11 @@ out_nourb:
 }
 
 
-static void atusb_read1(struct atusb_local *atusb,
+static int atusb_read1(struct atusb_local *atusb,
     uint8_t tx, uint8_t *rx, int len)
 {
 	dev_info(&atusb->udev->dev, "atusb_read1: tx = 0x%x\n", tx);
-	submit_control_msg(atusb,
+	return submit_control_msg(atusb,
 	    ATUSB_SPI_READ1, ATUSB_FROM_DEV, tx, 0,
 	    rx, 1, atusb_read1_cb, atusb);
 }
@@ -245,12 +245,12 @@ static void atusb_read2(struct atusb_local *atusb, uint8_t *buf, int len)
 	/* ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes */
 }
 
-static void atusb_write(struct atusb_local *atusb,
+static int atusb_write(struct atusb_local *atusb,
     uint8_t tx0, uint8_t tx1, uint8_t *tx, int len)
 {
 	dev_info(&atusb->udev->dev, "atusb_write: tx[0] = 0x%x\n", tx0);
 	dev_info(&atusb->udev->dev, "atusb_write: tx[1] = 0x%x\n", tx1);
-	submit_control_msg(atusb,
+	return submit_control_msg(atusb,
 	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
 	    tx, len, atusb_read1_cb, atusb);
 }
@@ -264,6 +264,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	const uint8_t *tx;
 	uint8_t *rx;
 	int len;
+	int retval = 0;
 
 	if (unlikely(list_empty(&msg->transfers))) {
 		dev_err(&atusb->udev->dev, "transfer is empty\n");
@@ -283,22 +284,20 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 		n++;
 	}
 
-	msg->actual_length = 0;
-
 	tx = x[0]->tx_buf;
 	rx = x[0]->rx_buf;
 	len = x[0]->len;
+
+	msg->actual_length = len;
 
 	if (!tx || len != 2)
 		goto bad_req;
 	if (n == 1) {
 		if (rx) {
 			dev_info(&atusb->udev->dev, "read 1\n");
-			msg->actual_length += len;
-			atusb_read1(atusb, tx[0], rx+1, len-1);
+			retval = atusb_read1(atusb, tx[0], rx+1, len-1);
 		} else {
 			dev_info(&atusb->udev->dev, "write 2\n");
-			msg->actual_length += len;
 			/*
 			 * Don't take our clock away !! ;-)
 			 */
@@ -306,7 +305,8 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 				msg->status = 0;
 				msg->complete(msg->context);
 			} else {
-				atusb_write(atusb, tx[0], tx[1], NULL, 0);
+				retval = atusb_write(atusb,
+				    tx[0], tx[1], NULL, 0);
 			}
 		}
 	} else {
@@ -337,7 +337,7 @@ static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
 	    (tx[1] & 0x1f) == STATE_FORCE_TX_ON)
 		synchronize_irq(atusb->gpio_irq);
 #endif
-	return 0;
+	return retval;
 
 bad_req:
 	dev_info(&atusb->udev->dev, "unrecognized request:\n");
