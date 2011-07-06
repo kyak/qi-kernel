@@ -383,8 +383,10 @@ config SPI_NUC900
 	  SPI driver for Nuvoton NUC900 series ARM SoCs
 
 config SPI_ATUSB
-       tristate "Ben WPAN USB transceiver driver"
+       tristate "ATUSB SPI interface"
        depends on USB && SPI
+	help
+	  SPI-over-USB driver for the ATUSB IEEE 802.15.4 board.
 
 config SPI_ATBEN
 	tristate "ATBEN 8:10 SPI interface"
