@@ -11,8 +11,14 @@
  */
 
 /*
- * - Implement buffer and sram read write
- * - Implement IRQ handling
+ * - implement more robust interrupt synchronization
+ * - check URB killing in atusb_disconnect for races
+ * - switch from bulk to interrupt endpoint
+ * - implement buffer read without extra copy
+ * - decrease debug chatter
+ * - harmonize indentation style
+ * - mv atusb.c ../ieee802.15.4/spi_atusb.c, or maybe atrf_atusb.c or such
+ * - check module load/unload
  */
 
 #include <linux/kernel.h>
@@ -418,7 +424,7 @@ static int atusb_arm_interrupt(struct atusb_local *atusb)
 	if (!retval)
 		return 0;
 
-	dev_err(&dev->dev, "failed submitting bulk urb, error %d", retval);
+	dev_err(&dev->dev, "failed submitting bulk urb, error %d\n", retval);
 	retval = retval == -ENOMEM ? retval : -EIO;
 
 	usb_free_urb(urb);
@@ -493,7 +499,7 @@ static int atusb_get_and_show_revision(struct atusb_local *atusb)
 	    atusb->buffer, 3, 1000);
 	if (retval < 0) {
 		dev_info(&dev->dev,
-		    "failed submitting urb for ATUSB_ID, error %d", retval);
+		    "failed submitting urb for ATUSB_ID, error %d\n", retval);
 		return retval == -ENOMEM ? retval : -EIO;
 	}
 
@@ -520,7 +526,8 @@ static int atusb_get_and_show_build(struct atusb_local *atusb)
 	    build, ATUSB_BUILD_SIZE, 1000);
 	if (retval < 0) {
 		dev_info(&dev->dev,
-		    "failed submitting urb for ATUSB_BUILD, error %d", retval);
+		    "failed submitting urb for ATUSB_BUILD, error %d\n",
+		    retval);
 		return retval == -ENOMEM ? retval : -EIO;
 	}
 
