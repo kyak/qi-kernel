@@ -33,6 +33,10 @@
 
 #include "../ieee802154/at86rf230.h"	/* dirty */
 
+
+#define	SYNC_TIMEOUT_MS	50	/* assume interrupt has been synced after
+				   waiting this long */
+
 #define VENDOR_ID     0x20b7
 #define PRODUCT_ID    0x1540
 
@@ -53,7 +57,9 @@ struct atusb_local {
 	struct spi_master *master;
 	int slave_irq;
 	struct urb *irq_urb;
-	uint8_t irq_buf;		/* scratch space */
+	uint8_t irq_buf;		/* receive irq serial here*/
+	uint8_t irq_seen;		/* last irq serial from bulk */
+	uint8_t irq_sync;		/* last irq serial from WRITE2_SYNC */
 	struct tasklet_struct task;	/* interrupt delivery tasklet */
 	struct timer_list timer;	/* delay, for interrupt synch */
 	struct at86rf230_platform_data platform_data;
@@ -85,6 +91,7 @@ enum atspi_requests {
 	ATUSB_SPI_WRITE			= 0x30,	/* SPI group */
 	ATUSB_SPI_READ1,
 	ATUSB_SPI_READ2,
+	ATUSB_SPI_WRITE2_SYNC,
 };
 
 /*
@@ -112,6 +119,7 @@ enum atspi_requests {
  * host->	ATUSB_SPI_WRITE		byte0		byte1	#bytes
  * ->host	ATUSB_SPI_READ1		byte0		-	#bytes
  * ->host	ATUSB_SPI_READ2		byte0		byte1	#bytes
+ * ->host	ATUSB_SPI_WRITE2_SYNC	byte0		byte1	0/1
  */
 
 #define ATUSB_FROM_DEV (USB_TYPE_VENDOR | USB_DIR_IN)
@@ -165,22 +173,24 @@ static void atusb_timer(unsigned long data)
 {
 	struct urb *urb = (void *) data;
 
-	dev_vdbg(&urb->dev->dev, "atusb_timer\n");
+	dev_warn(&urb->dev->dev, "atusb_timer\n");
 	atusb_async_finish(urb);
 }
 
-static void atusb_ctrl_cb_delayed(struct urb *urb)
+static void atusb_ctrl_cb_sync(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
 
-	if (atusb_async_errchk(urb))
+	/* @@@ needs locking/atomic */
+	if (atusb_async_errchk(urb) || atusb->irq_sync == atusb->irq_seen) {
 		atusb_async_finish(urb);
-	else {
-		BUG_ON(timer_pending(&atusb->timer));
-		atusb->timer.expires = jiffies+msecs_to_jiffies(10);
-		atusb->timer.data = (unsigned long) urb;
-		add_timer(&atusb->timer);
+		return;
 	}
+	
+	BUG_ON(timer_pending(&atusb->timer));
+	atusb->timer.expires = jiffies+msecs_to_jiffies(SYNC_TIMEOUT_MS);
+	atusb->timer.data = (unsigned long) urb;
+	add_timer(&atusb->timer);
 }
 
 static void atusb_read_fb_cb(struct urb *urb)
@@ -273,8 +283,6 @@ static int atusb_read_fb(struct atusb_local *atusb,
 static int atusb_write(struct atusb_local *atusb,
     uint8_t tx0, uint8_t tx1, const uint8_t *tx, int len)
 {
-	usb_complete_t cb = atusb_ctrl_cb;
-
 	dev_dbg(&atusb->udev->dev,
 	    "atusb_write: tx0 = 0x%x tx1 = 0x%x\n", tx0, tx1);
 
@@ -288,11 +296,13 @@ static int atusb_write(struct atusb_local *atusb,
 	 */
 	if (tx0 == (CMD_REG | CMD_WRITE | RG_TRX_STATE) &&
 	    (tx1 & 0x1f) == STATE_FORCE_TX_ON)
-		cb = atusb_ctrl_cb_delayed;
-
-	return submit_control_msg(atusb,
-	    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
-	    (uint8_t *) tx, len, cb, atusb);
+		return submit_control_msg(atusb,
+		    ATUSB_SPI_WRITE2_SYNC, ATUSB_FROM_DEV, tx0, tx1,
+		     &atusb->irq_sync, 1, atusb_ctrl_cb_sync, atusb);
+	else
+		return submit_control_msg(atusb,
+		    ATUSB_SPI_WRITE, ATUSB_TO_DEV, tx0, tx1,
+		    (uint8_t *) tx, len, atusb_ctrl_cb, atusb);
 }
 
 static int atusb_transfer(struct spi_device *spi, struct spi_message *msg)
@@ -395,7 +405,14 @@ static void atusb_irq(struct urb *urb)
 {
 	struct atusb_local *atusb = urb->context;
 
-	dev_dbg(&urb->dev->dev, "atusb_irq (%d)\n", urb->status);
+	dev_dbg(&urb->dev->dev, "atusb_irq (%d), seen %d sync %d\n",
+	    urb->status, atusb->irq_buf, atusb->irq_sync);
+	if (!urb->status) {
+		atusb->irq_seen = atusb->irq_buf;
+		if (atusb->irq_sync == atusb->irq_seen &&
+		    try_to_del_timer_sync(&atusb->timer) == 1)
+			atusb_async_finish((struct urb *) atusb->timer.data);
+	}
 	usb_free_urb(urb);
 	atusb->irq_urb = NULL;
 	tasklet_schedule(&atusb->task);
