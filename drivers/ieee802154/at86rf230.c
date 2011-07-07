@@ -322,6 +322,8 @@ at86rf230_state(struct ieee802154_dev *dev, int state)
 
 	if (val == desired_status)
 		return 0;
+	if (state == STATE_RX_ON && val == STATE_BUSY_RX)
+		return 0;
 
 	pr_err("%s unexpected state change: %d, asked for %d\n", __func__,
 			val, state);
