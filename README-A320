@@ -38,25 +38,21 @@ Tell the Linux kernel build that you want to compile for MIPS:
 Alternatively, you can pass "ARCH=mips" to every "make" command.
 
 Use "make a320_defconfig" for a default configuration.
+After that, you can modify the kernel configuration using "make menuconfig".
 
-If your A320 is one of the older models, you must change the LCD driver
-to ILI9325: (the default config uses ILI9331)
+There are three different LCD controllers used in the Dingoo A320 over time:
+until mid-2009 the ILI9325 was used, from then until mid-2011 the ILI9331 was
+used and after that the ILI9338 was used. The default config uses ILI9331;
+if your Dingoo has a different LCD controller you should change the config:
 
     Device drivers
     |---Graphics support
         |---Support for framebuffer devices
             |---SLCD panel
 
-If you have an A330, keep the ILI9331 setting. If you want to use the full
-64 MB of RAM, you need a new boot loader:
+If you have a Dingoo A330, keep the ILI9331 setting. If you want to use the
+full 64 MB of RAM, you need a new boot loader:
   http://boards.dingoonity.org/dingux-releases/(release)-64mb-dingux-for-a330
-Also, you should tell Linux that there is 64 MB present:
-
-    Kernel hacking
-    |---Built-in kernel command line
-        (... mem=64M)
-
-You can modify the kernel configuration using "make menuconfig".
 
 To build the kernel, use "make vmlinuz.bin". It will produce the kernel
 binary named "vmlinuz.bin" in the top-level directory. The current u-boot
