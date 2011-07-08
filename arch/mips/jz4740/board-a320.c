@@ -257,86 +257,84 @@ static struct platform_device a320_charger_device = {
 	},
 };
 
-    /* TODO(CongoZombie): Figure out a way to reimplement power slider functionality
-                          so that existing apps won't break. (Possible that an SDL
-                          remapping would fix this, but it is unclear how many apps
-                          use other interfaces)
-                          Original Dingux used SysRq keys to perform different tasks
-                          (restart, backlight, volume etc.)
-    */
-    /* TODO(CongoZombie): Confirm power slider pin (Booboo's docs seem unsure)  */
-
+/* Note that the microswitch buttons need debounce while the rubber buttons
+ * do not need it.
+ */
 static struct gpio_keys_button a320_buttons[] = {
 	/* D-pad up */ {
-		.gpio		= JZ_GPIO_PORTD(6),
-		.active_low	= 1,
-		.code		= KEY_UP
+		.gpio			= JZ_GPIO_PORTD(6),
+		.active_low		= 1,
+		.code			= KEY_UP,
 	},
 	/* D-pad down */ {
-		.gpio		= JZ_GPIO_PORTD(27),
-		.active_low	= 1,
-		.code		= KEY_DOWN
+		.gpio			= JZ_GPIO_PORTD(27),
+		.active_low		= 1,
+		.code			= KEY_DOWN,
 	},
 	/* D-pad left */ {
-		.gpio		= JZ_GPIO_PORTD(5),
-		.active_low	= 1,
-		.code		= KEY_LEFT
+		.gpio			= JZ_GPIO_PORTD(5),
+		.active_low		= 1,
+		.code			= KEY_LEFT,
 	},
 	/* D-pad right */ {
-		.gpio		= JZ_GPIO_PORTD(18),
-		.active_low	= 1,
-		.code		= KEY_RIGHT
+		.gpio			= JZ_GPIO_PORTD(18),
+		.active_low		= 1,
+		.code			= KEY_RIGHT,
 	},
 	/* A button */ {
-		.gpio		= JZ_GPIO_PORTD(0),
-		.active_low	= 1,
-		.code		= KEY_LEFTCTRL
+		.gpio			= JZ_GPIO_PORTD(0),
+		.active_low		= 1,
+		.code			= KEY_LEFTCTRL,
 	},
 	/* B button */ {
-		.gpio		= JZ_GPIO_PORTD(1),
-		.active_low	= 1,
-		.code		= KEY_LEFTALT
+		.gpio			= JZ_GPIO_PORTD(1),
+		.active_low		= 1,
+		.code			= KEY_LEFTALT,
 	},
 	/* X button */ {
-		.gpio		= JZ_GPIO_PORTD(19),
-		.active_low	= 1,
-		.code		= KEY_SPACE
+		.gpio			= JZ_GPIO_PORTD(19),
+		.active_low		= 1,
+		.code			= KEY_SPACE,
 	},
 	/* Y button */ {
-		.gpio		= JZ_GPIO_PORTD(2),
-		.active_low	= 1,
-		.code		= KEY_LEFTSHIFT
+		.gpio			= JZ_GPIO_PORTD(2),
+		.active_low		= 1,
+		.code			= KEY_LEFTSHIFT,
 	},
 	/* Left shoulder button */ {
-		.gpio		= JZ_GPIO_PORTD(14),
-		.active_low	= 1,
-		.code		= KEY_TAB
+		.gpio			= JZ_GPIO_PORTD(14),
+		.active_low		= 1,
+		.code			= KEY_TAB,
+		.debounce_interval	= 5,
 	},
 	/* Right shoulder button */ {
-		.gpio		= JZ_GPIO_PORTD(15),
-		.active_low	= 1,
-		.code		= KEY_BACKSPACE
+		.gpio			= JZ_GPIO_PORTD(15),
+		.active_low		= 1,
+		.code			= KEY_BACKSPACE,
+		.debounce_interval	= 5,
 	},
 	/* START button */ {
-		.gpio		= JZ_GPIO_PORTC(17),
-		.active_low	= 1,
-		.code		= KEY_ENTER
+		.gpio			= JZ_GPIO_PORTC(17),
+		.active_low		= 1,
+		.code			= KEY_ENTER,
+		.debounce_interval	= 5,
 	},
 	/* SELECT button */ {
-		.gpio		= JZ_GPIO_PORTD(17),
-		.active_low	= 1,
-		.code		= KEY_ESC
+		.gpio			= JZ_GPIO_PORTD(17),
+		.active_low		= 1,
+		.code			= KEY_ESC,
+		.debounce_interval	= 5,
 	},
 	/* POWER slider */ {
-		.gpio		= JZ_GPIO_PORTD(29),
-		.active_low	= 1,
-		.code		= KEY_POWER,
-		.wakeup		= 1,
+		.gpio			= JZ_GPIO_PORTD(29),
+		.active_low		= 1,
+		.code			= KEY_POWER,
+		.wakeup			= 1,
 	},
 	/* POWER hold */ {
-		.gpio		= JZ_GPIO_PORTD(22),
-		.active_low	= 1,
-		.code		= KEY_PAUSE
+		.gpio			= JZ_GPIO_PORTD(22),
+		.active_low		= 1,
+		.code			= KEY_PAUSE,
 	},
 };
 
