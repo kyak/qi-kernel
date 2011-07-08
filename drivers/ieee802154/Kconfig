@@ -57,7 +57,7 @@ config SPI_ATBEN
 
 config SPI_ATUSB
        tristate "ATUSB SPI interface"
-       depends on USB && SPI && IEEE802154_AT86RF230
+       depends on USB && IEEE802154_AT86RF230
         help
           SPI-over-USB driver for the ATUSB IEEE 802.15.4 board.
 
