@@ -48,6 +48,19 @@ config IEEE802154_AT86RF230
 	tristate "AT86RF230 transceiver driver"
 	depends on SPI
 
+config SPI_ATBEN
+        tristate "ATBEN 8:10 SPI interface"
+        depends on JZ4740_QI_LB60 && IEEE802154_AT86RF230
+        help
+          Bit-banging SPI driver for the 8:10 interface of the Ben NanoNote
+          when equipped with an ATBEN board.
+
+config SPI_ATUSB
+       tristate "ATUSB SPI interface"
+       depends on USB && SPI && IEEE802154_AT86RF230
+        help
+          SPI-over-USB driver for the ATUSB IEEE 802.15.4 board.
+
 config IEEE802154_CC2420
        tristate "CC2420 driver"
        depends on SPI
