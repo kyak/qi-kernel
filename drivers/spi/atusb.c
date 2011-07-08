@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2011 Richard Sharpe <realrichardsharpe@gmail.com>
  * Copyright (c) 2011 Stefan Schmidt <stefan@datenfreihafen.org>
+ * Copyright (c) 2011 Werner Almesberger <werner@almesberger.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -742,7 +743,8 @@ static void __exit atusb_exit(void)
 module_init (atusb_init);
 module_exit (atusb_exit);
 
-MODULE_AUTHOR("Richard Sharpe <realrichardsharpe@gmail.com>, Stefan Schmidt \
-		<stefan@datenfreihafen.org>");
+MODULE_AUTHOR("Richard Sharpe <realrichardsharpe@gmail.com>");
+MODULE_AUTHOR("Stefan Schmidt <stefan@datenfreihafen.org>");
+MODULE_AUTHOR("Werner Almesberger <werner@almesberger.net>");
 MODULE_DESCRIPTION("ATUSB ben-wpan Driver");
 MODULE_LICENSE("GPL");
