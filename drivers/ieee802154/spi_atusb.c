@@ -1,5 +1,5 @@
 /*
- * atusb - SPI host look-alike for ATSUB
+ * spi_atusb - SPI host look-alike for ATUSB
  *
  * Copyright (c) 2011 Richard Sharpe <realrichardsharpe@gmail.com>
  * Copyright (c) 2011 Stefan Schmidt <stefan@datenfreihafen.org>
