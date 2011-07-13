@@ -17,7 +17,7 @@
 #include <linux/spi/at86rf230.h>
 #include <asm/mach-jz4740/base.h>
 
-#include "../ieee802154/at86rf230.h"	/* dirty */
+#include "at86rf230.h"
 
 
 enum {

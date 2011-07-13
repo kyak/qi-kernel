@@ -32,7 +32,7 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/at86rf230.h>
 
-#include "../ieee802154/at86rf230.h"	/* dirty */
+#include "at86rf230.h"
 
 
 #define	SYNC_TIMEOUT_MS	50	/* assume interrupt has been synced after
