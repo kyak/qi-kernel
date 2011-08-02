@@ -299,7 +299,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	struct nand_chip *chip;
 	struct mtd_info *mtd;
 	struct jz_nand_platform_data *pdata = pdev->dev.platform_data;
-	struct mtd_partition *partition_info;
+	struct mtd_partition *partition_info = NULL;
 	int num_partitions = 0;
 
 	nand = kzalloc(sizeof(*nand), GFP_KERNEL);
