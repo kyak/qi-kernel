@@ -411,7 +411,7 @@ static int __devinit jz_nand_probe(struct platform_device *pdev)
 	struct nand_chip *chip;
 	struct mtd_info *mtd;
 	struct jz_nand_platform_data *pdata = pdev->dev.platform_data;
-	struct mtd_partition *partition_info;
+	struct mtd_partition *partition_info = NULL;
 	int num_partitions = 0;
 	size_t chipnr, bank_idx;
 	uint8_t nand_maf_id = 0, nand_dev_id = 0;
