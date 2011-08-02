@@ -693,8 +693,6 @@ static struct jz4740_mmc_host *cpufreq_host;
 static int jz4740_mmc_cpufreq_transition(struct notifier_block *nb,
 					 unsigned long val, void *data)
 {
-	struct cpufreq_freqs *freqs = data;
-
 	/* TODO: We only have to take action when the PLL freq changes:
 	         the main dividers have no influence on the MSC device clock. */
 
