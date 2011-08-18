@@ -40,6 +40,9 @@ void __init jz4740_timer_init(void)
 	if (!jz4740_timer_base)
 		panic("Failed to ioremap timer registers");
 
-	/* Disable all timers except those used as system timers */
-	writel(0x100fc, jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
+	/* Disable all timer clocks except for those used as system timers */
+	writel(0x000100fc, jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
+
+	/* Timer irqs are unmasked by default, mask them */
+	writel(0x00ff00ff, jz4740_timer_base + JZ_REG_TIMER_MASK_SET);
 }
