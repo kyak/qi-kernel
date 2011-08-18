@@ -112,7 +112,7 @@ void __init plat_time_init(void)
 	jz4740_timer_init();
 
 	clk_rate = jz4740_clock_bdata.ext_rate >> 4;
-	jz4740_jiffies_per_tick = DIV_ROUND_CLOSEST(clk_rate, HZ);
+    jz4740_jiffies_per_tick = DIV_ROUND_CLOSEST(clk_rate, HZ);
 
 	clockevent_set_clock(&jz4740_clockevent, clk_rate);
 	jz4740_clockevent.min_delta_ns = clockevent_delta2ns(100, &jz4740_clockevent);
@@ -125,7 +125,7 @@ void __init plat_time_init(void)
 	ret = clocksource_register(&jz4740_clocksource);
 
 	if (ret)
-		printk(KERN_ERR "Failed to register clocksource: %d\n", ret);
+	    printk(KERN_ERR "Failed to register clocksource: %d\n", ret);
 
 	setup_irq(JZ4740_IRQ_TCU0, &timer_irqaction);
 
@@ -135,10 +135,10 @@ void __init plat_time_init(void)
 	jz4740_timer_set_ctrl(TIMER_CLOCKSOURCE, ctrl);
 
 	jz4740_timer_set_period(TIMER_CLOCKEVENT, jz4740_jiffies_per_tick);
-	jz4740_timer_irq_full_enable(TIMER_CLOCKEVENT);
+    jz4740_timer_irq_full_enable(TIMER_CLOCKEVENT);
 	jz4740_timer_irq_half_disable(TIMER_CLOCKEVENT);
 
-	jz4740_timer_irq_full_disable(TIMER_CLOCKSOURCE);
+    jz4740_timer_irq_full_disable(TIMER_CLOCKSOURCE);
 	jz4740_timer_irq_half_disable(TIMER_CLOCKSOURCE);
 	jz4740_timer_set_period(TIMER_CLOCKSOURCE, 0xffff);
 
