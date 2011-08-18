@@ -136,10 +136,8 @@ void __init plat_time_init(void)
 
 	jz4740_timer_set_period(TIMER_CLOCKEVENT, jz4740_jiffies_per_tick);
     jz4740_timer_irq_full_enable(TIMER_CLOCKEVENT);
-	jz4740_timer_irq_half_disable(TIMER_CLOCKEVENT);
 
     jz4740_timer_irq_full_disable(TIMER_CLOCKSOURCE);
-	jz4740_timer_irq_half_disable(TIMER_CLOCKSOURCE);
 	jz4740_timer_set_period(TIMER_CLOCKSOURCE, 0xffff);
 
 	jz4740_timer_enable(TIMER_CLOCKEVENT);

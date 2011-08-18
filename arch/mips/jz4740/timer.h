@@ -122,17 +122,6 @@ static inline void jz4740_timer_irq_full_disable(unsigned int timer)
 	writel(JZ_TIMER_IRQ_FULL(timer), jz4740_timer_base + JZ_REG_TIMER_MASK_SET);
 }
 
-static inline void jz4740_timer_irq_half_enable(unsigned int timer)
-{
-	writel(JZ_TIMER_IRQ_HALF(timer), jz4740_timer_base + JZ_REG_TIMER_FLAG_CLEAR);
-	writel(JZ_TIMER_IRQ_HALF(timer), jz4740_timer_base + JZ_REG_TIMER_MASK_CLEAR);
-}
-
-static inline void jz4740_timer_irq_half_disable(unsigned int timer)
-{
-	writel(JZ_TIMER_IRQ_HALF(timer), jz4740_timer_base + JZ_REG_TIMER_MASK_SET);
-}
-
 static inline void jz4740_timer_set_ctrl(unsigned int timer, uint16_t ctrl)
 {
 	writew(ctrl, jz4740_timer_base + JZ_REG_TIMER_CTRL(timer));
