@@ -472,7 +472,7 @@ static void jzfb_disable(struct jzfb *jzfb)
 
 static int jzfb_blank(int blank_mode, struct fb_info *info)
 {
-	struct jzfb* jzfb = info->par;
+	struct jzfb *jzfb = info->par;
 	int ret = 0;
 	int new_enabled = (blank_mode == FB_BLANK_UNBLANK);
 
@@ -498,7 +498,13 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 
 static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
+	struct jzfb *jzfb = info->par;
+
 	info->var.yoffset = var->yoffset;
+	/* update frame start address for TV-out mode */
+	jzfb->framedesc->addr = jzfb->vidmem_phys
+	                      + info->fix.line_length * var->yoffset;
+
 	return 0;
 }
 
