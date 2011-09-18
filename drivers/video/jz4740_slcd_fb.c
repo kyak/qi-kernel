@@ -240,13 +240,17 @@ static void jzfb_upload_frame_dma(struct jzfb *jzfb)
 {
 	struct fb_info *fb = jzfb->fb;
 	struct fb_videomode *mode = fb->mode;
-	__u32 bytes_per_line = fb->fix.line_length;
+	__u32 offset = fb->fix.line_length * fb->var.yoffset;
+	__u32 size = fb->fix.line_length * mode->yres;
 
-	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys +
-					   bytes_per_line * fb->var.yoffset);
+	/* Ensure that the data to be uploaded is in memory. */
+	dma_cache_sync(fb->device, jzfb->vidmem + offset, size,
+		       DMA_TO_DEVICE);
+
+	jz4740_dma_set_src_addr(jzfb->dma, jzfb->vidmem_phys + offset);
 	jz4740_dma_set_dst_addr(jzfb->dma,
 				CPHYSADDR(jzfb->base + JZ_REG_SLCD_FIFO));
-	jz4740_dma_set_transfer_count(jzfb->dma, bytes_per_line * mode->yres);
+	jz4740_dma_set_transfer_count(jzfb->dma, size);
 
 	while (readb(jzfb->base + JZ_REG_SLCD_STATE) & SLCD_STATE_BUSY);
 	writeb(readb(jzfb->base + JZ_REG_SLCD_CTRL) | SLCD_CTRL_DMA_EN,
@@ -508,6 +512,22 @@ static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	return 0;
 }
 
+static int jzfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
+{
+	const unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	const unsigned long size = vma->vm_end - vma->vm_start;
+
+	if (offset + size > info->fix.smem_len)
+		return -EINVAL;
+
+	if (remap_pfn_range(vma, vma->vm_start,
+			    (info->fix.smem_start + offset) >> PAGE_SHIFT,
+			    size, vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
+
 static int jzfb_alloc_devmem(struct jzfb *jzfb)
 {
 	int max_framesize = 0;
@@ -670,6 +690,7 @@ static struct fb_ops jzfb_ops = {
 	.fb_copyarea		= sys_copyarea,
 	.fb_imageblit		= sys_imageblit,
 	.fb_ioctl		= jzfb_ioctl,
+	.fb_mmap		= jzfb_mmap,
 };
 
 static int __devinit jzfb_probe(struct platform_device *pdev)
