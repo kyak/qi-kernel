@@ -39,7 +39,7 @@
 
 #include "at86rf230.h"
 
-//#define ENABLE_AACK
+#define ENABLE_AACK
 
 struct at86rf230_local {
 	struct spi_device *spi;
@@ -292,7 +292,11 @@ at86rf230_state(struct ieee802154_dev *dev, int state)
 	might_sleep();
 
 	if (state == STATE_FORCE_TX_ON)
+#ifdef ENABLE_AACK
+		desired_status = STATE_TX_ARET_ON;
+#else
 		desired_status = STATE_TX_ON;
+#endif
 	else if (state == STATE_FORCE_TRX_OFF)
 		desired_status = STATE_TRX_OFF;
 	else
@@ -320,6 +324,32 @@ at86rf230_state(struct ieee802154_dev *dev, int state)
 		pr_debug("%s val2 = %x\n", __func__, val);
 	} while (val == STATE_TRANSITION_IN_PROGRESS);
 
+#ifdef ENABLE_AACK
+	/* Make sure we go to TX_ON before we go to STATE_TX_ARET_ON  */
+	if (desired_status == STATE_TX_ARET_ON) {
+		rc = at86rf230_write_subreg(lp, SR_TRX_CMD, STATE_TX_ON);
+		if (rc)
+			goto err;
+
+		do {
+			rc = at86rf230_read_subreg(lp, SR_TRX_STATUS, &val);
+			if (rc)
+				goto err;
+			pr_debug("%s val3 = %x\n", __func__, val);
+		} while (val == STATE_TRANSITION_IN_PROGRESS);
+
+		rc = at86rf230_write_subreg(lp, SR_TRX_CMD, desired_status);
+		if (rc)
+			goto err;
+
+		do {
+			rc = at86rf230_read_subreg(lp, SR_TRX_STATUS, &val);
+			if (rc)
+				goto err;
+			pr_debug("%s val4 = %x\n", __func__, val);
+		} while (val == STATE_TRANSITION_IN_PROGRESS);
+	}
+#endif
 
 	if (val == desired_status)
 		return 0;
@@ -415,6 +445,9 @@ at86rf230_xmit(struct ieee802154_dev *dev, struct sk_buff *skb)
 		udelay(80); /* > 62.5 */
 		gpio_set_value(lp->slp_tr, 0);
 	} else {
+		/* FIXME: Stay with STATE_BUSY_TX even if we want to got into
+		 * state BUSY_TX_ART. The logic with state and command matching
+		 * the same number breaks totally here. */
 		rc = at86rf230_write_subreg(lp, SR_TRX_CMD, STATE_BUSY_TX);
 		if (rc)
 			goto err_rx;
@@ -633,7 +666,11 @@ static int at86rf230_hw_init(struct at86rf230_local *lp)
 
 	msleep(100);
 
+#ifdef ENABLE_AACK
+	rc = at86rf230_write_subreg(lp, SR_TRX_CMD, STATE_TX_ARET_ON);
+#else
 	rc = at86rf230_write_subreg(lp, SR_TRX_CMD, STATE_TX_ON);
+#endif
 	if (rc)
 		return rc;
 	msleep(1);
