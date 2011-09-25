@@ -39,6 +39,7 @@
 
 #include "at86rf230.h"
 
+//#define ENABLE_AACK
 
 struct at86rf230_local {
 	struct spi_device *spi;
@@ -322,7 +323,11 @@ at86rf230_state(struct ieee802154_dev *dev, int state)
 
 	if (val == desired_status)
 		return 0;
+#ifdef ENABLE_AACK
+	if (state == STATE_RX_AACK_ON && val == STATE_BUSY_RX_AACK)
+#else
 	if (state == STATE_RX_ON && val == STATE_BUSY_RX)
+#endif
 		return 0;
 
 	pr_err("%s unexpected state change: %d, asked for %d\n", __func__,
@@ -343,7 +348,11 @@ at86rf230_start(struct ieee802154_dev *dev)
 	rc = at86rf230_write_subreg(lp, SR_RX_SAFE_MODE, 1);
 	if (rc)
 		return rc;
+#ifdef ENABLE_AACK
+	return at86rf230_state(dev, STATE_RX_AACK_ON);
+#else
 	return at86rf230_state(dev, STATE_RX_ON);
+#endif
 }
 
 static void
@@ -478,6 +487,58 @@ err_fbuf:
 	return -EINVAL;
 }
 
+#ifdef ENABLE_AACK
+static int
+at86rf230_set_hw_addr_filt(struct ieee802154_dev *dev,
+						struct ieee802154_hw_addr_filt *filt,
+						unsigned long changed)
+{
+	struct at86rf230_local *lp = dev->priv;
+
+	might_sleep();
+
+	at86rf230_stop(dev);
+
+	msleep(10);
+
+	if (changed & IEEE802515_SADDR_CHANGED) {
+		dev_info(&lp->spi->dev, "at86rf230_set_hw_addr_filt called for saddr\n");
+		__at86rf230_write(lp, RG_SHORT_ADDR_0, filt->short_addr & 0xff); /* LSB */
+		__at86rf230_write(lp, RG_SHORT_ADDR_1, (filt->short_addr >> 8) & 0xff); /* MSB */
+	}
+
+	if (changed & IEEE802515_PANID_CHANGED) {
+		dev_info(&lp->spi->dev, "at86rf230_set_hw_addr_filt called for pan id\n");
+		__at86rf230_write(lp, RG_PAN_ID_0, filt->pan_id & 0xff); /* LSB */
+		__at86rf230_write(lp, RG_PAN_ID_1, (filt->pan_id >> 8) & 0xff); /* MSB */
+	}
+
+	if (changed & IEEE802515_IEEEADDR_CHANGED) {
+		dev_info(&lp->spi->dev, "at86rf230_set_hw_addr_filt called ieee addr\n");
+		// Make sure order MSB to LSB is correct
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_0, filt->ieee_addr[7]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_1, filt->ieee_addr[6]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_2, filt->ieee_addr[5]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_3, filt->ieee_addr[4]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_4, filt->ieee_addr[3]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_5, filt->ieee_addr[2]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_6, filt->ieee_addr[1]);
+		at86rf230_write_subreg(lp, SR_IEEE_ADDR_7, filt->ieee_addr[0]);
+	}
+
+	if (changed & IEEE802515_PANC_CHANGED) {
+		dev_info(&lp->spi->dev, "at86rf230_set_hw_addr_filt called panc change\n");
+		if (filt->pan_coord)
+			at86rf230_write_subreg(lp, SR_AACK_I_AM_COORD, 1);
+		else
+			at86rf230_write_subreg(lp, SR_AACK_I_AM_COORD, 0);
+	}
+
+	at86rf230_start(dev);
+
+	return 0;
+}
+#endif
 static struct ieee802154_ops at86rf230_ops = {
 	.owner = THIS_MODULE,
 	.xmit = at86rf230_xmit,
@@ -485,6 +546,9 @@ static struct ieee802154_ops at86rf230_ops = {
 	.set_channel = at86rf230_channel,
 	.start = at86rf230_start,
 	.stop = at86rf230_stop,
+#ifdef ENABLE_AACK
+	.set_hw_addr_filt = at86rf230_set_hw_addr_filt,
+#endif
 };
 
 static void at86rf230_irqwork(struct work_struct *work)
@@ -530,7 +594,6 @@ static irqreturn_t at86rf230_isr(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
-
 
 static int at86rf230_hw_init(struct at86rf230_local *lp)
 {
@@ -694,7 +757,11 @@ static int __devinit at86rf230_probe(struct spi_device *spi)
 	dev->extra_tx_headroom = 0;
 	/* We do support only 2.4 Ghz */
 	dev->phy->channels_supported[0] = 0x7FFF800;
+#ifdef ENABLE_AACK
+	dev->flags = IEEE802154_HW_OMIT_CKSUM | IEEE802154_HW_AACK;
+#else
 	dev->flags = IEEE802154_HW_OMIT_CKSUM;
+#endif
 
 	mutex_init(&lp->bmux);
 	INIT_WORK(&lp->irqwork, at86rf230_irqwork);
