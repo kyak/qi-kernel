@@ -166,9 +166,8 @@ static int rda5807_update_reg(struct rda5807_driver *radio,
 
 static int rda5807_set_enable(struct rda5807_driver *radio, int enabled)
 {
-	// TODO: What should control power up/down?
-	//       Mute would be a candidate.
 	u16 val = enabled ? RDA5807_MASK_CTRL_ENABLE : 0;
+	dev_info(&radio->i2c_client->dev, "set enabled to %d\n", enabled);
 	return rda5807_update_reg(radio, RDA5807_REG_CTRL,
 				  RDA5807_MASK_CTRL_ENABLE, val);
 }
@@ -176,6 +175,7 @@ static int rda5807_set_enable(struct rda5807_driver *radio, int enabled)
 static int rda5807_set_mute(struct rda5807_driver *radio, int muted)
 {
 	u16 val = muted ? 0 : RDA5807_MASK_CTRL_DMUTE /* disable mute */;
+	dev_info(&radio->i2c_client->dev, "set mute to %d\n", muted);
 	return rda5807_update_reg(radio, RDA5807_REG_CTRL,
 				  RDA5807_MASK_CTRL_DMUTE, val);
 }
@@ -237,8 +237,15 @@ static int rda5807_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct rda5807_driver *radio = ctrl_to_radio(ctrl);
 
 	switch (ctrl->id) {
-	case V4L2_CID_AUDIO_MUTE:
-		return rda5807_set_mute(radio, ctrl->val);
+	case V4L2_CID_AUDIO_MUTE: {
+		/* Disable the radio while muted, to save power.
+		 * TODO: We can't seek while the radio is disabled;
+		 *       is that a problem?
+		 */
+		int err1 = rda5807_set_enable(radio, !ctrl->val);
+		int err2 = rda5807_set_mute(radio, ctrl->val);
+		return err1 ? err1 : err2;
+	}
 	case V4L2_CID_AUDIO_VOLUME:
 		return rda5807_set_volume(radio, ctrl->val);
 	case V4L2_CID_TUNE_PREEMPHASIS:
@@ -369,7 +376,7 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 	/* Initialize controls. */
 	v4l2_ctrl_handler_init(&radio->ctrl_handler, 3);
 	v4l2_ctrl_new_std(&radio->ctrl_handler, &rda5807_ctrl_ops,
-			  V4L2_CID_AUDIO_MUTE, 0, 1, 1, 0);
+			  V4L2_CID_AUDIO_MUTE, 0, 1, 1, 1);
 	v4l2_ctrl_new_std(&radio->ctrl_handler, &rda5807_ctrl_ops,
 			  V4L2_CID_AUDIO_VOLUME, 0, 15, 1, 8);
 	v4l2_ctrl_new_std_menu(&radio->ctrl_handler, &rda5807_ctrl_ops,
@@ -409,8 +416,6 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 				       " (%d)\n", err);
 		goto err_video_unreg;
 	}
-	// TODO: Disable on startup and enable on demand.
-	rda5807_set_enable(radio, 1);
 
 	return 0;
 
