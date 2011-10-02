@@ -406,6 +406,13 @@ struct jz4740_clock_board_data jz4740_clock_bdata = {
 	.rtc_rate = 32768,
 };
 
+static struct i2c_board_info a320_i2c_info[] __initdata = {
+	{
+		.type = "radio-rda5807",
+		.addr = 0x11,
+	}
+};
+
 static int __init a320_board_setup(void)
 {
 	printk(KERN_INFO "JZ4740 A320 board setup\n");
@@ -416,6 +423,8 @@ static int __init a320_board_setup(void)
 
 	if (a320_init_platform_devices())
 		panic("Failed to initalize platform devices\n");
+
+	i2c_register_board_info(0, a320_i2c_info, ARRAY_SIZE(a320_i2c_info));
 
 	return 0;
 }
