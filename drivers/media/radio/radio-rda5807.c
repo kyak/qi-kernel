@@ -314,11 +314,7 @@ static int rda5807_vidioc_g_tuner(struct file *file, void *fh,
 		.rxsubchans = rxsubchans,
 		/* TODO: Implement forced mono (RDA5807_MASK_CTRL_MONO). */
 		.audmode = V4L2_TUNER_MODE_STEREO,
-		/* TODO: Is the signal strength 6 or 7 bits wide?
-		         Good reception is about 56, which would suggest
-		         that 63 is max, so 6 bits. */
-		/* TODO: RSSI is logarithmic, does V4L2 expect log or linear? */
-		.signal = signal < 0x40 ? signal << 10 : 0xFFFF,
+		.signal = signal << (16 - 7),
 		.afc = 0, /* automatic frequency control */
 	};
 
