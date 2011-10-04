@@ -168,9 +168,19 @@ static int rda5807_update_reg(struct rda5807_driver *radio,
 static int rda5807_set_enable(struct rda5807_driver *radio, int enabled)
 {
 	u16 val = enabled ? RDA5807_MASK_CTRL_ENABLE : 0;
+	int err;
 	dev_info(&radio->i2c_client->dev, "set enabled to %d\n", enabled);
-	return rda5807_update_reg(radio, RDA5807_REG_CTRL,
-				  RDA5807_MASK_CTRL_ENABLE, val);
+	err = rda5807_update_reg(radio, RDA5807_REG_CTRL,
+				 RDA5807_MASK_CTRL_ENABLE, val);
+	if (err < 0)
+		return err;
+	/* Tuning is lost when the chip is disabled, so re-tune when enabled. */
+	if (enabled)
+		return rda5807_update_reg(radio, RDA5807_REG_CHAN,
+					  RDA5807_MASK_CHAN_TUNE,
+					  RDA5807_MASK_CHAN_TUNE);
+	else
+		return 0;
 }
 
 static int rda5807_set_mute(struct rda5807_driver *radio, int muted)
