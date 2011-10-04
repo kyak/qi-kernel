@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/kernel.h>
+#include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/videodev2.h>
@@ -440,6 +441,40 @@ static int __devexit rda5807_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+
+static int rda5807_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct rda5807_driver *radio = i2c_get_clientdata(client);
+
+	return rda5807_set_enable(radio, 0);
+}
+
+static int rda5807_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct rda5807_driver *radio = i2c_get_clientdata(client);
+	struct v4l2_ctrl *mute_ctrl = v4l2_ctrl_find(&radio->ctrl_handler,
+						     V4L2_CID_AUDIO_MUTE);
+	s32 mute_val = v4l2_ctrl_g_ctrl(mute_ctrl);
+	int enabled = !mute_val;
+
+	if (enabled)
+		return rda5807_set_enable(radio, enabled);
+	else
+		return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(rda5807_pm_ops, rda5807_suspend, rda5807_resume);
+#define RDA5807_PM_OPS (&rda5807_pm_ops)
+
+#else
+
+#define RDA5807_PM_OPS NULL
+
+#endif
+
 static const struct i2c_device_id rda5807_id[] = {
 	{ "radio-rda5807", 0 },
 	{ }
@@ -451,8 +486,9 @@ static struct i2c_driver rda5807_i2c_driver = {
 	.remove = __devexit_p(rda5807_i2c_remove),
 	.id_table = rda5807_id,
 	.driver = {
-		.name = "radio-rda5807",
-		.owner = THIS_MODULE,
+		.name	= "radio-rda5807",
+		.owner	= THIS_MODULE,
+		.pm	= RDA5807_PM_OPS,
 	},
 };
 
