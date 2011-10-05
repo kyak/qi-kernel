@@ -361,19 +361,19 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 	u16 val;
 
 	if (!pdata) {
-		dev_warn(&client->dev, "Platform data missing\n");
+		dev_err(&client->dev, "Platform data missing\n");
 		return -EINVAL;
 	}
 
 	err = rda5807_i2c_read(client, RDA5807_REG_CHIPID);
 	if (err < 0) {
-		dev_warn(&client->dev, "Failed to read chip ID (%d)\n", err);
+		dev_err(&client->dev, "Failed to read chip ID (%d)\n", err);
 		return err;
 	}
 	val = err;
 	if ((val & 0xFF00) != 0x5800) {
-		dev_warn(&client->dev, "Chip ID mismatch: "
-				       "expected 58xx, got %04X\n", val);
+		dev_err(&client->dev, "Chip ID mismatch: "
+				      "expected 58xx, got %04X\n", val);
 		return -ENODEV;
 	}
 	dev_info(&client->dev, "Found FM radio receiver\n");
@@ -382,7 +382,7 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 
 	radio = kzalloc(sizeof(*radio), GFP_KERNEL);
 	if (!radio) {
-		dev_warn(&client->dev, "Failed to allocate driver data\n");
+		dev_err(&client->dev, "Failed to allocate driver data\n");
 		return -ENOMEM;
 	}
 
@@ -401,8 +401,8 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 			       V4L2_PREEMPHASIS_50_uS);
 	err = radio->ctrl_handler.error;
 	if (err) {
-		dev_warn(&client->dev, "Failed to init controls handler"
-			 " (%d)\n", err);
+		dev_err(&client->dev, "Failed to init controls handler (%d)\n",
+			err);
 		goto err_ctrl_free;
 	}
 
@@ -420,8 +420,8 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 
 	err = video_register_device(&radio->video_dev, VFL_TYPE_RADIO, -1);
 	if (err < 0) {
-		dev_warn(&client->dev, "Failed to register video device (%d)\n",
-				       err);
+		dev_err(&client->dev, "Failed to register video device (%d)\n",
+				      err);
 		goto err_ctrl_free;
 	}
 
@@ -456,8 +456,8 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 
 	err = v4l2_ctrl_handler_setup(&radio->ctrl_handler);
 	if (err < 0) {
-		dev_warn(&client->dev, "Failed to set default control values"
-				       " (%d)\n", err);
+		dev_err(&client->dev, "Failed to set default control values"
+				      " (%d)\n", err);
 		goto err_video_unreg;
 	}
 
