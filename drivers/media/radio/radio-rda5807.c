@@ -25,7 +25,7 @@
  * - I2C address 0x11: random access
  * - I2C address 0x60: sequential access, TEA5767 compatible
  * This driver uses random access and therefore the i2c_board_info should
- * specify address 0x11.
+ * specify address 0x11 using the macro RDA5807_I2C_ADDR.
  * Note that while there are many similarities, the register map of the RDA5807
  * differs from that of the RDA5800 in several essential places.
  */
@@ -40,6 +40,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/videodev2.h>
+#include <media/radio-rda5807.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
@@ -354,18 +355,25 @@ static const struct v4l2_ioctl_ops rda5807_ioctl_ops = {
 static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 				       const struct i2c_device_id *id)
 {
+	struct rda5807_platform_data *pdata = client->dev.platform_data;
 	struct rda5807_driver *radio;
-	int chipid;
 	int err;
+	u16 val;
 
-	chipid = rda5807_i2c_read(client, RDA5807_REG_CHIPID);
-	if (chipid < 0) {
-		dev_warn(&client->dev, "Failed to read chip ID (%d)\n", chipid);
-		return chipid;
+	if (!pdata) {
+		dev_warn(&client->dev, "Platform data missing\n");
+		return -EINVAL;
 	}
-	if ((chipid & 0xFF00) != 0x5800) {
+
+	err = rda5807_i2c_read(client, RDA5807_REG_CHIPID);
+	if (err < 0) {
+		dev_warn(&client->dev, "Failed to read chip ID (%d)\n", err);
+		return err;
+	}
+	val = err;
+	if ((val & 0xFF00) != 0x5800) {
 		dev_warn(&client->dev, "Chip ID mismatch: "
-				       "expected 58xx, got %04X\n", chipid);
+				       "expected 58xx, got %04X\n", val);
 		return -ENODEV;
 	}
 	dev_info(&client->dev, "Found FM radio receiver\n");
@@ -415,6 +423,35 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 		dev_warn(&client->dev, "Failed to register video device (%d)\n",
 				       err);
 		goto err_ctrl_free;
+	}
+
+	/* Configure chip inputs. */
+	err = rda5807_update_reg(radio, RDA5807_REG_INTM_THRESH_VOL,
+				 0xF << 4, (pdata->input_flags & 0xF) << 4);
+	if (err < 0) {
+		dev_warn(&client->dev, "Failed to configure inputs (%d)\n",
+				       err);
+	}
+	/* Configure chip outputs. */
+	val = 0;
+	if (pdata->output_flags & RDA5807_OUTPUT_AUDIO_I2S) {
+		val |= BIT(6);
+	} else if (pdata->output_flags & RDA5807_OUTPUT_STEREO_INDICATOR) {
+		val |= BIT(4);
+	}
+	err = rda5807_update_reg(radio, RDA5807_REG_IOCFG, 0x003F, val);
+	if (err < 0) {
+		dev_warn(&client->dev, "Failed to configure outputs (%d)\n",
+				       err);
+	}
+	val = 0;
+	if (pdata->output_flags & RDA5807_OUTPUT_AUDIO_ANALOG) {
+		val |= BIT(15);
+	}
+	err = rda5807_update_reg(radio, RDA5807_REG_CTRL, BIT(15), val);
+	if (err < 0) {
+		dev_warn(&client->dev, "Failed to configure outputs (%d)\n",
+				       err);
 	}
 
 	err = v4l2_ctrl_handler_setup(&radio->ctrl_handler);
