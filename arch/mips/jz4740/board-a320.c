@@ -30,6 +30,8 @@
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
 
+#include <media/radio-rda5807.h>
+
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
 #include <asm/mipsregs.h>
@@ -406,10 +408,16 @@ struct jz4740_clock_board_data jz4740_clock_bdata = {
 	.rtc_rate = 32768,
 };
 
+static struct rda5807_platform_data a320_rda5807_pdata = {
+	.input_flags		= RDA5807_INPUT_LNA_WC_25 | RDA5807_LNA_PORT_P,
+	.output_flags		= RDA5807_OUTPUT_AUDIO_ANALOG,
+};
+
 static struct i2c_board_info a320_i2c_info[] __initdata = {
 	{
-		.type = "radio-rda5807",
-		.addr = 0x11,
+		.type		= "radio-rda5807",
+		.addr		= RDA5807_I2C_ADDR,
+		.platform_data	= &a320_rda5807_pdata,
 	}
 };
 
