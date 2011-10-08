@@ -78,6 +78,7 @@ enum rda5807_reg {
 #define RDA5807_MASK_SEEKRES_COMPLETE	BIT(14)
 #define RDA5807_MASK_SEEKRES_FAIL	BIT(13)
 #define RDA5807_MASK_SEEKRES_STEREO	BIT(10)
+#define RDA5807_MASK_SEEKRES_READCHAN	0x3FF
 
 #define RDA5807_MASK_DEEMPHASIS		BIT(11)
 
@@ -208,6 +209,23 @@ static int rda5807_set_preemphasis(struct rda5807_driver *radio,
 				  RDA5807_MASK_DEEMPHASIS,
 				  preemp == V4L2_PREEMPHASIS_50_uS
 				          ? RDA5807_MASK_DEEMPHASIS : 0);
+}
+
+static int rda5807_get_frequency(struct rda5807_driver *radio)
+{
+	u32 freq_khz;
+	u16 val;
+	int err;
+
+	err = rda5807_i2c_read(radio->i2c_client, RDA5807_REG_SEEK_RESULT);
+	if (err < 0)
+		return err;
+	val = err;
+
+	freq_khz = 50 * (val & RDA5807_MASK_SEEKRES_READCHAN)
+		 + RDA5807_FREQ_MIN_KHZ;
+	dev_info(&radio->i2c_client->dev, "get freq of %u kHz\n", freq_khz);
+	return freq_khz;
 }
 
 static int rda5807_set_frequency(struct rda5807_driver *radio, u32 freq_khz)
@@ -346,6 +364,24 @@ static int rda5807_vidioc_g_tuner(struct file *file, void *fh,
 	return 0;
 }
 
+static int rda5807_vidioc_g_frequency(struct file *file, void *fh,
+				      struct v4l2_frequency *a)
+{
+	struct rda5807_driver *radio = video_drvdata(file);
+	int freq_khz;
+
+	if (a->tuner != 0)
+		return -EINVAL;
+	/* This ioctl ignores the type field. */
+
+	freq_khz = rda5807_get_frequency(radio);
+	if (freq_khz < 0)
+		return freq_khz;
+
+	a->frequency = (__u32)freq_khz * 16;
+	return 0;
+}
+
 static int rda5807_vidioc_s_frequency(struct file *file, void *fh,
 				      struct v4l2_frequency *a)
 {
@@ -363,6 +399,7 @@ static const struct v4l2_ioctl_ops rda5807_ioctl_ops = {
 	.vidioc_querycap	= rda5807_vidioc_querycap,
 	.vidioc_g_audio		= rda5807_vidioc_g_audio,
 	.vidioc_g_tuner		= rda5807_vidioc_g_tuner,
+	.vidioc_g_frequency	= rda5807_vidioc_g_frequency,
 	.vidioc_s_frequency	= rda5807_vidioc_s_frequency,
 };
 
