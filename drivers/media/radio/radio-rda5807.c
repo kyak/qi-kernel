@@ -271,6 +271,19 @@ static const struct v4l2_ctrl_ops rda5807_ctrl_ops = {
 	.s_ctrl = rda5807_s_ctrl,
 };
 
+static int rda5807_vidioc_querycap(struct file *file, void *fh,
+				   struct v4l2_capability *cap)
+{
+	*cap = (struct v4l2_capability) {
+		.driver		= "rda5807",
+		.card		= "RDA5807 FM receiver",
+		.bus_info	= "I2C",
+		.capabilities	= V4L2_CAP_RADIO | V4L2_CAP_TUNER,
+	};
+
+	return 0;
+}
+
 static int rda5807_vidioc_g_audio(struct file *file, void *fh,
 				  struct v4l2_audio *a)
 {
@@ -347,9 +360,10 @@ static int rda5807_vidioc_s_frequency(struct file *file, void *fh,
 }
 
 static const struct v4l2_ioctl_ops rda5807_ioctl_ops = {
-	.vidioc_g_audio     = rda5807_vidioc_g_audio,
-	.vidioc_g_tuner     = rda5807_vidioc_g_tuner,
-	.vidioc_s_frequency = rda5807_vidioc_s_frequency,
+	.vidioc_querycap	= rda5807_vidioc_querycap,
+	.vidioc_g_audio		= rda5807_vidioc_g_audio,
+	.vidioc_g_tuner		= rda5807_vidioc_g_tuner,
+	.vidioc_s_frequency	= rda5807_vidioc_s_frequency,
 };
 
 static int __devinit rda5807_i2c_probe(struct i2c_client *client,
@@ -394,6 +408,11 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 			  V4L2_CID_AUDIO_MUTE, 0, 1, 1, 1);
 	v4l2_ctrl_new_std(&radio->ctrl_handler, &rda5807_ctrl_ops,
 			  V4L2_CID_AUDIO_VOLUME, 0, 15, 1, 8);
+	/* TODO: V4L2_CID_TUNE_PREEMPHASIS is based on V4L2_CID_FM_TX_CLASS_BASE
+	 *       which suggests it is a transmit control rather than a receive
+	 *       control. The register bit we change is called "de-emphasis",
+	 *       but there is no de-emphasis control in V4L2.
+	 */
 	v4l2_ctrl_new_std_menu(&radio->ctrl_handler, &rda5807_ctrl_ops,
 			       V4L2_CID_TUNE_PREEMPHASIS,
 			       V4L2_PREEMPHASIS_75_uS,
