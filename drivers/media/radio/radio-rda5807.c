@@ -257,6 +257,30 @@ static int rda5807_set_frequency(struct rda5807_driver *radio, u32 freq_khz)
 	return rda5807_update_reg(radio, RDA5807_REG_CHAN, mask, val);
 }
 
+static int rda5807_seek_frequency(struct rda5807_driver *radio,
+				  int upward, int wrap)
+{
+	u16 mask = 0;
+	u16 val = 0;
+
+	/* TODO: Seek threshold is configurable. How should the driver handle
+	 *       this configuration?
+	 */
+	/* seek up or down? */
+	mask |= RDA5807_MASK_CTRL_SEEKUP;
+	if (upward)
+		val |= RDA5807_MASK_CTRL_SEEKUP;
+	/* wrap around at band limit? */
+	mask |= RDA5807_MASK_CTRL_SKMODE;
+	if (!wrap)
+		val |= RDA5807_MASK_CTRL_SKMODE;
+	/* seek command */
+	mask |= RDA5807_MASK_CTRL_SEEK;
+	val  |= RDA5807_MASK_CTRL_SEEK;
+
+	return rda5807_update_reg(radio, RDA5807_REG_CTRL, mask, val);
+}
+
 static inline struct rda5807_driver *ctrl_to_radio(struct v4l2_ctrl *ctrl)
 {
 	return container_of(ctrl->handler, struct rda5807_driver, ctrl_handler);
@@ -296,7 +320,8 @@ static int rda5807_vidioc_querycap(struct file *file, void *fh,
 		.driver		= "rda5807",
 		.card		= "RDA5807 FM receiver",
 		.bus_info	= "I2C",
-		.capabilities	= V4L2_CAP_RADIO | V4L2_CAP_TUNER,
+		.capabilities	= V4L2_CAP_RADIO | V4L2_CAP_TUNER
+					| V4L2_CAP_HW_FREQ_SEEK,
 	};
 
 	return 0;
@@ -395,12 +420,26 @@ static int rda5807_vidioc_s_frequency(struct file *file, void *fh,
 	return rda5807_set_frequency(radio, (a->frequency * 625) / 10000);
 }
 
+static int rda5807_vidioc_s_hw_freq_seek(struct file *file, void *fh,
+					 struct v4l2_hw_freq_seek *a)
+{
+	struct rda5807_driver *radio = video_drvdata(file);
+
+	if (a->tuner != 0)
+		return -EINVAL;
+	if (a->type != V4L2_TUNER_RADIO)
+		return -EINVAL;
+
+	return rda5807_seek_frequency(radio, a->seek_upward, a->wrap_around);
+}
+
 static const struct v4l2_ioctl_ops rda5807_ioctl_ops = {
 	.vidioc_querycap	= rda5807_vidioc_querycap,
 	.vidioc_g_audio		= rda5807_vidioc_g_audio,
 	.vidioc_g_tuner		= rda5807_vidioc_g_tuner,
 	.vidioc_g_frequency	= rda5807_vidioc_g_frequency,
 	.vidioc_s_frequency	= rda5807_vidioc_s_frequency,
+	.vidioc_s_hw_freq_seek  = rda5807_vidioc_s_hw_freq_seek,
 };
 
 static int __devinit rda5807_i2c_probe(struct i2c_client *client,
