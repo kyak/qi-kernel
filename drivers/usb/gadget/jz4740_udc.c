@@ -160,6 +160,9 @@ static struct jz4740_udc jz4740_udc_controller;
 /*
  * Local declarations.
  */
+static int jz4740_udc_start(struct usb_gadget_driver *driver,
+		int (*bind)(struct usb_gadget *));
+static int jz4740_udc_stop(struct usb_gadget_driver *driver);
 static void jz4740_ep0_kick(struct jz4740_udc *dev, struct jz4740_ep *ep);
 static void jz4740_handle_ep0(struct jz4740_udc *dev, uint32_t intr);
 
@@ -413,7 +416,7 @@ static void udc_enable(struct jz4740_udc *dev)
  * Register entry point for the peripheral controller driver.
  */
 
-int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
+static int jz4740_udc_start(struct usb_gadget_driver *driver,
 		int (*bind)(struct usb_gadget *))
 {
 	struct jz4740_udc *dev = &jz4740_udc_controller;
@@ -450,7 +453,6 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 
 	return 0;
 }
-EXPORT_SYMBOL(usb_gadget_probe_driver);
 
 static void stop_activity(struct jz4740_udc *dev,
 			  struct usb_gadget_driver *driver)
@@ -489,7 +491,7 @@ static void stop_activity(struct jz4740_udc *dev,
 /*
  * Unregister entry point for the peripheral controller driver.
  */
-int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
+static int jz4740_udc_stop(struct usb_gadget_driver *driver)
 {
 	struct jz4740_udc *dev = &jz4740_udc_controller;
 	unsigned long flags;
@@ -515,8 +517,6 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	return 0;
 }
-
-EXPORT_SYMBOL(usb_gadget_unregister_driver);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1936,6 +1936,8 @@ static const struct usb_gadget_ops jz4740_udc_ops = {
 	.get_frame = jz4740_udc_get_frame,
 	.wakeup = jz4740_udc_wakeup,
 	.pullup = jz4740_udc_pullup,
+	.start = jz4740_udc_start,
+	.stop = jz4740_udc_stop,
 };
 
 static struct usb_ep_ops jz4740_ep_ops = {
@@ -2087,9 +2089,15 @@ static int __devinit jz4740_udc_probe(struct platform_device *pdev)
 	jz4740_udc->irq = platform_get_irq(pdev, 0);
 	ret = request_irq(jz4740_udc->irq, jz4740_udc_irq, 0, pdev->name,
 	jz4740_udc);
-        if (ret) {
-                dev_err(&pdev->dev, "Failed to request irq: %d\n", ret);
-                goto err_iounmap;
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to request irq: %d\n", ret);
+		goto err_iounmap;
+	}
+
+	ret = usb_add_gadget_udc(&pdev->dev, &jz4740_udc->gadget);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to add gadget: %d\n", ret);
+		goto err_free_irq;
 	}
 
 	udc_disable(jz4740_udc);
@@ -2097,6 +2105,8 @@ static int __devinit jz4740_udc_probe(struct platform_device *pdev)
 
 	return 0;
 
+err_free_irq:
+	free_irq(jz4740_udc->irq, pdev);
 err_iounmap:
 	iounmap(jz4740_udc->base);
 err_release_mem_region:
@@ -2114,6 +2124,7 @@ static int __devexit jz4740_udc_remove(struct platform_device *pdev)
 {
 	struct jz4740_udc *dev = platform_get_drvdata(pdev);
 
+	usb_del_gadget_udc(&dev->gadget);
 	if (dev->driver)
 		return -EBUSY;
 
