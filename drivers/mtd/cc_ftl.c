@@ -81,7 +81,7 @@ uint32_t *cc_ftl_build_block_map(struct mtd_info *mtd)
 	// TODO: Is it worth reading multiple oobs at once?
 	//       Reading two will at least help against bit errors.
 	struct mtd_oob_ops oob_ops = {
-		.mode		= MTD_OOB_RAW,
+		.mode		= MTD_OPS_RAW,
 		.len		= 0,
 		.ooblen		= mtd->oobsize,
 		.datbuf		= NULL,
