@@ -831,6 +831,8 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	}
 
 	jzfb->fb = fb;
+	fb_prepare_logo(jzfb->fb, 0);
+	fb_show_logo(jzfb->fb, 0);
 
 	INIT_DELAYED_WORK(&jzfb->refresh_work, jzfb_refresh_work);
 	schedule_delayed_work(&jzfb->refresh_work, 0);
