@@ -146,7 +146,7 @@ static void a320_nand_ident(struct platform_device *pdev,
 			    struct mtd_partition **partitions,
 			    int *num_partitions)
 {
-	chip->options |= NAND_USE_FLASH_BBT;
+	chip->bbt_options |= NAND_BBT_USE_FLASH;
 	chip->bbt_td = &a320_nand_bbt_main_descr;
 	/* MtH: I did not find a mirror bbt yet, but it might exist. */
 	chip->bbt_md = NULL;
