@@ -454,13 +454,14 @@ static int __init fb_console_setup(char *this_opt)
 				k++;
 
 			/* Clear the 'k' or 'K' suffix to
-			 * prevent errors with kstrtoint */
+			 * prevent errors with kstrtouint */
 			if (*k != '\0')
 				*k++ = '\0';
 			else
 				k = NULL;
 
-			ret = kstrtoint(options, 0, &fbcon_softback_size);
+			ret = kstrtouint(options, 0, (unsigned int *)
+						&fbcon_softback_size);
 
 			if (!ret && k)
 				fbcon_softback_size *= 1024;
@@ -494,13 +495,15 @@ static int __init fb_console_setup(char *this_opt)
 			if (dash)
 				*dash++ = '\0';
 
-			ret = kstrtoint(options, 10, &first_fb_vc);
+			ret = kstrtouint(options, 10,
+						(unsigned int *) &first_fb_vc);
 			if (!ret) {
 				if (--first_fb_vc < 0)
 					first_fb_vc = 0;
 
 				if (dash) {
-					ret = kstrtoint(dash, 10,
+					ret = kstrtouint(dash, 10,
+								(unsigned int *)
 								&last_fb_vc);
 					if (!ret)
 						last_fb_vc--;
@@ -515,7 +518,8 @@ static int __init fb_console_setup(char *this_opt)
 
 		if (!strncmp(options, "rotate:", 7)) {
 			options += 7;
-			ret = kstrtoint(options, 0, &initial_rotation);
+			ret = kstrtouint(options, 0, (unsigned int *)
+						&initial_rotation);
 			if (!ret) {
 				if (initial_rotation > 3)
 					initial_rotation = 0;
@@ -3342,7 +3346,8 @@ static ssize_t store_rotate(struct device *device,
 			    size_t count)
 {
 	struct fb_info *info;
-	int rotate, idx;
+	int idx;
+	unsigned int rotate;
 
 	if (fbcon_has_exited)
 		return count;
@@ -3354,7 +3359,7 @@ static ssize_t store_rotate(struct device *device,
 		goto err;
 
 	info = registered_fb[idx];
-	if (kstrtoint(buf, 0, &rotate))
+	if (kstrtouint(buf, 0, &rotate))
 		goto err;
 	fbcon_rotate(info, rotate);
 err:
@@ -3367,7 +3372,8 @@ static ssize_t store_rotate_all(struct device *device,
 				size_t count)
 {
 	struct fb_info *info;
-	int rotate, idx;
+	int idx;
+	unsigned int rotate;
 
 	if (fbcon_has_exited)
 		return count;
@@ -3379,7 +3385,7 @@ static ssize_t store_rotate_all(struct device *device,
 		goto err;
 
 	info = registered_fb[idx];
-	if (kstrtoint(buf, 0, &rotate))
+	if (kstrtouint(buf, 0, &rotate))
 		goto err;
 	fbcon_rotate_all(info, rotate);
 err:
@@ -3442,7 +3448,8 @@ static ssize_t store_cursor_blink(struct device *device,
 				  const char *buf, size_t count)
 {
 	struct fb_info *info;
-	int blink, idx;
+	int idx;
+	unsigned int blink;
 
 	if (fbcon_has_exited)
 		return count;
@@ -3458,7 +3465,7 @@ static ssize_t store_cursor_blink(struct device *device,
 	if (!info->fbcon_par)
 		goto err;
 
-	if (kstrtoint(buf, 0, &blink))
+	if (kstrtouint(buf, 0, &blink))
 		goto err;
 
 	if (blink) {
