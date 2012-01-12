@@ -441,8 +441,10 @@ static int __init fb_console_setup(char *this_opt)
 		return 1;
 
 	while ((options = strsep(&this_opt, ",")) != NULL) {
-		if (!strncmp(options, "font:", 5))
+		if (!strncmp(options, "font:", 5)) {
 			strlcpy(fontname, options + 5, sizeof(fontname));
+			continue;
+		}
 		
 		if (!strncmp(options, "scrollback:", 11)) {
 			char *k;
@@ -468,6 +470,7 @@ static int __init fb_console_setup(char *this_opt)
 			/* (k && *k): Check for garbage after the suffix */
 			if (ret || (k && *k))
 				printk(KERN_WARNING "fbcon: scrollback: incorrect value.\n");
+			continue;
 		}
 		
 		if (!strncmp(options, "map:", 4)) {
@@ -484,6 +487,7 @@ static int __init fb_console_setup(char *this_opt)
 			} else {
 				printk(KERN_WARNING "fbcon: map: incorrect value.\n");
 			}
+			continue;
 		}
 
 		if (!strncmp(options, "vc:", 3)) {
@@ -513,6 +517,7 @@ static int __init fb_console_setup(char *this_opt)
 				fbcon_is_default = 0;
 			else
 				printk(KERN_WARNING "fbcon: vc: incorrect value.\n");
+			continue;
 		}
 
 		if (!strncmp(options, "rotate:", 7)) {
@@ -525,6 +530,7 @@ static int __init fb_console_setup(char *this_opt)
 			} else {
 				printk(KERN_WARNING "fbcon: rotate: incorrect value.\n");
 			}
+			continue;
 		}
 	}
 	return 1;
