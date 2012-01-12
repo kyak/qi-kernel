@@ -107,6 +107,8 @@ struct jz_slcd_panel {
 	void (*enable)(struct jzfb *jzfb);
 	/* deactivate */
 	void (*disable)(struct jzfb *jzfb);
+	/* panel name */
+	const char *name;
 };
 
 const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb);

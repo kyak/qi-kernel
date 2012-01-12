@@ -23,6 +23,8 @@
 
 #include "jz4740_slcd.h"
 
+static unsigned int jz_slcd_panel = 0;
+
 /* Send a command without data. */
 static void send_panel_command(struct jzfb *jzfb, u32 cmd) {
 	u16 slcd_cfg = readw(jzfb->base + JZ_REG_SLCD_CFG);
@@ -820,33 +822,63 @@ static const struct jz_slcd_panel jz_slcd_panels[] = {
 	{
 		ili9325_init, ili9325_exit,
 		ili9325_enable, ili9325_disable,
+		"ili9325",
 	},
 #endif
 #ifdef CONFIG_JZ_SLCD_ILI9331
 	{
 		ili9331_init, ili9331_exit,
 		ili9331_enable, ili9331_disable,
+		"ili9331",
 	},
 #endif
 #ifdef CONFIG_JZ_SLCD_ILI9338
 	{
 		ili9338_init, ili9338_exit,
 		ili9338_enable, ili9338_disable,
+		"ili9338",
 	},
 #endif
 #ifdef CONFIG_JZ_SLCD_LGDP4551
 	{
 		lgdp4551_init, lgdp4551_exit,
 		lgdp4551_enable, lgdp4551_disable,
+		"lgdp4551",
 	},
 #endif
 #ifdef CONFIG_JZ_SLCD_SPFD5420A
 	{
 		spfd5420a_init, spfd5420a_exit,
 		spfd5420a_enable, spfd5420a_disable,
+		"spfd5420a",
 	},
 #endif
 };
+
+static int __init jz_slcd_panels_setup(char *this_opt)
+{
+	char *options;
+
+	while ((options = strsep(&this_opt, ",")) != NULL) {
+		if (!strncmp(options, "panel:", 6)) {
+			unsigned int i;
+
+			options += 6;
+			for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
+				if (!strcmp(options, jz_slcd_panels[i].name)) {
+					jz_slcd_panel = i;
+					break;
+				}
+			}
+
+			continue;
+		}
+	}
+
+	return 0;
+}
+
+__setup("jz_slcd=", jz_slcd_panels_setup);
 
 const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb)
 {
@@ -856,9 +888,6 @@ const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb)
 	case 1:
 		return &jz_slcd_panels[0];
 	default:
-		dev_warn(&jzfb->pdev->dev,
-			"SLCD panel selection not implemented yet; "
-			"picking first panel\n");
-		return &jz_slcd_panels[0];
+		return &jz_slcd_panels[jz_slcd_panel];
 	}
 }
