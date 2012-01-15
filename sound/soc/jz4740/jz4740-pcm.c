@@ -62,15 +62,8 @@ static const struct snd_pcm_hardware jz4740_pcm_hardware = {
 static void jz4740_pcm_start_transfer(struct jz4740_runtime_data *prtd,
 	struct snd_pcm_substream *substream)
 {
-	unsigned long count;
-
 	if (prtd->dma_pos == prtd->dma_end)
 		prtd->dma_pos = prtd->dma_start;
-
-	if (prtd->dma_pos + prtd->dma_period > prtd->dma_end)
-		count = prtd->dma_end - prtd->dma_pos;
-	else
-		count = prtd->dma_period;
 
 	jz4740_dma_disable(prtd->dma);
 
@@ -82,9 +75,9 @@ static void jz4740_pcm_start_transfer(struct jz4740_runtime_data *prtd,
 		jz4740_dma_set_dst_addr(prtd->dma, prtd->dma_pos);
 	}
 
-	jz4740_dma_set_transfer_count(prtd->dma, count);
+	jz4740_dma_set_transfer_count(prtd->dma, prtd->dma_period);
 
-	prtd->dma_pos += count;
+	prtd->dma_pos += prtd->dma_period;
 
 	jz4740_dma_enable(prtd->dma);
 }
@@ -214,12 +207,20 @@ static int jz4740_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct jz4740_runtime_data *prtd;
+	int ret;
 
 	prtd = kzalloc(sizeof(*prtd), GFP_KERNEL);
 	if (prtd == NULL)
 		return -ENOMEM;
 
 	snd_soc_set_runtime_hwparams(substream, &jz4740_pcm_hardware);
+
+	ret = snd_pcm_hw_constraint_integer(runtime,
+			SNDRV_PCM_HW_PARAM_PERIODS);
+	if (ret < 0) {
+		kfree(prtd);
+		return ret;
+	}
 
 	runtime->private_data = prtd;
 
