@@ -198,8 +198,8 @@ static int a320_backlight_notify(struct device *dev, int brightness)
 static struct platform_pwm_backlight_data a320_backlight_pdata = {
 	.pwm_id = 7,
 	.max_brightness = 255,
-	.dft_brightness = 100,
-	.pwm_period_ns = 5000000,
+	.dft_brightness = 145,
+	.pwm_period_ns = 1000000,
 	.notify = a320_backlight_notify,
 };
 
