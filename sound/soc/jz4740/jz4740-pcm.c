@@ -213,14 +213,14 @@ static int jz4740_pcm_open(struct snd_pcm_substream *substream)
 	if (prtd == NULL)
 		return -ENOMEM;
 
+	snd_soc_set_runtime_hwparams(substream, &jz4740_pcm_hardware);
+
 	ret = snd_pcm_hw_constraint_integer(runtime,
 			SNDRV_PCM_HW_PARAM_PERIODS);
-	if (ret) {
+	if (ret < 0) {
 		kfree(prtd);
 		return ret;
 	}
-
-	snd_soc_set_runtime_hwparams(substream, &jz4740_pcm_hardware);
 
 	runtime->private_data = prtd;
 
