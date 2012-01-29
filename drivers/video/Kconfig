@@ -2411,14 +2411,6 @@ config JZ_SLCD_ILI9338
 	bool "ILI9338 Smart LCD panel"
 	depends on FB_JZ4740_SLCD
 
-config JZ_SLCD_LGDP4551
-	bool "LG LGDP4551 Smart LCD panel"
-	depends on FB_JZ4740_SLCD
-
-config JZ_SLCD_SPFD5420A
-	bool "SPFD5420A Smart LCD panel"
-	depends on FB_JZ4740_SLCD
-
 config FB_MXS
 	tristate "MXS LCD framebuffer support"
 	depends on FB && ARCH_MXS
