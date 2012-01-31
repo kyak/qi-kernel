@@ -91,37 +91,6 @@ static void set_panel_reg(struct jzfb *jzfb, u32 cmd, u32 data)
 #define ILI9325_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9325_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
 
-static int ili9325_init(struct jzfb *jzfb)
-{
-	struct device *dev = &jzfb->pdev->dev;
-	int ret;
-
-	ret = gpio_request(ILI9325_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(ILI9325_GPIO_CS_N, 1);
-
-	ret = gpio_request(ILI9325_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(ILI9325_GPIO_RESET_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_reset:
-	gpio_free(ILI9325_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9325 panel driver\n");
-	return ret;
-}
-
-static void ili9325_exit(struct jzfb *jzfb)
-{
-	gpio_free(ILI9325_GPIO_CS_N);
-	gpio_free(ILI9325_GPIO_RESET_N);
-}
-
 static void ili9325_enable(struct jzfb *jzfb)
 {
 	/* RESET pulse */
@@ -203,43 +172,43 @@ static void ili9325_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9325_GPIO_RESET_N, 0);
 }
 
+static int ili9325_init(struct jzfb *jzfb)
+{
+	struct device *dev = &jzfb->pdev->dev;
+	int ret;
+
+	ret = gpio_request(ILI9325_GPIO_CS_N, dev_name(dev));
+	if (ret)
+		goto err_cs;
+	gpio_direction_output(ILI9325_GPIO_CS_N, 1);
+
+	ret = gpio_request(ILI9325_GPIO_RESET_N, dev_name(dev));
+	if (ret)
+		goto err_reset;
+	gpio_direction_output(ILI9325_GPIO_RESET_N, 0);
+
+	mdelay(100);
+	return 0;
+
+err_reset:
+	gpio_free(ILI9325_GPIO_CS_N);
+err_cs:
+	dev_err(dev, "Could not reserve GPIO pins for ILI9325 panel driver\n");
+	return ret;
+}
+
+static void ili9325_exit(struct jzfb *jzfb)
+{
+	gpio_free(ILI9325_GPIO_CS_N);
+	gpio_free(ILI9325_GPIO_RESET_N);
+}
+
 #endif
 
 #ifdef CONFIG_JZ_SLCD_ILI9331
 
 #define ILI9331_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9331_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-
-static int ili9331_init(struct jzfb *jzfb)
-{
-	struct device *dev = &jzfb->pdev->dev;
-	int ret;
-
-	ret = gpio_request(ILI9331_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(ILI9331_GPIO_CS_N, 1);
-
-	ret = gpio_request(ILI9331_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(ILI9331_GPIO_RESET_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_reset:
-	gpio_free(ILI9331_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9331 panel driver\n");
-	return ret;
-}
-
-static void ili9331_exit(struct jzfb *jzfb)
-{
-	gpio_free(ILI9331_GPIO_CS_N);
-	gpio_free(ILI9331_GPIO_RESET_N);
-}
 
 static void ili9331_enable(struct jzfb *jzfb)
 {
@@ -319,43 +288,43 @@ static void ili9331_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9331_GPIO_RESET_N, 0);
 }
 
+static int ili9331_init(struct jzfb *jzfb)
+{
+	struct device *dev = &jzfb->pdev->dev;
+	int ret;
+
+	ret = gpio_request(ILI9331_GPIO_CS_N, dev_name(dev));
+	if (ret)
+		goto err_cs;
+	gpio_direction_output(ILI9331_GPIO_CS_N, 1);
+
+	ret = gpio_request(ILI9331_GPIO_RESET_N, dev_name(dev));
+	if (ret)
+		goto err_reset;
+	gpio_direction_output(ILI9331_GPIO_RESET_N, 0);
+
+	mdelay(100);
+	return 0;
+
+err_reset:
+	gpio_free(ILI9331_GPIO_CS_N);
+err_cs:
+	dev_err(dev, "Could not reserve GPIO pins for ILI9331 panel driver\n");
+	return ret;
+}
+
+static void ili9331_exit(struct jzfb *jzfb)
+{
+	gpio_free(ILI9331_GPIO_CS_N);
+	gpio_free(ILI9331_GPIO_RESET_N);
+}
+
 #endif
 
 #ifdef CONFIG_JZ_SLCD_ILI9338
 
 #define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-
-static int ili9338_init(struct jzfb *jzfb)
-{
-	struct device *dev = &jzfb->pdev->dev;
-	int ret;
-
-	ret = gpio_request(ILI9338_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(ILI9338_GPIO_CS_N, 1);
-
-	ret = gpio_request(ILI9338_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_reset:
-	gpio_free(ILI9338_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9338 panel driver\n");
-	return ret;
-}
-
-static void ili9338_exit(struct jzfb *jzfb)
-{
-	gpio_free(ILI9338_GPIO_CS_N);
-	gpio_free(ILI9338_GPIO_RESET_N);
-}
 
 static void ili9338_enable(struct jzfb *jzfb)
 {
@@ -450,6 +419,38 @@ static void ili9338_disable(struct jzfb *jzfb)
 	/* Keep RESET active */
 	gpio_set_value(ILI9338_GPIO_RESET_N, 0);
 }
+
+static int ili9338_init(struct jzfb *jzfb)
+{
+	struct device *dev = &jzfb->pdev->dev;
+	int ret;
+
+	ret = gpio_request(ILI9338_GPIO_CS_N, dev_name(dev));
+	if (ret)
+		goto err_cs;
+	gpio_direction_output(ILI9338_GPIO_CS_N, 1);
+
+	ret = gpio_request(ILI9338_GPIO_RESET_N, dev_name(dev));
+	if (ret)
+		goto err_reset;
+	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
+
+	mdelay(100);
+	return 0;
+
+err_reset:
+	gpio_free(ILI9338_GPIO_CS_N);
+err_cs:
+	dev_err(dev, "Could not reserve GPIO pins for ILI9338 panel driver\n");
+	return ret;
+}
+
+static void ili9338_exit(struct jzfb *jzfb)
+{
+	gpio_free(ILI9338_GPIO_CS_N);
+	gpio_free(ILI9338_GPIO_RESET_N);
+}
+
 #endif
 
 static const struct jz_slcd_panel jz_slcd_panels[] = {
