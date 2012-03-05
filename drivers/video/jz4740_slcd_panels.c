@@ -24,6 +24,9 @@
 #include "jz4740_slcd.h"
 
 static char *default_slcd_panel;
+#ifdef CONFIG_JZ_SLCD_ILI9338
+static unsigned int default_slcd_rgb[3] = { 100, 100, 100, };
+#endif
 
 /* Send a command without data. */
 static void send_panel_command(struct jzfb *jzfb, u32 cmd) {
@@ -323,6 +326,31 @@ static void ili9331_exit(struct jzfb *jzfb)
 
 #ifdef CONFIG_JZ_SLCD_ILI9338
 
+static void ili9338_set_color_table(struct jzfb *jzfb)
+{
+	unsigned int c;
+	struct device *dev = &jzfb->pdev->dev;
+
+	/* Set up a custom color lookup table.
+	 * This helps to fix the 'blueish' display on some devices. */
+	send_panel_command(jzfb, 0x2d);
+
+	for (c = 0; c < 3; c++) {
+		unsigned int i, n, v, s;
+		n = c == 1 ? 64 /* 6 bits G */ : 32 /* 5 bits R/B */;
+		s = jzfb->rgb[c] * (((63 << 24) - 1) / (100 * (n - 1)));
+		v = 0;
+		for (i = 0; i < n; i++, v += s)
+			send_panel_data(jzfb, (v >> 24) + ((v >> 23) & 1));
+	}
+
+	dev_info(dev, "ILI9338 color table initialized with R=%u G=%u B=%u\n",
+				jzfb->rgb[0], jzfb->rgb[1], jzfb->rgb[2]);
+}
+
+module_param_array_named(rgb, default_slcd_rgb, uint, NULL, 0);
+MODULE_PARM_DESC(rgb, "comma-separated list of three values representing the percentage of red, green and blue");
+
 #define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
 
@@ -406,6 +434,8 @@ static void ili9338_enable(struct jzfb *jzfb)
 	send_panel_command(jzfb, 0x3A);
 	send_panel_data(jzfb, 0x05);
 
+	ili9338_set_color_table(jzfb);
+
 	send_panel_command(jzfb, 0x29);
 
 	send_panel_command(jzfb, 0x2c);
@@ -435,6 +465,7 @@ static int ili9338_init(struct jzfb *jzfb)
 		goto err_reset;
 	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
 
+	memcpy(jzfb->rgb, default_slcd_rgb, sizeof(default_slcd_rgb));
 	mdelay(100);
 	return 0;
 
