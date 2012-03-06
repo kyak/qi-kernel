@@ -23,7 +23,7 @@
 
 #include "jz4740_slcd.h"
 
-static unsigned int jz_slcd_panel = 0;
+static char *default_slcd_panel;
 
 /* Send a command without data. */
 static void send_panel_command(struct jzfb *jzfb, u32 cmd) {
@@ -477,39 +477,34 @@ static const struct jz_slcd_panel jz_slcd_panels[] = {
 #endif
 };
 
-static int __init jz_slcd_panels_setup(char *this_opt)
+module_param_named(panel, default_slcd_panel, charp, 0);
+MODULE_PARM_DESC(panel, "SLCD panel used on the device");
+
+static const struct jz_slcd_panel *jz_slcd_panel_from_name(const char *name)
 {
-	char *options;
-
-	while ((options = strsep(&this_opt, ",")) != NULL) {
-		if (!strncmp(options, "panel:", 6)) {
-			unsigned int i;
-
-			options += 6;
-			for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
-				if (!strcmp(options, jz_slcd_panels[i].name)) {
-					jz_slcd_panel = i;
-					break;
-				}
-			}
-
-			continue;
-		}
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
+		if (sysfs_streq(name, jz_slcd_panels[i].name))
+			return &jz_slcd_panels[i];
 	}
-
-	return 0;
+	return NULL;
 }
-
-__setup("jz_slcd=", jz_slcd_panels_setup);
 
 const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb)
 {
-	switch (ARRAY_SIZE(jz_slcd_panels)) {
-	case 0:
+	const struct jz_slcd_panel *panel;
+	if (ARRAY_SIZE(jz_slcd_panels) == 0)
 		return NULL;
-	case 1:
-		return &jz_slcd_panels[0];
-	default:
-		return &jz_slcd_panels[jz_slcd_panel];
+
+	panel = &jz_slcd_panels[0];
+
+	if (default_slcd_panel) {
+		panel = jz_slcd_panel_from_name(default_slcd_panel);
+		if (!panel) {
+			struct device *dev = &jzfb->pdev->dev;
+			dev_err(dev, "Unknown SLCD panel: %s\n",
+						default_slcd_panel);
+		}
 	}
+	return panel;
 }
