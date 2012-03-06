@@ -511,7 +511,7 @@ static const struct jz_slcd_panel jz_slcd_panels[] = {
 module_param_named(panel, default_slcd_panel, charp, 0);
 MODULE_PARM_DESC(panel, "SLCD panel used on the device");
 
-static const struct jz_slcd_panel *jz_slcd_panel_from_name(const char *name)
+const struct jz_slcd_panel *jz_slcd_panel_from_name(const char *name)
 {
 	unsigned int i;
 	for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
