@@ -351,6 +351,33 @@ static void ili9338_set_color_table(struct jzfb *jzfb)
 module_param_array_named(rgb, default_slcd_rgb, uint, NULL, 0);
 MODULE_PARM_DESC(rgb, "comma-separated list of three values representing the percentage of red, green and blue");
 
+static ssize_t rgb_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	return sprintf(buf, "%u,%u,%u\n", jzfb->rgb[0],
+				jzfb->rgb[1], jzfb->rgb[2]);
+}
+
+static ssize_t rgb_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t n)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	unsigned int rgb[3];
+
+	if (sscanf(buf, "%u,%u,%u", &rgb[0], &rgb[1], &rgb[2]) < 3)
+		return -EINVAL;
+
+	if (rgb[0] > 100 || rgb[1] > 100 || rgb[2] > 100)
+		return -EINVAL;
+
+	memcpy(jzfb->rgb, rgb, sizeof(rgb));
+	ili9338_set_color_table(jzfb);
+	return n;
+}
+
+static DEVICE_ATTR(rgb, 0644, rgb_show, rgb_store);
+
 #define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
 
@@ -467,7 +494,10 @@ static int ili9338_init(struct jzfb *jzfb)
 
 	memcpy(jzfb->rgb, default_slcd_rgb, sizeof(default_slcd_rgb));
 	mdelay(100);
-	return 0;
+
+	ret = device_create_file(dev, &dev_attr_rgb);
+	if (!ret)
+		return 0;
 
 err_reset:
 	gpio_free(ILI9338_GPIO_CS_N);
@@ -478,6 +508,9 @@ err_cs:
 
 static void ili9338_exit(struct jzfb *jzfb)
 {
+	struct device *dev = &jzfb->pdev->dev;
+	device_remove_file(dev, &dev_attr_rgb);
+
 	gpio_free(ILI9338_GPIO_CS_N);
 	gpio_free(ILI9338_GPIO_RESET_N);
 }
