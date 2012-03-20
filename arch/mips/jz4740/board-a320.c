@@ -234,8 +234,8 @@ static struct jz_battery_platform_data a320_battery_pdata = {
 	.info = {
 		.name = "battery",
 		.technology = POWER_SUPPLY_TECHNOLOGY_LIPO,
-		.voltage_max_design = 4200000,
-		.voltage_min_design = 3600000,
+		.voltage_max_design = 4150000,
+		.voltage_min_design = 3450000,
 	},
 };
 
