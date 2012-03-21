@@ -96,6 +96,9 @@ struct jzfb {
 	struct delayed_work refresh_work;
 
 	uint32_t pseudo_palette[16];
+#ifdef CONFIG_JZ_SLCD_ILI9338
+	unsigned int rgb[3];
+#endif
 };
 
 struct jz_slcd_panel {
@@ -111,6 +114,7 @@ struct jz_slcd_panel {
 	const char *name;
 };
 
+const struct jz_slcd_panel *jz_slcd_panel_from_name(const char *name);
 const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb);
 
 #endif  /*__JZ4740_SLCD_H__*/
