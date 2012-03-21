@@ -23,7 +23,10 @@
 
 #include "jz4740_slcd.h"
 
-static unsigned int jz_slcd_panel = 0;
+static char *default_slcd_panel;
+#ifdef CONFIG_JZ_SLCD_ILI9338
+static unsigned int default_slcd_rgb[3] = { 100, 100, 100, };
+#endif
 
 /* Send a command without data. */
 static void send_panel_command(struct jzfb *jzfb, u32 cmd) {
@@ -90,37 +93,6 @@ static void set_panel_reg(struct jzfb *jzfb, u32 cmd, u32 data)
 // TODO(MtH): CS mismatch: B17 (A320) vs C20 (standard).
 #define ILI9325_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9325_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-
-static int ili9325_init(struct jzfb *jzfb)
-{
-	struct device *dev = &jzfb->pdev->dev;
-	int ret;
-
-	ret = gpio_request(ILI9325_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(ILI9325_GPIO_CS_N, 1);
-
-	ret = gpio_request(ILI9325_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(ILI9325_GPIO_RESET_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_reset:
-	gpio_free(ILI9325_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9325 panel driver\n");
-	return ret;
-}
-
-static void ili9325_exit(struct jzfb *jzfb)
-{
-	gpio_free(ILI9325_GPIO_CS_N);
-	gpio_free(ILI9325_GPIO_RESET_N);
-}
 
 static void ili9325_enable(struct jzfb *jzfb)
 {
@@ -203,43 +175,43 @@ static void ili9325_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9325_GPIO_RESET_N, 0);
 }
 
+static int ili9325_init(struct jzfb *jzfb)
+{
+	struct device *dev = &jzfb->pdev->dev;
+	int ret;
+
+	ret = gpio_request(ILI9325_GPIO_CS_N, dev_name(dev));
+	if (ret)
+		goto err_cs;
+	gpio_direction_output(ILI9325_GPIO_CS_N, 1);
+
+	ret = gpio_request(ILI9325_GPIO_RESET_N, dev_name(dev));
+	if (ret)
+		goto err_reset;
+	gpio_direction_output(ILI9325_GPIO_RESET_N, 0);
+
+	mdelay(100);
+	return 0;
+
+err_reset:
+	gpio_free(ILI9325_GPIO_CS_N);
+err_cs:
+	dev_err(dev, "Could not reserve GPIO pins for ILI9325 panel driver\n");
+	return ret;
+}
+
+static void ili9325_exit(struct jzfb *jzfb)
+{
+	gpio_free(ILI9325_GPIO_CS_N);
+	gpio_free(ILI9325_GPIO_RESET_N);
+}
+
 #endif
 
 #ifdef CONFIG_JZ_SLCD_ILI9331
 
 #define ILI9331_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
 #define ILI9331_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-
-static int ili9331_init(struct jzfb *jzfb)
-{
-	struct device *dev = &jzfb->pdev->dev;
-	int ret;
-
-	ret = gpio_request(ILI9331_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(ILI9331_GPIO_CS_N, 1);
-
-	ret = gpio_request(ILI9331_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(ILI9331_GPIO_RESET_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_reset:
-	gpio_free(ILI9331_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9331 panel driver\n");
-	return ret;
-}
-
-static void ili9331_exit(struct jzfb *jzfb)
-{
-	gpio_free(ILI9331_GPIO_CS_N);
-	gpio_free(ILI9331_GPIO_RESET_N);
-}
 
 static void ili9331_enable(struct jzfb *jzfb)
 {
@@ -319,43 +291,95 @@ static void ili9331_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9331_GPIO_RESET_N, 0);
 }
 
-#endif
-
-#ifdef CONFIG_JZ_SLCD_ILI9338
-
-#define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
-#define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-
-static int ili9338_init(struct jzfb *jzfb)
+static int ili9331_init(struct jzfb *jzfb)
 {
 	struct device *dev = &jzfb->pdev->dev;
 	int ret;
 
-	ret = gpio_request(ILI9338_GPIO_CS_N, dev_name(dev));
+	ret = gpio_request(ILI9331_GPIO_CS_N, dev_name(dev));
 	if (ret)
 		goto err_cs;
-	gpio_direction_output(ILI9338_GPIO_CS_N, 1);
+	gpio_direction_output(ILI9331_GPIO_CS_N, 1);
 
-	ret = gpio_request(ILI9338_GPIO_RESET_N, dev_name(dev));
+	ret = gpio_request(ILI9331_GPIO_RESET_N, dev_name(dev));
 	if (ret)
 		goto err_reset;
-	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
+	gpio_direction_output(ILI9331_GPIO_RESET_N, 0);
 
 	mdelay(100);
 	return 0;
 
 err_reset:
-	gpio_free(ILI9338_GPIO_CS_N);
+	gpio_free(ILI9331_GPIO_CS_N);
 err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for ILI9338 panel driver\n");
+	dev_err(dev, "Could not reserve GPIO pins for ILI9331 panel driver\n");
 	return ret;
 }
 
-static void ili9338_exit(struct jzfb *jzfb)
+static void ili9331_exit(struct jzfb *jzfb)
 {
-	gpio_free(ILI9338_GPIO_CS_N);
-	gpio_free(ILI9338_GPIO_RESET_N);
+	gpio_free(ILI9331_GPIO_CS_N);
+	gpio_free(ILI9331_GPIO_RESET_N);
 }
+
+#endif
+
+#ifdef CONFIG_JZ_SLCD_ILI9338
+
+static void ili9338_set_color_table(struct jzfb *jzfb)
+{
+	unsigned int c;
+	struct device *dev = &jzfb->pdev->dev;
+
+	/* Set up a custom color lookup table.
+	 * This helps to fix the 'blueish' display on some devices. */
+	send_panel_command(jzfb, 0x2d);
+
+	for (c = 0; c < 3; c++) {
+		unsigned int i, n, v, s;
+		n = c == 1 ? 64 /* 6 bits G */ : 32 /* 5 bits R/B */;
+		s = jzfb->rgb[c] * (((63 << 24) - 1) / (100 * (n - 1)));
+		v = 0;
+		for (i = 0; i < n; i++, v += s)
+			send_panel_data(jzfb, (v >> 24) + ((v >> 23) & 1));
+	}
+
+	dev_info(dev, "ILI9338 color table initialized with R=%u G=%u B=%u\n",
+				jzfb->rgb[0], jzfb->rgb[1], jzfb->rgb[2]);
+}
+
+module_param_array_named(rgb, default_slcd_rgb, uint, NULL, 0);
+MODULE_PARM_DESC(rgb, "comma-separated list of three values representing the percentage of red, green and blue");
+
+static ssize_t rgb_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	return sprintf(buf, "%u,%u,%u\n", jzfb->rgb[0],
+				jzfb->rgb[1], jzfb->rgb[2]);
+}
+
+static ssize_t rgb_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t n)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	unsigned int rgb[3];
+
+	if (sscanf(buf, "%u,%u,%u", &rgb[0], &rgb[1], &rgb[2]) < 3)
+		return -EINVAL;
+
+	if (rgb[0] > 100 || rgb[1] > 100 || rgb[2] > 100)
+		return -EINVAL;
+
+	memcpy(jzfb->rgb, rgb, sizeof(rgb));
+	ili9338_set_color_table(jzfb);
+	return n;
+}
+
+static DEVICE_ATTR(rgb, 0644, rgb_show, rgb_store);
+
+#define ILI9338_GPIO_CS_N 	JZ_GPIO_PORTB(17)	/* Chip select */
+#define ILI9338_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
 
 static void ili9338_enable(struct jzfb *jzfb)
 {
@@ -437,6 +461,8 @@ static void ili9338_enable(struct jzfb *jzfb)
 	send_panel_command(jzfb, 0x3A);
 	send_panel_data(jzfb, 0x05);
 
+	ili9338_set_color_table(jzfb);
+
 	send_panel_command(jzfb, 0x29);
 
 	send_panel_command(jzfb, 0x2c);
@@ -451,368 +477,42 @@ static void ili9338_disable(struct jzfb *jzfb)
 	gpio_set_value(ILI9338_GPIO_RESET_N, 0);
 }
 
-#endif
-
-#ifdef CONFIG_JZ_SLCD_LGDP4551
-
-#define LGDP4551_GPIO_CS_N 	JZ_GPIO_PORTC(18)	/* Chip select */
-#define LGDP4551_GPIO_RESET_N 	JZ_GPIO_PORTC(21)	/* LCD reset */
-
-/* Set the start address of screen, for example (0, 0) */
-static void lgdp4551_set_addr(struct jzfb *jzfb, u16 x, u16 y)
-{
-	set_panel_reg(jzfb, 0x20, x);
-	udelay(1);
-	set_panel_reg(jzfb, 0x21, y);
-	udelay(1);
-	send_panel_command(jzfb, 0x22);
-}
-
-static int lgdp4551_init(struct jzfb *jzfb)
+static int ili9338_init(struct jzfb *jzfb)
 {
 	struct device *dev = &jzfb->pdev->dev;
 	int ret;
 
-	ret = gpio_request(LGDP4551_GPIO_CS_N, dev_name(dev));
+	ret = gpio_request(ILI9338_GPIO_CS_N, dev_name(dev));
 	if (ret)
 		goto err_cs;
-	gpio_direction_output(LGDP4551_GPIO_CS_N, 0);
+	gpio_direction_output(ILI9338_GPIO_CS_N, 1);
 
-	ret = gpio_request(LGDP4551_GPIO_RESET_N, dev_name(dev));
+	ret = gpio_request(ILI9338_GPIO_RESET_N, dev_name(dev));
 	if (ret)
 		goto err_reset;
-	gpio_direction_output(LGDP4551_GPIO_RESET_N, 1);
+	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
 
+	memcpy(jzfb->rgb, default_slcd_rgb, sizeof(default_slcd_rgb));
 	mdelay(100);
-	return 0;
+
+	ret = device_create_file(dev, &dev_attr_rgb);
+	if (!ret)
+		return 0;
 
 err_reset:
-	gpio_free(LGDP4551_GPIO_CS_N);
+	gpio_free(ILI9338_GPIO_CS_N);
 err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for LGDP4551 panel\n");
+	dev_err(dev, "Could not reserve GPIO pins for ILI9338 panel driver\n");
 	return ret;
 }
 
-static void lgdp4551_exit(struct jzfb *jzfb)
-{
-	gpio_free(LGDP4551_GPIO_CS_N);
-	gpio_free(LGDP4551_GPIO_RESET_N);
-}
-
-static void lgdp4551_enable(struct jzfb *jzfb)
-{
-	/* RESET# */
-	gpio_set_value(LGDP4551_GPIO_RESET_N, 1);
-	mdelay(10);
-	gpio_set_value(LGDP4551_GPIO_RESET_N, 0);
-	mdelay(10);
-	gpio_set_value(LGDP4551_GPIO_RESET_N, 1);
-	mdelay(100);
-	set_panel_reg(jzfb, 0x0015, 0x0050);
-	set_panel_reg(jzfb, 0x0011, 0x0000);
-	set_panel_reg(jzfb, 0x0010, 0x3628);
-	set_panel_reg(jzfb, 0x0012, 0x0002);
-	set_panel_reg(jzfb, 0x0013, 0x0E47);
-	udelay(100);
-	set_panel_reg(jzfb, 0x0012, 0x0012);
-	udelay(100);
-	set_panel_reg(jzfb, 0x0010, 0x3620);
-	set_panel_reg(jzfb, 0x0013, 0x2E47);
-	udelay(50);
-	set_panel_reg(jzfb, 0x0030, 0x0000);
-	set_panel_reg(jzfb, 0x0031, 0x0502);
-	set_panel_reg(jzfb, 0x0032, 0x0307);
-	set_panel_reg(jzfb, 0x0033, 0x0304);
-	set_panel_reg(jzfb, 0x0034, 0x0004);
-	set_panel_reg(jzfb, 0x0035, 0x0401);
-	set_panel_reg(jzfb, 0x0036, 0x0707);
-	set_panel_reg(jzfb, 0x0037, 0x0303);
-	set_panel_reg(jzfb, 0x0038, 0x1E02);
-	set_panel_reg(jzfb, 0x0039, 0x1E02);
-	set_panel_reg(jzfb, 0x0001, 0x0000);
-	set_panel_reg(jzfb, 0x0002, 0x0300);
-	if (jzfb->pdata->bpp == 16)
-		set_panel_reg(jzfb, 0x0003, 0x10B8); /*8-bit system interface two transfers
-						  up:0x10B8 down:0x1088 left:0x1090 right:0x10a0*/
-	else if (jzfb->pdata->bpp == 32)
-		set_panel_reg(jzfb, 0x0003, 0xD0B8);/*8-bit system interface three transfers,666
-						   up:0xD0B8 down:0xD088 left:0xD090 right:0xD0A0*/
-	set_panel_reg(jzfb, 0x0008, 0x0204);
-	set_panel_reg(jzfb, 0x000A, 0x0008);
-	set_panel_reg(jzfb, 0x0060, 0x3100);
-	set_panel_reg(jzfb, 0x0061, 0x0001);
-	set_panel_reg(jzfb, 0x0090, 0x0052);
-	set_panel_reg(jzfb, 0x0092, 0x000F);
-	set_panel_reg(jzfb, 0x0093, 0x0001);
-	set_panel_reg(jzfb, 0x009A, 0x0008);
-	set_panel_reg(jzfb, 0x00A3, 0x0010);
-	set_panel_reg(jzfb, 0x0050, 0x0000);
-	set_panel_reg(jzfb, 0x0051, 0x00EF);
-	set_panel_reg(jzfb, 0x0052, 0x0000);
-	set_panel_reg(jzfb, 0x0053, 0x018F);
-	/*===Display_On_Function=== */
-	set_panel_reg(jzfb, 0x0007, 0x0001);
-	set_panel_reg(jzfb, 0x0007, 0x0021);
-	set_panel_reg(jzfb, 0x0007, 0x0023);
-	set_panel_reg(jzfb, 0x0007, 0x0033);
-	set_panel_reg(jzfb, 0x0007, 0x0133);
-	send_panel_command(jzfb, 0x0022); /* Write Data to GRAM. */
-	udelay(1);
-	lgdp4551_set_addr(jzfb, 0, 0);
-	mdelay(100);
-}
-
-static void lgdp4551_disable(struct jzfb *jzfb)
-{
-}
-
-#endif
-
-#ifdef CONFIG_JZ_SLCD_SPFD5420A
-
-#define SPFD5420A_GPIO_CS_N 	JZ_GPIO_PORTC(22)	/* Chip select */
-#define SPFD5420A_GPIO_RESET_N 	JZ_GPIO_PORTB(18)	/* LCD reset */
-#define SPFD5420A_GPIO_POWER_N	JZ_GPIO_PORTD(0)	/* Power off */
-#define SPFD5420A_GPIO_FMARK_N	JZ_GPIO_PORTD(1)	/* fmark */
-
-/* Set the start address of screen, for example (0, 0) */
-static void spfd5420a_set_addr(struct jzfb *jzfb, u32 x, u32 y)
-{
-	set_panel_reg(jzfb, 0x200, x);
-	udelay(1);
-	set_panel_reg(jzfb, 0x201, y);
-	udelay(1);
-	send_panel_command(jzfb, 0x202);
-}
-
-static int spfd5420a_init(struct jzfb *jzfb)
+static void ili9338_exit(struct jzfb *jzfb)
 {
 	struct device *dev = &jzfb->pdev->dev;
-	int ret;
+	device_remove_file(dev, &dev_attr_rgb);
 
-	ret = gpio_request(SPFD5420A_GPIO_CS_N, dev_name(dev));
-	if (ret)
-		goto err_cs;
-	gpio_direction_output(SPFD5420A_GPIO_CS_N, 0);
-
-	ret = gpio_request(SPFD5420A_GPIO_RESET_N, dev_name(dev));
-	if (ret)
-		goto err_reset;
-	gpio_direction_output(SPFD5420A_GPIO_RESET_N, 1);
-
-	ret = gpio_request(SPFD5420A_GPIO_POWER_N, dev_name(dev));
-	if (ret)
-		goto err_power;
-	gpio_direction_output(SPFD5420A_GPIO_POWER_N, 0);
-
-	mdelay(100);
-	return 0;
-
-err_power:
-	gpio_free(SPFD5420A_GPIO_RESET_N);
-err_reset:
-	gpio_free(SPFD5420A_GPIO_CS_N);
-err_cs:
-	dev_err(dev, "Could not reserve GPIO pins for SPFD5420A panel\n");
-	return ret;
-}
-
-static void spfd5420a_exit(struct jzfb *jzfb)
-{
-	gpio_free(SPFD5420A_GPIO_CS_N);
-	gpio_free(SPFD5420A_GPIO_RESET_N);
-	gpio_free(SPFD5420A_GPIO_POWER_N);
-}
-
-static void spfd5420a_init_gamma(struct jzfb *jzfb)
-{
-	set_panel_reg(jzfb, 0x0300, 0x0101);
-	set_panel_reg(jzfb, 0x0301, 0x0b27);
-	set_panel_reg(jzfb, 0x0302, 0x132a);
-	set_panel_reg(jzfb, 0x0303, 0x2a13);
-	set_panel_reg(jzfb, 0x0304, 0x270b);
-	set_panel_reg(jzfb, 0x0305, 0x0101);
-	set_panel_reg(jzfb, 0x0306, 0x1205);
-	set_panel_reg(jzfb, 0x0307, 0x0512);
-	set_panel_reg(jzfb, 0x0308, 0x0005);
-	set_panel_reg(jzfb, 0x0309, 0x0003);
-	set_panel_reg(jzfb, 0x030a, 0x0f04);
-	set_panel_reg(jzfb, 0x030b, 0x0f00);
-	set_panel_reg(jzfb, 0x030c, 0x000f);
-	set_panel_reg(jzfb, 0x030d, 0x040f);
-	set_panel_reg(jzfb, 0x030e, 0x0300);
-	set_panel_reg(jzfb, 0x030f, 0x0500);
-	/*** secorrect gamma2 ***/
-	set_panel_reg(jzfb, 0x0400, 0x3500);
-	set_panel_reg(jzfb, 0x0401, 0x0001);
-	set_panel_reg(jzfb, 0x0404, 0x0000);
-	set_panel_reg(jzfb, 0x0500, 0x0000);
-	set_panel_reg(jzfb, 0x0501, 0x0000);
-	set_panel_reg(jzfb, 0x0502, 0x0000);
-	set_panel_reg(jzfb, 0x0503, 0x0000);
-	set_panel_reg(jzfb, 0x0504, 0x0000);
-	set_panel_reg(jzfb, 0x0505, 0x0000);
-	set_panel_reg(jzfb, 0x0600, 0x0000);
-	set_panel_reg(jzfb, 0x0606, 0x0000);
-	set_panel_reg(jzfb, 0x06f0, 0x0000);
-	set_panel_reg(jzfb, 0x07f0, 0x5420);
-	set_panel_reg(jzfb, 0x07f3, 0x288a);
-	set_panel_reg(jzfb, 0x07f4, 0x0022);
-	set_panel_reg(jzfb, 0x07f5, 0x0001);
-	set_panel_reg(jzfb, 0x07f0, 0x0000);
-}
-
-static void spfd5420a_enable(struct jzfb *jzfb)
-{
-	gpio_set_value(SPFD5420A_GPIO_RESET_N, 1);
-	mdelay(10);
-	gpio_set_value(SPFD5420A_GPIO_RESET_N, 0);
-	mdelay(10);
-	gpio_set_value(SPFD5420A_GPIO_RESET_N, 1);
-	mdelay(100);
-	if (jzfb->pdata->lcd_type == JZ_LCD_TYPE_SMART_PARALLEL_18_BIT) {
-		set_panel_reg(jzfb, 0x0606, 0x0000);
-		udelay(10);
-		set_panel_reg(jzfb, 0x0007, 0x0001);
-		udelay(10);
-		set_panel_reg(jzfb, 0x0110, 0x0001);
-		udelay(10);
-		set_panel_reg(jzfb, 0x0100, 0x17b0);
-		set_panel_reg(jzfb, 0x0101, 0x0147);
-		set_panel_reg(jzfb, 0x0102, 0x019d);
-		set_panel_reg(jzfb, 0x0103, 0x8600);
-		set_panel_reg(jzfb, 0x0281, 0x0010);
-		udelay(10);
-		set_panel_reg(jzfb, 0x0102, 0x01bd);
-		udelay(10);
-		/************initial************/
-		set_panel_reg(jzfb, 0x0000, 0x0000);
-		set_panel_reg(jzfb, 0x0001, 0x0000);
-		set_panel_reg(jzfb, 0x0002, 0x0400);
-		set_panel_reg(jzfb, 0x0003, 0x1288); /*up:0x1288 down:0x12B8 left:0x1290 right:0x12A0*/
-		set_panel_reg(jzfb, 0x0006, 0x0000);
-		set_panel_reg(jzfb, 0x0008, 0x0503);
-		set_panel_reg(jzfb, 0x0009, 0x0001);
-		set_panel_reg(jzfb, 0x000b, 0x0010);
-		set_panel_reg(jzfb, 0x000c, 0x0000);
-		set_panel_reg(jzfb, 0x000f, 0x0000);
-		set_panel_reg(jzfb, 0x0007, 0x0001);
-		set_panel_reg(jzfb, 0x0010, 0x0010);
-		set_panel_reg(jzfb, 0x0011, 0x0202);
-		set_panel_reg(jzfb, 0x0012, 0x0300);
-		set_panel_reg(jzfb, 0x0020, 0x021e);
-		set_panel_reg(jzfb, 0x0021, 0x0202);
-		set_panel_reg(jzfb, 0x0022, 0x0100);
-		set_panel_reg(jzfb, 0x0090, 0x0000);
-		set_panel_reg(jzfb, 0x0092, 0x0000);
-		set_panel_reg(jzfb, 0x0100, 0x16b0);
-		set_panel_reg(jzfb, 0x0101, 0x0147);
-		set_panel_reg(jzfb, 0x0102, 0x01bd);
-		set_panel_reg(jzfb, 0x0103, 0x2c00);
-		set_panel_reg(jzfb, 0x0107, 0x0000);
-		set_panel_reg(jzfb, 0x0110, 0x0001);
-		set_panel_reg(jzfb, 0x0210, 0x0000);
-		set_panel_reg(jzfb, 0x0211, 0x00ef);
-		set_panel_reg(jzfb, 0x0212, 0x0000);
-		set_panel_reg(jzfb, 0x0213, 0x018f);
-		set_panel_reg(jzfb, 0x0280, 0x0000);
-		set_panel_reg(jzfb, 0x0281, 0x0001);
-		set_panel_reg(jzfb, 0x0282, 0x0000);
-		spfd5420a_init_gamma(jzfb);
-		set_panel_reg(jzfb, 0x0007, 0x0173);
-	} else {
-		set_panel_reg(jzfb, 0x0600, 0x0001);   /*soft reset*/
-		mdelay(10);
-		set_panel_reg(jzfb, 0x0600, 0x0000);   /*soft reset*/
-		mdelay(10);
-		set_panel_reg(jzfb, 0x0606, 0x0000);   /*i80-i/F Endian Control*/
-		/*===User setting===    */
-		set_panel_reg(jzfb, 0x0001, 0x0000);/* Driver Output Control-----0x0100 SM(bit10) | 0x400*/
-		set_panel_reg(jzfb, 0x0002, 0x0100);   /*LCD Driving Wave Control      0x0100 */
-		if (jzfb->pdata->bpp == 16)
-			set_panel_reg(jzfb, 0x0003, 0x50A8);/*Entry Mode 0x1030*/
-		else /*bpp = 18*/
-			set_panel_reg(jzfb, 0x0003, 0x1010 | 0xC8);   /*Entry Mode 0x1030*/
-		set_panel_reg(jzfb, 0x0006, 0x0000);   /*Outline Sharpening Control*/
-		set_panel_reg(jzfb, 0x0008, 0x0808);   /*Sets the number of lines for front/back porch period*/
-		set_panel_reg(jzfb, 0x0009, 0x0001);   /*Display Control 3   */
-		set_panel_reg(jzfb, 0x000B, 0x0010);   /*Low Power Control*/
-		set_panel_reg(jzfb, 0x000C, 0x0000);   /*External Display Interface Control 1 0x0001  */
-		set_panel_reg(jzfb, 0x000F, 0x0000);   /*External Display Interface Control 2         */
-		set_panel_reg(jzfb, 0x0400, 0xB104);   /*Base Image Number of Line---GS(bit15) | 0x8000*/
-		set_panel_reg(jzfb, 0x0401, 0x0001);   /*Base Image Display        0x0001*/
-		set_panel_reg(jzfb, 0x0404, 0x0000);   /*Base Image Vertical Scroll Control    0x0000*/
-		set_panel_reg(jzfb, 0x0500, 0x0000);   /*Partial Image 1: Display Position*/
-		set_panel_reg(jzfb, 0x0501, 0x0000);   /*RAM Address (Start Line Address) */
-		set_panel_reg(jzfb, 0x0502, 0x018f);   /*RAM Address (End Line Address)  */
-		set_panel_reg(jzfb, 0x0503, 0x0000);   /*Partial Image 2: Display Position  RAM Address*/
-		set_panel_reg(jzfb, 0x0504, 0x0000);   /*RAM Address (Start Line Address) */
-		set_panel_reg(jzfb, 0x0505, 0x0000);   /*RAM Address (End Line Address)*/
-		/*Panel interface control===*/
-		set_panel_reg(jzfb, 0x0010, 0x0011);   /*Division Ratio,Clocks per Line  14  */
-		mdelay(10);
-		set_panel_reg(jzfb, 0x0011, 0x0202);   /*Division Ratio,Clocks per Line*/
-		set_panel_reg(jzfb, 0x0012, 0x0300);   /*Sets low power VCOM drive period.   */
-		mdelay(10);
-		set_panel_reg(jzfb, 0x0020, 0x021e);   /*Panel Interface Control 4  */
-		set_panel_reg(jzfb, 0x0021, 0x0202);   /*Panel Interface Control 5 */
-		set_panel_reg(jzfb, 0x0022, 0x0100);   /*Panel Interface Control 6*/
-		set_panel_reg(jzfb, 0x0090, 0x0000);   /*Frame Marker Control  */
-		set_panel_reg(jzfb, 0x0092, 0x0000);   /*MDDI Sub-display Control  */
-		/*===Gamma setting===    */
-		set_panel_reg(jzfb, 0x0300, 0x0101);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0301, 0x0000);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0302, 0x0016);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0303, 0x2913);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0304, 0x260B);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0305, 0x0101);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0306, 0x1204);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0307, 0x0415);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0308, 0x0205);   /*γ Control*/
-		set_panel_reg(jzfb, 0x0309, 0x0303);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030a, 0x0E05);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030b, 0x0D01);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030c, 0x010D);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030d, 0x050E);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030e, 0x0303);   /*γ Control*/
-		set_panel_reg(jzfb, 0x030f, 0x0502);   /*γ Control*/
-		/*===Power on sequence===*/
-		set_panel_reg(jzfb, 0x0007, 0x0001);   /*Display Control 1*/
-		set_panel_reg(jzfb, 0x0110, 0x0001);   /*Power supply startup enable bit*/
-		set_panel_reg(jzfb, 0x0112, 0x0060);   /*Power Control 7*/
-		set_panel_reg(jzfb, 0x0100, 0x16B0);   /*Power Control 1 */
-		set_panel_reg(jzfb, 0x0101, 0x0115);   /*Power Control 2*/
-		set_panel_reg(jzfb, 0x0102, 0x0119);   /*Starts VLOUT3,Sets the VREG1OUT.*/
-		mdelay(50);
-		set_panel_reg(jzfb, 0x0103, 0x2E00);   /*set the amplitude of VCOM*/
-		mdelay(50);
-		set_panel_reg(jzfb, 0x0282, 0x0093);   /*VCOMH voltage, alt: 0x008E, 0x0093*/
-		set_panel_reg(jzfb, 0x0281, 0x000A);   /*Selects the factor of VREG1OUT to generate VCOMH. */
-		set_panel_reg(jzfb, 0x0102, 0x01BE);   /*Starts VLOUT3,Sets the VREG1OUT.*/
-		mdelay(10);
-		/*Address */
-		set_panel_reg(jzfb, 0x0210, 0x0000);   /*Window Horizontal RAM Address Start*/
-		set_panel_reg(jzfb, 0x0211, 0x00ef);   /*Window Horizontal RAM Address End*/
-		set_panel_reg(jzfb, 0x0212, 0x0000);   /*Window Vertical RAM Address Start*/
-		set_panel_reg(jzfb, 0x0213, 0x018f);   /*Window Vertical RAM Address End */
-		set_panel_reg(jzfb, 0x0200, 0x0000);   /*RAM Address Set (Horizontal Address)*/
-		set_panel_reg(jzfb, 0x0201, 0x018f);   /*RAM Address Set (Vertical Address)*/
-		/*===Display_On_Function===*/
-		set_panel_reg(jzfb, 0x0007, 0x0021);   /*Display Control 1 */
-		mdelay(50);   /*40*/
-		set_panel_reg(jzfb, 0x0007, 0x0061);   /*Display Control 1 */
-		mdelay(50);   /*100*/
-		set_panel_reg(jzfb, 0x0007, 0x0173);   /*Display Control 1 */
-		mdelay(50);   /*300*/
-	}
-	send_panel_command(jzfb, 0x0202);                  /*Write Data to GRAM	*/
-	udelay(10);
-	spfd5420a_set_addr(jzfb, 0, 0);
-	udelay(100);
-}
-
-static void spfd5420a_disable(struct jzfb *jzfb)
-{
+	gpio_free(ILI9338_GPIO_CS_N);
+	gpio_free(ILI9338_GPIO_RESET_N);
 }
 
 #endif
@@ -839,55 +539,36 @@ static const struct jz_slcd_panel jz_slcd_panels[] = {
 		"ili9338",
 	},
 #endif
-#ifdef CONFIG_JZ_SLCD_LGDP4551
-	{
-		lgdp4551_init, lgdp4551_exit,
-		lgdp4551_enable, lgdp4551_disable,
-		"lgdp4551",
-	},
-#endif
-#ifdef CONFIG_JZ_SLCD_SPFD5420A
-	{
-		spfd5420a_init, spfd5420a_exit,
-		spfd5420a_enable, spfd5420a_disable,
-		"spfd5420a",
-	},
-#endif
 };
 
-static int __init jz_slcd_panels_setup(char *this_opt)
+module_param_named(panel, default_slcd_panel, charp, 0);
+MODULE_PARM_DESC(panel, "SLCD panel used on the device");
+
+const struct jz_slcd_panel *jz_slcd_panel_from_name(const char *name)
 {
-	char *options;
-
-	while ((options = strsep(&this_opt, ",")) != NULL) {
-		if (!strncmp(options, "panel:", 6)) {
-			unsigned int i;
-
-			options += 6;
-			for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
-				if (!strcmp(options, jz_slcd_panels[i].name)) {
-					jz_slcd_panel = i;
-					break;
-				}
-			}
-
-			continue;
-		}
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(jz_slcd_panels); i++) {
+		if (sysfs_streq(name, jz_slcd_panels[i].name))
+			return &jz_slcd_panels[i];
 	}
-
-	return 0;
+	return NULL;
 }
-
-__setup("jz_slcd=", jz_slcd_panels_setup);
 
 const struct jz_slcd_panel *jz_slcd_panels_probe(struct jzfb *jzfb)
 {
-	switch (ARRAY_SIZE(jz_slcd_panels)) {
-	case 0:
+	const struct jz_slcd_panel *panel;
+	if (ARRAY_SIZE(jz_slcd_panels) == 0)
 		return NULL;
-	case 1:
-		return &jz_slcd_panels[0];
-	default:
-		return &jz_slcd_panels[jz_slcd_panel];
+
+	panel = &jz_slcd_panels[0];
+
+	if (default_slcd_panel) {
+		panel = jz_slcd_panel_from_name(default_slcd_panel);
+		if (!panel) {
+			struct device *dev = &jzfb->pdev->dev;
+			dev_err(dev, "Unknown SLCD panel: %s\n",
+						default_slcd_panel);
+		}
 	}
+	return panel;
 }

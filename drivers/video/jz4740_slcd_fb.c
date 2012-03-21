@@ -679,6 +679,36 @@ static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
+static ssize_t jzfb_panel_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	return sprintf(buf, "%s\n", jzfb->panel->name);
+}
+
+static ssize_t jzfb_panel_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t n)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	const struct jz_slcd_panel *panel = jz_slcd_panel_from_name(buf);
+
+	if (!panel) {
+		dev_err(dev, "Unknown SLCD panel: %s\n", buf);
+		return -EINVAL;
+	}
+
+	if (panel != jzfb->panel) {
+		jzfb->panel->disable(jzfb);
+		jzfb->panel->exit(jzfb);
+		jzfb->panel = panel;
+		panel->init(jzfb);
+		panel->enable(jzfb);
+	}
+	return n;
+}
+
+static DEVICE_ATTR(panel, 0644, jzfb_panel_show, jzfb_panel_store);
+
 static struct fb_ops jzfb_ops = {
 	.owner			= THIS_MODULE,
 	.fb_check_var 		= jzfb_check_var,
@@ -837,8 +867,11 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&jzfb->refresh_work, jzfb_refresh_work);
 	schedule_delayed_work(&jzfb->refresh_work, 0);
 
-	return 0;
+	ret = device_create_file(&pdev->dev, &dev_attr_panel);
+	if (!ret)
+		return 0;
 
+	cancel_delayed_work_sync(&jzfb->refresh_work);
 err_free_panel:
 	jzfb->panel->exit(jzfb);
 err_free_devmem:
@@ -865,6 +898,7 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 {
 	struct jzfb *jzfb = platform_get_drvdata(pdev);
 
+	device_remove_file(&pdev->dev, &dev_attr_panel);
 	jzfb_blank(FB_BLANK_POWERDOWN, jzfb->fb);
 
 	/* Blanking will prevent future refreshes from behind scheduled.
