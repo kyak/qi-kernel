@@ -98,6 +98,7 @@ static struct snd_soc_dai_link a320_dai = {
 
 static struct snd_soc_card a320 = {
 	.name = "Dingoo A320",
+	.owner = THIS_MODULE,
 	.dai_link = &a320_dai,
 	.num_links = 1,
 };
