@@ -150,7 +150,7 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	int ret;
 	struct ili8960 *ili8960;
 
-	ili8960 = kmalloc(sizeof(*ili8960), GFP_KERNEL);
+	ili8960 = devm_kzalloc(&spi->dev, sizeof(*ili8960), GFP_KERNEL);
 	if (!ili8960)
 		return -ENOMEM;
 
@@ -160,7 +160,7 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	ret = spi_setup(spi);
 	if (ret) {
 		dev_err(&spi->dev, "Failed to setup spi\n");
-		goto err_free_ili8960;
+		return ret;
 	}
 
 	ili8960->spi = spi;
@@ -171,7 +171,7 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	if (IS_ERR(ili8960->lcd)) {
 		ret = PTR_ERR(ili8960->lcd);
 		dev_err(&spi->dev, "Failed to register lcd device: %d\n", ret);
-		goto err_free_ili8960;
+		return ret;
 	}
 
 	ili8960->lcd->props.max_contrast = 255;
@@ -190,8 +190,6 @@ static int __devinit ili8960_probe(struct spi_device *spi)
 	return 0;
 err_unregister_lcd:
 	lcd_device_unregister(ili8960->lcd);
-err_free_ili8960:
-	kfree(ili8960);
 	return ret;
 }
 
@@ -203,7 +201,6 @@ static int __devexit ili8960_remove(struct spi_device *spi)
 	lcd_device_unregister(ili8960->lcd);
 
 	spi_set_drvdata(spi, NULL);
-	kfree(ili8960);
 	return 0;
 }
 
