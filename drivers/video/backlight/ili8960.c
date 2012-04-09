@@ -122,7 +122,7 @@ static ssize_t ili8960_store_brightness(struct device *dev,
 	unsigned long brightness;
 	int ret;
 
-	ret = strict_strtoul(buf, 0, &brightness);
+	ret = kstrtoul(buf, 0, &brightness);
 	if (ret)
 		return ret;
 
