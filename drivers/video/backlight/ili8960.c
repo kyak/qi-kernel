@@ -244,18 +244,7 @@ static struct spi_driver ili8960_driver = {
 	.suspend = ili8960_suspend,
 	.resume = ili8960_resume,
 };
-
-static int __init ili8960_init(void)
-{
-	return spi_register_driver(&ili8960_driver);
-}
-module_init(ili8960_init);
-
-static void __exit ili8960_exit(void)
-{
-	spi_unregister_driver(&ili8960_driver);
-}
-module_exit(ili8960_exit)
+module_spi_driver(ili8960_driver);
 
 MODULE_AUTHOR("Lars-Peter Clausen");
 MODULE_LICENSE("GPL");
