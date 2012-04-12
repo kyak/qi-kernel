@@ -109,9 +109,11 @@ static int jz4740_pcm_hw_params(struct snd_pcm_substream *substream,
 
 	if (!prtd->dma) {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-			prtd->dma = jz4740_dma_request(substream, "PCM Capture");
+			prtd->dma = jz4740_dma_request(substream,
+						       "PCM Capture", 0);
 		else
-			prtd->dma = jz4740_dma_request(substream, "PCM Playback");
+			prtd->dma = jz4740_dma_request(substream,
+						       "PCM Playback", 0);
 	}
 
 	if (!prtd->dma)
