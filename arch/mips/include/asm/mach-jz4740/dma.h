@@ -68,7 +68,11 @@ struct jz4740_dma_config {
 
 typedef void (*jz4740_dma_complete_callback_t)(struct jz4740_dma_chan *, int, void *);
 
-struct jz4740_dma_chan *jz4740_dma_request(void *dev, const char *name);
+/*
+ * The 'prio' argument selects priority group: 0 (high) or 1 (low).
+ * There are 3 DMA channels available per group.
+ */
+struct jz4740_dma_chan *jz4740_dma_request(void *dev, const char *name, int prio);
 void jz4740_dma_free(struct jz4740_dma_chan *dma);
 
 void jz4740_dma_configure(struct jz4740_dma_chan *dma,
