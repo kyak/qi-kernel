@@ -66,7 +66,7 @@
 #define JZ_DMA_CTRL_PRIORITY_012345		(0x0 << 8)
 #define JZ_DMA_CTRL_PRIORITY_023145		(0x1 << 8)
 #define JZ_DMA_CTRL_PRIORITY_201345		(0x2 << 8)
-#define JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN	(0x2 << 8)
+#define JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN	(0x3 << 8)
 #define JZ_DMA_CTRL_PRIORITY_MASK		(0x3 << 8)
 #define JZ_DMA_CTRL_HALT			BIT(3)
 #define JZ_DMA_CTRL_ADDRESS_ERROR		BIT(2)
@@ -291,8 +291,8 @@ static int jz4740_dma_init(void)
 	}
 
 	jz4740_dma_write_mask(JZ_REG_DMA_CTRL,
-			      JZ_DMA_CTRL_PRIORITY_MASK,
-			      JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN);
+			      JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN,
+			      JZ_DMA_CTRL_PRIORITY_MASK);
 
 	return 0;
 
