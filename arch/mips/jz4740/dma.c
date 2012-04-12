@@ -63,10 +63,14 @@
 #define JZ_DMA_CMD_TRANSFER_SIZE_OFFSET 8
 #define JZ_DMA_CMD_MODE_OFFSET 7
 
-#define JZ_DMA_CTRL_PRIORITY_MASK	(0x3 << 8)
-#define JZ_DMA_CTRL_HALT		BIT(3)
-#define JZ_DMA_CTRL_ADDRESS_ERROR	BIT(2)
-#define JZ_DMA_CTRL_ENABLE		BIT(0)
+#define JZ_DMA_CTRL_PRIORITY_012345		(0x0 << 8)
+#define JZ_DMA_CTRL_PRIORITY_023145		(0x1 << 8)
+#define JZ_DMA_CTRL_PRIORITY_201345		(0x2 << 8)
+#define JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN	(0x2 << 8)
+#define JZ_DMA_CTRL_PRIORITY_MASK		(0x3 << 8)
+#define JZ_DMA_CTRL_HALT			BIT(3)
+#define JZ_DMA_CTRL_ADDRESS_ERROR		BIT(2)
+#define JZ_DMA_CTRL_ENABLE			BIT(0)
 
 
 static void __iomem *jz4740_dma_base;
@@ -115,14 +119,18 @@ struct jz4740_dma_chan jz4740_dma_channels[] = {
 	JZ4740_DMA_CHANNEL(5),
 };
 
-struct jz4740_dma_chan *jz4740_dma_request(void *dev, const char *name)
+struct jz4740_dma_chan *jz4740_dma_request(void *dev, const char *name,
+					   int prio)
 {
 	unsigned int i;
 	struct jz4740_dma_chan *dma = NULL;
 
+	if (prio < 0 || prio > 1)
+		return NULL;
+
 	spin_lock(&jz4740_dma_lock);
 
-	for (i = 0; i < ARRAY_SIZE(jz4740_dma_channels); ++i) {
+	for (i = prio * 3; i < prio * 3 + 3; ++i) {
 		if (!jz4740_dma_channels[i].used) {
 			dma = &jz4740_dma_channels[i];
 			dma->used = 1;
@@ -271,17 +279,25 @@ static int jz4740_dma_init(void)
 	unsigned int ret;
 
 	jz4740_dma_base = ioremap(JZ4740_DMAC_BASE_ADDR, 0x400);
-
 	if (!jz4740_dma_base)
 		return -EBUSY;
 
 	spin_lock_init(&jz4740_dma_lock);
 
 	ret = request_irq(JZ4740_IRQ_DMAC, jz4740_dma_irq, 0, "DMA", NULL);
-
-	if (ret)
+	if (ret) {
 		printk(KERN_ERR "JZ4740 DMA: Failed to request irq: %d\n", ret);
+		goto err_iounmap;
+	}
 
+	jz4740_dma_write_mask(JZ_REG_DMA_CTRL,
+			      JZ_DMA_CTRL_PRIORITY_MASK,
+			      JZ_DMA_CTRL_PRIORITY_ROUND_ROBIN);
+
+	return 0;
+
+err_iounmap:
+	iounmap(jz4740_dma_base);
 	return ret;
 }
 arch_initcall(jz4740_dma_init);

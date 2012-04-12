@@ -766,7 +766,7 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	jzfb->pdata = pdata;
 	jzfb->mem = mem;
 
-	jzfb->dma = jz4740_dma_request(&pdev->dev, dev_name(&pdev->dev));
+	jzfb->dma = jz4740_dma_request(&pdev->dev, dev_name(&pdev->dev), 0);
 	if (!jzfb->dma) {
 		dev_err(&pdev->dev, "Failed to get DMA channel\n");
 		ret = -EBUSY;
