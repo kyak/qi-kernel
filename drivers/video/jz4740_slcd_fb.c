@@ -592,8 +592,9 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 #define FB_A320TV_OFF 0
 #define FB_A320TV_NTSC 1
 #define FB_A320TV_PAL 2
+#define FB_A320TV_LAST 2
 
-static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
+static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
 	int blank = jzfb->is_enabled ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
 	struct fb_event event = {
@@ -602,6 +603,8 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 	};
 
 	printk("A320 TV out: %d\n", mode);
+	if (mode > FB_A320TV_LAST)
+		return -EINVAL;
 
 	if (mode != FB_A320TV_OFF) {
 		cancel_delayed_work(&jzfb->refresh_work);
@@ -622,20 +625,19 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		if (mode == FB_A320TV_PAL) {
 			/* PAL */
 			/* H-Sync pulse start position */
-			writel(125, jzfb->base + JZ_REG_LCD_HSYNC);
+			writel(0x0000007D, jzfb->base + JZ_REG_LCD_HSYNC);
 			/* virtual area size */
 			writel(0x036c0112, jzfb->base + JZ_REG_LCD_VAT);
 			/* horizontal start/end point */
 			writel(0x02240364, jzfb->base + JZ_REG_LCD_DAH);
 			/* vertical start/end point */
-			writel(0x1b010b, jzfb->base + JZ_REG_LCD_DAV);
-		}
-		else {
+			writel(0x001b010b, jzfb->base + JZ_REG_LCD_DAV);
+		} else {
 			/* NTSC */
-			writel(0x3c, jzfb->base + JZ_REG_LCD_HSYNC);
+			writel(0x0000003c, jzfb->base + JZ_REG_LCD_HSYNC);
 			writel(0x02e00110, jzfb->base + JZ_REG_LCD_VAT);
 			writel(0x019902d9, jzfb->base + JZ_REG_LCD_DAH);
-			writel(0x1d010d, jzfb->base + JZ_REG_LCD_DAV);
+			writel(0x001d010d, jzfb->base + JZ_REG_LCD_DAV);
 		}
 		writel(0, jzfb->base + JZ_REG_LCD_PS);
 		writel(0, jzfb->base + JZ_REG_LCD_CLS);
@@ -650,8 +652,7 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		writel(JZ_LCD_CTRL_BURST_16 | JZ_LCD_CTRL_ENABLE |
 		       JZ_LCD_CTRL_BPP_15_16,
 		       jzfb->base + JZ_REG_LCD_CTRL);
-	}
-	else {
+	} else {
 		/* disable LCD controller and re-enable SLCD */
 		writel(JZ_LCD_CFG_SLCD, jzfb->base + JZ_REG_LCD_CFG);
 		jzfb->panel->enable(jzfb);
@@ -660,6 +661,7 @@ static void jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 
 	/* reaffirm the current blanking state, to trigger a backlight update */
 	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	return 0;
 }
 
 static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
@@ -671,8 +673,7 @@ static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 			if (!jzfb->is_enabled)
 				return -EBUSY;
 
-			jzfb_tv_out(jzfb, arg);
-			break;
+			return jzfb_tv_out(jzfb, arg);
 		default:
 			return -EINVAL;
 	}
