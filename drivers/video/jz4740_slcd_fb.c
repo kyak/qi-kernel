@@ -591,8 +591,9 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 #define FBIOA320TVOUT 0x46F0
 #define FB_A320TV_OFF 0
 #define FB_A320TV_NTSC 1
-#define FB_A320TV_PAL 2
-#define FB_A320TV_LAST 2
+#define FB_A320TV_PAL50 2
+#define FB_A320TV_PAL60 3
+#define FB_A320TV_LAST 3
 
 static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
@@ -622,10 +623,10 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		/* V-Sync pulse end position */
 		writel(10, jzfb->base + JZ_REG_LCD_VSYNC);
 
-		if (mode == FB_A320TV_PAL) {
-			/* PAL */
+		if (mode == FB_A320TV_PAL50) {
+			/* PAL 50 Hz */
 			/* H-Sync pulse start position */
-			writel(0x0000007D, jzfb->base + JZ_REG_LCD_HSYNC);
+			writel(0x0000007d, jzfb->base + JZ_REG_LCD_HSYNC);
 			/* virtual area size */
 			writel(0x036c0112, jzfb->base + JZ_REG_LCD_VAT);
 			/* horizontal start/end point */
@@ -633,7 +634,7 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 			/* vertical start/end point */
 			writel(0x001b010b, jzfb->base + JZ_REG_LCD_DAV);
 		} else {
-			/* NTSC */
+			/* NTSC and PAL 60 Hz */
 			writel(0x0000003c, jzfb->base + JZ_REG_LCD_HSYNC);
 			writel(0x02e00110, jzfb->base + JZ_REG_LCD_VAT);
 			writel(0x019902d9, jzfb->base + JZ_REG_LCD_DAH);
