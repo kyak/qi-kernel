@@ -593,7 +593,8 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 #define FB_A320TV_NTSC 1
 #define FB_A320TV_PAL50 2
 #define FB_A320TV_PAL60 3
-#define FB_A320TV_LAST 3
+#define FB_A320TV_PAL_M 4
+#define FB_A320TV_LAST 4
 
 static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
