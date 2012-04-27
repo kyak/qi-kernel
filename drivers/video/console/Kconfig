@@ -203,11 +203,11 @@ config FONT_MINI_4x6
 	depends on !SPARC && FONTS
 
 config FONT_6x10
-	bool "Medium-size 6x10 font" if FONTS
+	bool "Medium-size 6x10 font"
 	depends on !SPARC && FONTS
 	help
 	  Medium-size console font. Suitable for framebuffer consoles on
-	  mobile devices with a 320x240 screen, to get a reasonable number
+	  embedded devices with a 320x240 screen, to get a reasonable number
 	  of characters (53x24) that are still at a readable size.
 
 config FONT_SUN8x16
