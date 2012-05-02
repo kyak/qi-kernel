@@ -72,6 +72,13 @@
 
 /*************************************************************************/
 
+struct jzfb_framedesc {
+	uint32_t next;
+	uint32_t addr;
+	uint32_t id;
+	uint32_t cmd;
+} __attribute__((packed));
+
 struct jzfb {
 	struct fb_info *fb;
 	struct platform_device *pdev;
@@ -83,8 +90,14 @@ struct jzfb {
 	size_t vidmem_size;
 	void *vidmem;
 	dma_addr_t vidmem_phys;
-	struct jzfb_framedesc *framedesc;
+
+	size_t blackline_size;
+	void *blackline;
+	dma_addr_t blackline_phys;
+
+	struct jzfb_framedesc (*framedesc)[3];
 	dma_addr_t framedesc_phys;
+
 	struct jz4740_dma_chan *dma;
 
 	struct clk *ldclk;

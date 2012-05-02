@@ -34,13 +34,6 @@
 #include "jz4740_lcd.h"
 #include "jz4740_slcd.h"
 
-struct jzfb_framedesc {
-	uint32_t next;
-	uint32_t addr;
-	uint32_t id;
-	uint32_t cmd;
-} __attribute__((packed));
-
 static struct fb_fix_screeninfo jzfb_fix __devinitdata = {
 	.id =		"JZ4740 SLCD FB",
 	.type =		FB_TYPE_PACKED_PIXELS,
@@ -506,7 +499,7 @@ static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 
 	info->var.yoffset = var->yoffset;
 	/* update frame start address for TV-out mode */
-	jzfb->framedesc->addr = jzfb->vidmem_phys
+	(*jzfb->framedesc)[1].addr = jzfb->vidmem_phys
 	                      + info->fix.line_length * var->yoffset;
 
 	return 0;
@@ -530,24 +523,38 @@ static int jzfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 
 static int jzfb_alloc_devmem(struct jzfb *jzfb)
 {
-	int max_framesize = 0;
+	int max_linesize = 0, max_framesize = 0;
+	int bytes_per_pixel;
 	struct fb_videomode *mode = jzfb->pdata->modes;
 	void *page;
 	int i;
 
 	for (i = 0; i < jzfb->pdata->num_modes; ++mode, ++i) {
+		if (max_linesize < mode->xres)
+			max_linesize = mode->xres;
 		if (max_framesize < mode->xres * mode->yres)
 			max_framesize = mode->xres * mode->yres;
 	}
 
-	max_framesize *= jzfb_get_controller_bpp(jzfb) >> 3;
+	bytes_per_pixel = jzfb_get_controller_bpp(jzfb) >> 3;
+	max_linesize *= bytes_per_pixel;
+	max_framesize *= bytes_per_pixel;
 
 	jzfb->framedesc = dma_alloc_coherent(&jzfb->pdev->dev,
 				    sizeof(*jzfb->framedesc),
 				    &jzfb->framedesc_phys, GFP_KERNEL);
-
 	if (!jzfb->framedesc)
 		return -ENOMEM;
+
+	jzfb->blackline_size = max_linesize;
+	jzfb->blackline = dma_alloc_coherent(&jzfb->pdev->dev,
+					     jzfb->blackline_size,
+					     &jzfb->blackline_phys, GFP_KERNEL);
+	if (!jzfb->blackline)
+		goto err_free_framedesc;
+
+	/* Set the black line to black... */
+	memset(jzfb->blackline, 0, jzfb->blackline_size);
 
 	/* reserve memory for two frames to allow double buffering */
 	jzfb->vidmem_size = PAGE_ALIGN(max_framesize * 2);
@@ -556,7 +563,7 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 						&jzfb->vidmem_phys, GFP_KERNEL);
 
 	if (!jzfb->vidmem)
-		goto err_free_framedesc;
+		goto err_free_blackline;
 
 	for (page = jzfb->vidmem;
 		 page < jzfb->vidmem + PAGE_ALIGN(jzfb->vidmem_size);
@@ -564,14 +571,24 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 		SetPageReserved(virt_to_page(page));
 	}
 
-	jzfb->framedesc->next = jzfb->framedesc_phys;
-	jzfb->framedesc->addr = jzfb->vidmem_phys;
-	jzfb->framedesc->id = 0xdeafbead;
-	jzfb->framedesc->cmd = 0;
-	jzfb->framedesc->cmd |= max_framesize / 4;
+	for (i = 0; i < 3; i++)
+		(*jzfb->framedesc)[i].next = jzfb->framedesc_phys
+				+ ((i + 1) % 3) * sizeof(struct jzfb_framedesc);
+	(*jzfb->framedesc)[0].addr = (*jzfb->framedesc)[2].addr =
+			jzfb->blackline_phys;
+	(*jzfb->framedesc)[0].id = 0xdadabeeb;
+	(*jzfb->framedesc)[2].id = 0xfadefeed;
+	(*jzfb->framedesc)[0].cmd = (*jzfb->framedesc)[2].cmd =
+			jzfb->blackline_size / 4;
+	(*jzfb->framedesc)[1].addr = jzfb->vidmem_phys;
+	(*jzfb->framedesc)[1].id = 0xdeafbead;
+	(*jzfb->framedesc)[1].cmd = max_framesize / 4;
 
 	return 0;
 
+err_free_blackline:
+	dma_free_coherent(&jzfb->pdev->dev, jzfb->blackline_size,
+				jzfb->blackline, jzfb->blackline_phys);
 err_free_framedesc:
 	dma_free_coherent(&jzfb->pdev->dev, sizeof(*jzfb->framedesc),
 				jzfb->framedesc, jzfb->framedesc_phys);
@@ -582,6 +599,8 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 {
 	dma_free_coherent(&jzfb->pdev->dev, jzfb->vidmem_size,
 				jzfb->vidmem, jzfb->vidmem_phys);
+	dma_free_coherent(&jzfb->pdev->dev, jzfb->blackline_size,
+				jzfb->blackline, jzfb->blackline_phys);
 	dma_free_coherent(&jzfb->pdev->dev, sizeof(*jzfb->framedesc),
 				jzfb->framedesc, jzfb->framedesc_phys);
 }
@@ -633,13 +652,13 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 			/* horizontal start/end point */
 			writel(0x02240364, jzfb->base + JZ_REG_LCD_DAH);
 			/* vertical start/end point */
-			writel(0x001b010b, jzfb->base + JZ_REG_LCD_DAV);
+			writel(0x001a010c, jzfb->base + JZ_REG_LCD_DAV);
 		} else {
 			/* NTSC and PAL 60 Hz */
 			writel(0x0000003c, jzfb->base + JZ_REG_LCD_HSYNC);
 			writel(0x02e00110, jzfb->base + JZ_REG_LCD_VAT);
 			writel(0x019902d9, jzfb->base + JZ_REG_LCD_DAH);
-			writel(0x001d010d, jzfb->base + JZ_REG_LCD_DAV);
+			writel(0x001c010e, jzfb->base + JZ_REG_LCD_DAV);
 		}
 		writel(0, jzfb->base + JZ_REG_LCD_PS);
 		writel(0, jzfb->base + JZ_REG_LCD_CLS);
