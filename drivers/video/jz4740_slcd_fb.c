@@ -682,7 +682,9 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 	}
 
 	/* reaffirm the current blanking state, to trigger a backlight update */
+	console_lock();
 	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	console_unlock();
 	jzfb->tv_out = mode;
 	return 0;
 }
