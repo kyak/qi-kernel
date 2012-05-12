@@ -103,6 +103,8 @@ struct jzfb {
 	struct clk *ldclk;
 	struct clk *lpclk;
 
+	unsigned int tv_out;
+
 	unsigned is_enabled:1;
 	struct mutex lock; /* Protecting against running enable/disable in paralell */
 

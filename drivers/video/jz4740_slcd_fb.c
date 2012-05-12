@@ -34,6 +34,10 @@
 #include "jz4740_lcd.h"
 #include "jz4740_slcd.h"
 
+static const char *jzfb_tv_out_norm[] = {
+	"off", "ntsc", "pal", "pal-60", "pal-m",
+};
+
 static struct fb_fix_screeninfo jzfb_fix __devinitdata = {
 	.id =		"JZ4740 SLCD FB",
 	.type =		FB_TYPE_PACKED_PIXELS,
@@ -605,9 +609,6 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 				jzfb->framedesc, jzfb->framedesc_phys);
 }
 
-#include "jz4740_lcd.h"
-
-#define FBIOA320TVOUT 0x46F0
 #define FB_A320TV_OFF 0
 #define FB_A320TV_NTSC 1
 #define FB_A320TV_PAL50 2
@@ -682,24 +683,39 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 
 	/* reaffirm the current blanking state, to trigger a backlight update */
 	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
+	jzfb->tv_out = mode;
 	return 0;
 }
 
-static int jzfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+static ssize_t jzfb_tv_out_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
 {
-	struct jzfb *jzfb = info->par;
-	switch (cmd) {
-		case FBIOA320TVOUT:
-			/* No TV-out mode while sleeping. */
-			if (!jzfb->is_enabled)
-				return -EBUSY;
+	struct jzfb *jzfb = dev_get_drvdata(dev);
 
-			return jzfb_tv_out(jzfb, arg);
-		default:
-			return -EINVAL;
+	if (jzfb->tv_out > FB_A320TV_LAST) {
+		dev_err(dev, "Unknown norm for TV-out\n");
+		return -1;
 	}
-	return 0;
+
+	return sprintf(buf, "%s\n", jzfb_tv_out_norm[jzfb->tv_out]);
 }
+
+static ssize_t jzfb_tv_out_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t n)
+{
+	size_t i;
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+
+	for (i = 0; i <= FB_A320TV_LAST; i++) {
+		if (!strncmp(jzfb_tv_out_norm[i], buf, n-1)) {
+			jzfb_tv_out(jzfb, i);
+			return n;
+		}
+	}
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(tv_out, 0644, jzfb_tv_out_show, jzfb_tv_out_store);
 
 static ssize_t jzfb_panel_show(struct device *dev, struct device_attribute *attr,
 			char *buf)
@@ -741,7 +757,6 @@ static struct fb_ops jzfb_ops = {
 	.fb_fillrect		= sys_fillrect,
 	.fb_copyarea		= sys_copyarea,
 	.fb_imageblit		= sys_imageblit,
-	.fb_ioctl		= jzfb_ioctl,
 	.fb_mmap		= jzfb_mmap,
 };
 
@@ -787,6 +802,8 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	jzfb->pdev = pdev;
 	jzfb->pdata = pdata;
 	jzfb->mem = mem;
+
+	jzfb->tv_out = FB_A320TV_OFF;
 
 	jzfb->dma = jz4740_dma_request(&pdev->dev, dev_name(&pdev->dev), 0);
 	if (!jzfb->dma) {
@@ -890,9 +907,15 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	schedule_delayed_work(&jzfb->refresh_work, 0);
 
 	ret = device_create_file(&pdev->dev, &dev_attr_panel);
+	if (ret)
+		goto err_cancel_work;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_tv_out);
 	if (!ret)
 		return 0;
 
+	device_remove_file(&pdev->dev, &dev_attr_panel);
+err_cancel_work:
 	cancel_delayed_work_sync(&jzfb->refresh_work);
 err_free_panel:
 	jzfb->panel->exit(jzfb);
@@ -920,6 +943,7 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 {
 	struct jzfb *jzfb = platform_get_drvdata(pdev);
 
+	device_remove_file(&pdev->dev, &dev_attr_tv_out);
 	device_remove_file(&pdev->dev, &dev_attr_panel);
 	jzfb_blank(FB_BLANK_POWERDOWN, jzfb->fb);
 
