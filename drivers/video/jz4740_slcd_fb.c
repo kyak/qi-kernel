@@ -709,7 +709,7 @@ static ssize_t jzfb_tv_out_store(struct device *dev, struct device_attribute *at
 	struct jzfb *jzfb = dev_get_drvdata(dev);
 
 	for (i = 0; i <= FB_A320TV_LAST; i++) {
-		if (!strncmp(jzfb_tv_out_norm[i], buf, n-1)) {
+		if (sysfs_streq(jzfb_tv_out_norm[i], buf)) {
 			jzfb_tv_out(jzfb, i);
 			return n;
 		}
