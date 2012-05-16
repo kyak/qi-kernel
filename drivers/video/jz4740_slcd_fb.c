@@ -627,6 +627,8 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 	printk("A320 TV out: %d\n", mode);
 	if (mode > FB_A320TV_LAST)
 		return -EINVAL;
+	if (mode == jzfb->tv_out)
+		return 0;
 
 	if (mode != FB_A320TV_OFF) {
 		cancel_delayed_work(&jzfb->refresh_work);
