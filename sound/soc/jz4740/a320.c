@@ -77,7 +77,8 @@ static int a320_codec_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
-	snd_soc_add_controls(codec, a320_controls, ARRAY_SIZE(a320_controls));
+	snd_soc_add_card_controls(rtd->card, a320_controls,
+				  ARRAY_SIZE(a320_controls));
 
 	snd_soc_dapm_new_controls(dapm, a320_widgets, ARRAY_SIZE(a320_widgets));
 	snd_soc_dapm_add_routes(dapm, a320_routes, ARRAY_SIZE(a320_routes));
