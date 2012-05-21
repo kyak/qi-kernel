@@ -37,7 +37,6 @@
 #include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/system.h>
 #include <asm/mach-jz4740/clock.h>
 
 #include "jz4740_udc.h"
