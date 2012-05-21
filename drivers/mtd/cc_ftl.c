@@ -57,7 +57,7 @@ static int cc_ftl_readsect(struct mtd_blktrans_dev *dev, unsigned long block,
 	phy_offs += mtd_mod_by_eb(log_offs, mtd);
 
 	/* Read data. */
-	ret = mtd->read(mtd, phy_offs, SECTOR_SIZE, &retlen, buffer);
+	ret = mtd_read(mtd, phy_offs, SECTOR_SIZE, &retlen, buffer);
 	if (ret == -EUCLEAN) /* sector contains correctable errors */
 		ret = 0;
 	if (ret)
@@ -101,9 +101,9 @@ uint32_t *cc_ftl_build_block_map(struct mtd_info *mtd)
 		uint32_t log_blk;
 		int err;
 
-		if (mtd->block_isbad(mtd, ofs))
+		if (mtd_block_isbad(mtd, ofs))
 			continue;
-		err = mtd->read_oob(mtd, ofs, &oob_ops);
+		err = mtd_read_oob(mtd, ofs, &oob_ops);
 		if (err)
 			continue;
 		signature = oob_buf[0] | ((uint16_t)oob_buf[1] << 8);
@@ -163,10 +163,6 @@ static void cc_ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 
 	/* Check for NAND first, so we know we can use the "chip" pointer. */
 	if (mtd->type != MTD_NANDFLASH)
-		return;
-
-	/* A bad block table is expected. */
-	if (!mtd->block_isbad)
 		return;
 
 	/* Erase size must be a power of two. */
