@@ -104,65 +104,69 @@ static struct snd_soc_card a320 = {
 	.num_links = 1,
 };
 
-static struct platform_device *a320_snd_device;
-
-static int __init a320_init(void)
+static int __devinit a320_probe(struct platform_device *pdev)
 {
+	struct snd_soc_card *card = &a320;
 	int ret;
-
-	a320_snd_device = platform_device_alloc("soc-audio", -1);
-
-	if (!a320_snd_device)
-		return -ENOMEM;
 
 	ret = gpio_request(A320_SPK_GPIO, "SPK");
 	if (ret) {
-		pr_err("a320 snd: Failed to request SPK GPIO(%d): %d\n",
-				A320_SPK_GPIO, ret);
-		goto err_device_put;
+		dev_err(&pdev->dev, "Failed to request SPK GPIO(%d): %d\n",
+			A320_SPK_GPIO, ret);
+		return ret;
 	}
 
 	ret = gpio_request(A320_HPTV_GPIO, "HPTV");
 	if (ret) {
-		pr_err("a320 snd: Failed to request HPTV GPIO(%d): %d\n",
-				A320_HPTV_GPIO, ret);
+		dev_err(&pdev->dev, "Failed to request HPTV GPIO(%d): %d\n",
+			A320_HPTV_GPIO, ret);
 		goto err_gpio_free_spk;
 	}
 
 	gpio_direction_output(A320_SPK_GPIO, 0);
 	gpio_direction_output(A320_HPTV_GPIO, 0);
 
-	platform_set_drvdata(a320_snd_device, &a320);
+	card->dev = &pdev->dev;
 
-	ret = platform_device_add(a320_snd_device);
+	ret = snd_soc_register_card(card);
 	if (ret) {
-		pr_err("a320 snd: Failed to add snd soc device: %d\n", ret);
-		goto err_unset_pdata;
+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
+			ret);
+		goto err_gpio_free_hptv;
 	}
 
-	 return 0;
+	return 0;
 
-err_unset_pdata:
-	platform_set_drvdata(a320_snd_device, NULL);
-/*err_gpio_free_hptv:*/
+err_gpio_free_hptv:
 	gpio_free(A320_HPTV_GPIO);
 err_gpio_free_spk:
 	gpio_free(A320_SPK_GPIO);
-err_device_put:
-	platform_device_put(a320_snd_device);
 
 	return ret;
 }
-module_init(a320_init);
 
-static void __exit a320_exit(void)
+static int __devexit a320_remove(struct platform_device *pdev)
 {
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+
+	snd_soc_unregister_card(card);
 	gpio_free(A320_HPTV_GPIO);
 	gpio_free(A320_SPK_GPIO);
-	platform_device_unregister(a320_snd_device);
+	return 0;
 }
-module_exit(a320_exit);
+
+static struct platform_driver a320_driver = {
+	.driver		= {
+		.name	= "a320-audio",
+		.owner	= THIS_MODULE,
+	},
+	.probe		= a320_probe,
+	.remove		= __devexit_p(a320_remove),
+};
+
+module_platform_driver(a320_driver);
 
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>, Maarten ter Huurne <maarten@treewalker.org>, Paul Cercueil <paul@crapouillou.net>");
 MODULE_DESCRIPTION("ALSA SoC Dingoo A320 Audio support");
 MODULE_LICENSE("GPL v2");
+MODULE_ALIAS("platform:a320-audio");

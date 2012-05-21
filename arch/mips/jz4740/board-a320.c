@@ -354,6 +354,12 @@ static struct platform_device a320_gpio_keys_device = {
 	},
 };
 
+/* Audio */
+static struct platform_device a320_audio_device = {
+	.name = "a320-audio",
+	.id = -1,
+};
+
 static struct platform_device *jz_platform_devices[] __initdata = {
 #ifdef CONFIG_I2C_JZ47XX
 	&jz4740_i2c_device,
@@ -377,6 +383,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&a320_charger_device,
 	&a320_backlight_device,
 	&a320_gpio_keys_device,
+	&a320_audio_device,
 };
 
 static void __init board_gpio_setup(void)
