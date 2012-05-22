@@ -731,8 +731,15 @@ void zs_unmap_object(struct zs_pool *pool, void *handle)
 	} else {
 		set_pte(area->vm_ptes[0], __pte(0));
 		set_pte(area->vm_ptes[1], __pte(0));
+#if defined(CONFIG_X86)
 		__flush_tlb_one((unsigned long)area->vm_addr);
 		__flush_tlb_one((unsigned long)area->vm_addr + PAGE_SIZE);
+#elif defined(CONFIG_MIPS)
+		flush_tlb_one((unsigned long)area->vm_addr);
+		flush_tlb_one((unsigned long)area->vm_addr + PAGE_SIZE);
+#else
+#error Unsupported arch.
+#endif
 	}
 	put_cpu_var(zs_map_area);
 }
