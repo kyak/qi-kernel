@@ -998,7 +998,6 @@ static int jzfb_suspend(struct device *dev)
 static int jzfb_resume(struct device *dev)
 {
 	struct jzfb *jzfb = dev_get_drvdata(dev);
-	clk_enable(jzfb->ldclk);
 
 	mutex_lock(&jzfb->lock);
 	if (jzfb->is_enabled)
