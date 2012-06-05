@@ -451,7 +451,7 @@ static void jzfb_enable(struct jzfb *jzfb)
 static void jzfb_disable(struct jzfb *jzfb)
 {
 	/* It is safe but wasteful to call refresh_work() while disabled. */
-	cancel_delayed_work(&jzfb->refresh_work);
+	cancel_delayed_work_sync(&jzfb->refresh_work);
 
 	/* Abort any DMA transfer that might be in progress and allow direct
 	   writes to the panel. */
@@ -631,7 +631,7 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		return 0;
 
 	if (mode != FB_A320TV_OFF) {
-		cancel_delayed_work(&jzfb->refresh_work);
+		cancel_delayed_work_sync(&jzfb->refresh_work);
 		/* Abort any DMA transfer that might be in progress and
 		   allow direct writes to the panel.  */
 		jzfb_disable_dma(jzfb);
