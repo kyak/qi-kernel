@@ -99,11 +99,14 @@ struct jzfb {
 	dma_addr_t framedesc_phys;
 
 	struct jz4740_dma_chan *dma;
+	struct completion dma_completion;
+	unsigned refresh_on_pan:1;
 
 	struct clk *ldclk;
 	struct clk *lpclk;
 
 	unsigned int tv_out;
+	unsigned tv_out_vsync:1;
 
 	unsigned is_enabled:1;
 	struct mutex lock; /* Protecting against running enable/disable in paralell */

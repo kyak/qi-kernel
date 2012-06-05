@@ -34,6 +34,13 @@
 #include "jz4740_lcd.h"
 #include "jz4740_slcd.h"
 
+#define FB_A320TV_OFF 0
+#define FB_A320TV_NTSC 1
+#define FB_A320TV_PAL50 2
+#define FB_A320TV_PAL60 3
+#define FB_A320TV_PAL_M 4
+#define FB_A320TV_LAST 4
+
 static const char *jzfb_tv_out_norm[] = {
 	"off", "ntsc", "pal", "pal-60", "pal-m",
 };
@@ -276,8 +283,21 @@ static void jzfb_refresh_work(struct work_struct *work)
 	mutex_lock(&jzfb->lock);
 	if (jzfb->is_enabled) {
 		if (1) {
-			jzfb_upload_frame_dma(jzfb);
-			/* The DMA complete callback will reschedule. */
+			int interval;
+
+			if (jzfb->dma_completion.done) {
+				if (jzfb->refresh_on_pan)
+					interval = HZ / 5;
+				else
+					interval = HZ / 60;
+				jzfb->refresh_on_pan = 0;
+
+				INIT_COMPLETION(jzfb->dma_completion);
+				jzfb_upload_frame_dma(jzfb);
+			} else
+				interval = HZ / 250;
+
+			schedule_delayed_work(&jzfb->refresh_work, interval);
 		} else {
 			jzfb_upload_frame_cpu(jzfb);
 			schedule_delayed_work(&jzfb->refresh_work, HZ / 10);
@@ -290,10 +310,7 @@ static void jzfb_refresh_work_complete(
 		struct jz4740_dma_chan *dma, int res, void *dev)
 {
 	struct jzfb *jzfb = dev_get_drvdata(dev);
-	// TODO: Stick to refresh rate in mode description.
-	int interval = HZ / 60;
-
-	schedule_delayed_work(&jzfb->refresh_work, interval);
+	complete_all(&jzfb->dma_completion);
 }
 
 static int jzfb_set_par(struct fb_info *info)
@@ -438,6 +455,7 @@ static void jzfb_enable(struct jzfb *jzfb)
 				    jzfb_num_data_pins(jzfb));
 	}
 	jzfb_disable_dma(jzfb);
+	complete_all(&jzfb->dma_completion);
 	jzfb->panel->enable(jzfb);
 
 	ctrl = readl(jzfb->base + JZ_REG_LCD_CTRL);
@@ -456,6 +474,7 @@ static void jzfb_disable(struct jzfb *jzfb)
 	/* Abort any DMA transfer that might be in progress and allow direct
 	   writes to the panel. */
 	jzfb_disable_dma(jzfb);
+	complete_all(&jzfb->dma_completion);
 
 	jzfb->panel->disable(jzfb);
 	jz_gpio_bulk_suspend(jz_slcd_ctrl_pins, jzfb_num_ctrl_pins(jzfb));
@@ -497,15 +516,35 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 	return ret;
 }
 
-static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+static int jzfb_wait_for_vsync(struct fb_info *info)
 {
 	struct jzfb *jzfb = info->par;
 
+	if (jzfb->tv_out != FB_A320TV_OFF &&
+				!jzfb->tv_out_vsync)
+		return 0;
+	return wait_for_completion_interruptible(&jzfb->dma_completion);
+}
+
+static int jzfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct jzfb *jzfb = info->par;
 	info->var.yoffset = var->yoffset;
+
+	/* Ensure that the data to be uploaded is in memory. */
+	dma_cache_sync(&jzfb->pdev->dev, jzfb->vidmem
+				+ info->fix.line_length * var->yoffset,
+				info->fix.line_length * var->yres,
+				DMA_TO_DEVICE);
+
 	/* update frame start address for TV-out mode */
 	(*jzfb->framedesc)[1].addr = jzfb->vidmem_phys
 	                      + info->fix.line_length * var->yoffset;
 
+	jzfb_wait_for_vsync(info);
+
+	jzfb->refresh_on_pan = 1;
+	flush_delayed_work(&jzfb->refresh_work);
 	return 0;
 }
 
@@ -586,7 +625,8 @@ static int jzfb_alloc_devmem(struct jzfb *jzfb)
 			jzfb->blackline_size / 4;
 	(*jzfb->framedesc)[1].addr = jzfb->vidmem_phys;
 	(*jzfb->framedesc)[1].id = 0xdeafbead;
-	(*jzfb->framedesc)[1].cmd = max_framesize / 4;
+	(*jzfb->framedesc)[1].cmd = (max_framesize / 4)
+			| JZ_LCD_CMD_EOF_IRQ | JZ_LCD_CMD_SOF_IRQ;
 
 	return 0;
 
@@ -609,13 +649,6 @@ static void jzfb_free_devmem(struct jzfb *jzfb)
 				jzfb->framedesc, jzfb->framedesc_phys);
 }
 
-#define FB_A320TV_OFF 0
-#define FB_A320TV_NTSC 1
-#define FB_A320TV_PAL50 2
-#define FB_A320TV_PAL60 3
-#define FB_A320TV_PAL_M 4
-#define FB_A320TV_LAST 4
-
 static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 {
 	int blank = jzfb->is_enabled ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
@@ -636,6 +669,7 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		   allow direct writes to the panel.  */
 		jzfb_disable_dma(jzfb);
 		jzfb->panel->disable(jzfb);
+		complete_all(&jzfb->dma_completion);
 
 		/* set up LCD controller for TV output */
 
@@ -674,12 +708,21 @@ static int jzfb_tv_out(struct jzfb *jzfb, unsigned int mode)
 		writel(jzfb->framedesc_phys, jzfb->base + JZ_REG_LCD_DA0);
 
 		writel(JZ_LCD_CTRL_BURST_16 | JZ_LCD_CTRL_ENABLE |
-		       JZ_LCD_CTRL_BPP_15_16,
-		       jzfb->base + JZ_REG_LCD_CTRL);
+					JZ_LCD_CTRL_BPP_15_16 |
+					JZ_LCD_CTRL_EOF_IRQ | JZ_LCD_CTRL_SOF_IRQ,
+					jzfb->base + JZ_REG_LCD_CTRL);
 	} else {
+		/* disable EOF/SOF interrupts */
+		unsigned long ctrl = readl(jzfb->base + JZ_REG_LCD_CTRL);
+		ctrl &= ~(JZ_LCD_CTRL_EOF_IRQ | JZ_LCD_CTRL_SOF_IRQ);
+		writel(ctrl, jzfb->base + JZ_REG_LCD_CTRL);
+
 		/* disable LCD controller and re-enable SLCD */
 		writel(JZ_LCD_CFG_SLCD, jzfb->base + JZ_REG_LCD_CFG);
 		jzfb->panel->enable(jzfb);
+
+		jzfb->refresh_on_pan = 0;
+		complete_all(&jzfb->dma_completion);
 		schedule_delayed_work(&jzfb->refresh_work, 0);
 	}
 
@@ -720,6 +763,28 @@ static ssize_t jzfb_tv_out_store(struct device *dev, struct device_attribute *at
 }
 
 static DEVICE_ATTR(tv_out, 0644, jzfb_tv_out_show, jzfb_tv_out_store);
+
+static ssize_t jzfb_vsync_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	return sprintf(buf, "%u\n", jzfb->tv_out_vsync);
+}
+
+static ssize_t jzfb_vsync_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t n)
+{
+	struct jzfb *jzfb = dev_get_drvdata(dev);
+	unsigned int vsync;
+
+	if (sscanf(buf, "%u", &vsync) < 1)
+		return -EINVAL;
+
+	jzfb->tv_out_vsync = vsync;
+	return n;
+}
+
+static DEVICE_ATTR(tv_out_vsync, 0644, jzfb_vsync_show, jzfb_vsync_store);
 
 static ssize_t jzfb_panel_show(struct device *dev, struct device_attribute *attr,
 			char *buf)
@@ -763,6 +828,24 @@ static struct fb_ops jzfb_ops = {
 	.fb_imageblit		= sys_imageblit,
 	.fb_mmap		= jzfb_mmap,
 };
+
+static irqreturn_t jz4740_lcd_irq(int irq, void *dev_id)
+{
+	struct jzfb *jzfb = dev_id;
+	unsigned long state = readl(jzfb->base + JZ_REG_LCD_STATE);
+
+	if (state & JZ_LCD_STATE_SOF) {
+		INIT_COMPLETION(jzfb->dma_completion);
+		state &= ~JZ_LCD_STATE_SOF;
+	} else {
+		complete_all(&jzfb->dma_completion);
+		state &= ~JZ_LCD_STATE_EOF;
+	}
+
+	/* Acknowledge the interrupt */
+	writel(state, jzfb->base + JZ_REG_LCD_STATE);
+	return IRQ_HANDLED;
+}
 
 static int __devinit jzfb_probe(struct platform_device *pdev)
 {
@@ -808,6 +891,10 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 	jzfb->mem = mem;
 
 	jzfb->tv_out = FB_A320TV_OFF;
+	jzfb->tv_out_vsync = 1;
+	jzfb->refresh_on_pan = 0;
+	init_completion(&jzfb->dma_completion);
+	complete_all(&jzfb->dma_completion);
 
 	jzfb->dma = jz4740_dma_request(&pdev->dev, dev_name(&pdev->dev), 0);
 	if (!jzfb->dma) {
@@ -887,14 +974,21 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 				     jzfb_num_data_pins(jzfb));
 	}
 
+	ret = request_irq(JZ4740_IRQ_LCD, jz4740_lcd_irq, 0, "LCD", jzfb);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to request IRQ\n");
+		goto err_free_devmem;
+	}
+
 	jzfb->panel = jz_slcd_panels_probe(jzfb);
 	if (!jzfb->panel) {
 		dev_err(&pdev->dev, "Failed to find panel driver\n");
 		ret = -ENOENT;
-		goto err_free_devmem;
+		goto err_free_irq;
 	}
 	jzfb_disable_dma(jzfb);
 	jzfb->panel->init(jzfb);
+
 	jzfb->panel->enable(jzfb);
 
 	ret = register_framebuffer(fb);
@@ -915,14 +1009,22 @@ static int __devinit jzfb_probe(struct platform_device *pdev)
 		goto err_cancel_work;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_tv_out);
+	if (ret)
+		goto err_remove_file_panel;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_tv_out_vsync);
 	if (!ret)
 		return 0;
 
+	device_remove_file(&pdev->dev, &dev_attr_tv_out);
+err_remove_file_panel:
 	device_remove_file(&pdev->dev, &dev_attr_panel);
 err_cancel_work:
 	cancel_delayed_work_sync(&jzfb->refresh_work);
 err_free_panel:
 	jzfb->panel->exit(jzfb);
+err_free_irq:
+	free_irq(JZ4740_IRQ_LCD, jzfb);
 err_free_devmem:
 	jzfb_free_gpio_pins(jzfb);
 
@@ -947,9 +1049,12 @@ static int __devexit jzfb_remove(struct platform_device *pdev)
 {
 	struct jzfb *jzfb = platform_get_drvdata(pdev);
 
+	device_remove_file(&pdev->dev, &dev_attr_tv_out_vsync);
 	device_remove_file(&pdev->dev, &dev_attr_tv_out);
 	device_remove_file(&pdev->dev, &dev_attr_panel);
 	jzfb_blank(FB_BLANK_POWERDOWN, jzfb->fb);
+
+	free_irq(JZ4740_IRQ_LCD, jzfb);
 
 	/* Blanking will prevent future refreshes from behind scheduled.
 	   Now wait for a possible refresh in progress to finish. */
