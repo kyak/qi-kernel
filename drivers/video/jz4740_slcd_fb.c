@@ -503,7 +503,7 @@ static int jzfb_blank(int blank_mode, struct fb_info *info)
 	} else {
 		if (jzfb->is_enabled) {
 			/* No sleep in TV-out mode. */
-			if (readl(jzfb->base + JZ_REG_LCD_CFG) & JZ_LCD_CFG_SLCD)
+			if (jzfb->tv_out == FB_A320TV_OFF)
 				jzfb_disable(jzfb);
 			else
 				ret = -EBUSY;
