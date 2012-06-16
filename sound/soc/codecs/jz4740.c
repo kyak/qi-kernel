@@ -18,7 +18,6 @@
 #include <linux/io.h>
 
 #include <linux/delay.h>
-#include <linux/completion.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -75,10 +74,6 @@ static const uint32_t jz4740_codec_regs[] = {
 struct jz4740_codec {
 	void __iomem *base;
 	struct resource *mem;
-
-	struct snd_soc_codec *codec;
-	struct delayed_work dma_work;
-	struct completion completion;
 };
 
 static unsigned int jz4740_codec_read(struct snd_soc_codec *codec,
@@ -252,24 +247,11 @@ static void jz4740_codec_wakeup(struct snd_soc_codec *codec)
 		jz4740_codec_write(codec, i, cache[i]);
 }
 
-static void jz4740_dma_work(struct work_struct *work)
-{
-	struct jz4740_codec *jz4740_codec =
-	  container_of(work, struct jz4740_codec, dma_work.work);
-
-	unsigned int mask = JZ4740_CODEC_1_VREF_DISABLE |
-	  JZ4740_CODEC_1_VREF_AMP_DISABLE;
-	snd_soc_update_bits(jz4740_codec->codec,
-				JZ4740_REG_CODEC_1, mask, 0);
-	complete_all(&jz4740_codec->completion);
-}
-
 static int jz4740_codec_set_bias_level(struct snd_soc_codec *codec,
 	enum snd_soc_bias_level level)
 {
 	unsigned int mask;
 	unsigned int value;
-	struct jz4740_codec *jz4740_codec = snd_soc_codec_get_drvdata(codec);
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
@@ -279,9 +261,10 @@ static int jz4740_codec_set_bias_level(struct snd_soc_codec *codec,
 		value = 0;
 		snd_soc_update_bits(codec, JZ4740_REG_CODEC_1, mask, value);
 
-		INIT_COMPLETION(jz4740_codec->completion);
-		schedule_delayed_work(&jz4740_codec->dma_work, HZ / 2);
-		wait_for_completion_interruptible(&jz4740_codec->completion);
+		msleep(500);
+		mask = JZ4740_CODEC_1_VREF_DISABLE |
+						JZ4740_CODEC_1_VREF_AMP_DISABLE;
+		snd_soc_update_bits(codec, JZ4740_REG_CODEC_1, mask, 0);
 		break;
 	case SND_SOC_BIAS_STANDBY:
 		/* The only way to clear the suspend flag is to reset the codec */
@@ -314,12 +297,6 @@ static int jz4740_codec_set_bias_level(struct snd_soc_codec *codec,
 
 static int jz4740_codec_dev_probe(struct snd_soc_codec *codec)
 {
-	struct jz4740_codec *jz4740_codec = snd_soc_codec_get_drvdata(codec);
-
-	jz4740_codec->codec = codec;
-	init_completion(&jz4740_codec->completion);
-	INIT_DELAYED_WORK(&jz4740_codec->dma_work, jz4740_dma_work);
-
 	snd_soc_update_bits(codec, JZ4740_REG_CODEC_1,
 			JZ4740_CODEC_1_SW2_ENABLE, JZ4740_CODEC_1_SW2_ENABLE);
 
