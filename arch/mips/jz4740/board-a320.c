@@ -85,28 +85,20 @@ static struct mtd_partition a320_nand_partitions[] = {
 	{ .name = "SPL",
 	  .offset = 0 * A320_NAND_ERASE_BLOCK_SIZE,
 	  .size = 64 * A320_NAND_PAGE_SIZE,
-	  /* MtH: Read-only until we can trust it. */
-	  .mask_flags = MTD_WRITEABLE,
 	},
 	{ .name = "uC/OS-II loader",
 	  .offset = 64 * A320_NAND_PAGE_SIZE,
 	  .size = 192 * A320_NAND_PAGE_SIZE,
-	  /* MtH: Read-only until we can trust it. */
-	  .mask_flags = MTD_WRITEABLE,
 	},
 	/* erase block 3 is empty (maybe alternative location for bbt?) */
 	/* erase block 4 contains the bad block table */
 	{ .name = "uC/OS-II Z:",
 	  .offset = 5 * A320_NAND_ERASE_BLOCK_SIZE,
 	  .size = 127 * A320_NAND_ERASE_BLOCK_SIZE,
-	  /* MtH: Read-only until we can trust it. */
-	  .mask_flags = MTD_WRITEABLE,
 	},
 	{ .name = "uC/OS-II A:",
 	  .offset = 132 * A320_NAND_ERASE_BLOCK_SIZE,
 	  .size = (8192 - 132) * A320_NAND_ERASE_BLOCK_SIZE,
-	  /* MtH: Read-only until we can trust it. */
-	  .mask_flags = MTD_WRITEABLE,
 	},
 };
 
