@@ -84,13 +84,13 @@ static struct platform_device a320_i2c_device = {
 static struct mtd_partition a320_nand_partitions[] = {
 	{ .name = "SPL",
 	  .offset = 0 * A320_NAND_ERASE_BLOCK_SIZE,
-	  .size = 1 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .size = 64 * A320_NAND_PAGE_SIZE,
 	  /* MtH: Read-only until we can trust it. */
 	  .mask_flags = MTD_WRITEABLE,
 	},
 	{ .name = "uC/OS-II loader",
-	  .offset = 1 * A320_NAND_ERASE_BLOCK_SIZE,
-	  .size = 2 * A320_NAND_ERASE_BLOCK_SIZE,
+	  .offset = 64 * A320_NAND_PAGE_SIZE,
+	  .size = 192 * A320_NAND_PAGE_SIZE,
 	  /* MtH: Read-only until we can trust it. */
 	  .mask_flags = MTD_WRITEABLE,
 	},
