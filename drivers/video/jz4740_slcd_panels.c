@@ -98,9 +98,9 @@ static void ili9325_enable(struct jzfb *jzfb)
 {
 	/* RESET pulse */
 	gpio_set_value(ILI9325_GPIO_RESET_N, 0);
-	mdelay(10);
+	msleep(10);
 	gpio_set_value(ILI9325_GPIO_RESET_N, 1);
-	mdelay(50);
+	msleep(50);
 
 	/* Enable chip select */
 	gpio_set_value(ILI9325_GPIO_CS_N, 0);
@@ -123,16 +123,16 @@ static void ili9325_enable(struct jzfb *jzfb)
 	set_panel_reg(jzfb, 0x11, 0x0007);
 	set_panel_reg(jzfb, 0x12, 0x0000);
 	set_panel_reg(jzfb, 0x13, 0x0000);
-	mdelay(200);
+	msleep(200);
 	set_panel_reg(jzfb, 0x10, 0x1290);
 	set_panel_reg(jzfb, 0x11, 0x0227);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x12, 0x001B);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x13, 0x0500);
 	set_panel_reg(jzfb, 0x29, 0x000C);
 	set_panel_reg(jzfb, 0x2B, 0x000D);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x20, 0x0000);
 	set_panel_reg(jzfb, 0x21, 0x0000);
 	set_panel_reg(jzfb, 0x30, 0x0000);
@@ -160,9 +160,9 @@ static void ili9325_enable(struct jzfb *jzfb)
 	set_panel_reg(jzfb, 0x85, 0x0000);
 	set_panel_reg(jzfb, 0x90, 0x0010);
 	set_panel_reg(jzfb, 0x92, 0x0600);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x07, 0x0133);
-	mdelay(50);
+	msleep(50);
 	send_panel_command(jzfb, 0x22);
 }
 
@@ -190,7 +190,7 @@ static int ili9325_init(struct jzfb *jzfb)
 		goto err_reset;
 	gpio_direction_output(ILI9325_GPIO_RESET_N, 0);
 
-	mdelay(100);
+	msleep(100);
 	return 0;
 
 err_reset:
@@ -217,9 +217,9 @@ static void ili9331_enable(struct jzfb *jzfb)
 {
 	/* RESET pulse */
 	gpio_set_value(ILI9331_GPIO_RESET_N, 0);
-	mdelay(10);
+	msleep(10);
 	gpio_set_value(ILI9331_GPIO_RESET_N, 1);
-	mdelay(50);
+	msleep(50);
 
 	/* Enable chip select */
 	gpio_set_value(ILI9331_GPIO_CS_N, 0);
@@ -239,16 +239,16 @@ static void ili9331_enable(struct jzfb *jzfb)
 	set_panel_reg(jzfb, 0x11, 0x0007);
 	set_panel_reg(jzfb, 0x12, 0x0000);
 	set_panel_reg(jzfb, 0x13, 0x0000);
-	mdelay(100);
+	msleep(100);
 	set_panel_reg(jzfb, 0x10, 0x1690);
 	set_panel_reg(jzfb, 0x11, 0x0224);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x12, 0x001F);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x13, 0x0500);
 	set_panel_reg(jzfb, 0x29, 0x000C);
 	set_panel_reg(jzfb, 0x2B, 0x000D);
-	mdelay(50);
+	msleep(50);
 	set_panel_reg(jzfb, 0x30, 0x0000);
 	set_panel_reg(jzfb, 0x31, 0x0106);
 	set_panel_reg(jzfb, 0x32, 0x0000);
@@ -306,7 +306,7 @@ static int ili9331_init(struct jzfb *jzfb)
 		goto err_reset;
 	gpio_direction_output(ILI9331_GPIO_RESET_N, 0);
 
-	mdelay(100);
+	msleep(100);
 	return 0;
 
 err_reset:
@@ -385,16 +385,16 @@ static void ili9338_enable(struct jzfb *jzfb)
 {
 	/* RESET pulse */
 	gpio_set_value(ILI9338_GPIO_RESET_N, 0);
-	mdelay(10);
+	msleep(10);
 	gpio_set_value(ILI9338_GPIO_RESET_N, 1);
-	mdelay(50);
+	msleep(50);
 
 	/* Enable chip select */
 	gpio_set_value(ILI9338_GPIO_CS_N, 0);
 
 	/* Black magic */
 	send_panel_command(jzfb, 0x11);
-	mdelay(100);
+	msleep(100);
 
 	send_panel_command(jzfb, 0xCB);
 	send_panel_data(jzfb, 0x01);
@@ -493,7 +493,7 @@ static int ili9338_init(struct jzfb *jzfb)
 	gpio_direction_output(ILI9338_GPIO_RESET_N, 0);
 
 	memcpy(jzfb->rgb, default_slcd_rgb, sizeof(default_slcd_rgb));
-	mdelay(100);
+	msleep(100);
 
 	ret = device_create_file(dev, &dev_attr_rgb);
 	if (!ret)
