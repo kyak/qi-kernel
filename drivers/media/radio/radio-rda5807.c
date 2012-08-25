@@ -33,6 +33,7 @@
 
 #include <asm/byteorder.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/kernel.h>
@@ -177,12 +178,18 @@ static int rda5807_set_enable(struct rda5807_driver *radio, int enabled)
 	if (err < 0)
 		return err;
 	/* Tuning is lost when the chip is disabled, so re-tune when enabled. */
-	if (enabled)
-		return rda5807_update_reg(radio, RDA5807_REG_CHAN,
+	if (enabled) {
+		err =  rda5807_update_reg(radio, RDA5807_REG_CHAN,
 					  RDA5807_MASK_CHAN_TUNE,
 					  RDA5807_MASK_CHAN_TUNE);
-	else
-		return 0;
+
+		/* following the rda5807 programming guide, we
+		 * need to wait for 0.5 seconds before tune */
+		if (!err)
+			msleep(500);
+	}
+
+	return err;
 }
 
 static int rda5807_set_mute(struct rda5807_driver *radio, int muted)
