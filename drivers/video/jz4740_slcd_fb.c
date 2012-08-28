@@ -1116,12 +1116,7 @@ static int jzfb_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops jzfb_pm_ops = {
-	.suspend	= jzfb_suspend,
-	.resume		= jzfb_resume,
-	.poweroff	= jzfb_suspend,
-	.restore	= jzfb_resume,
-};
+static SIMPLE_DEV_PM_OPS(jzfb_pm_ops, jzfb_suspend, jzfb_resume);
 
 #define JZFB_PM_OPS (&jzfb_pm_ops)
 
