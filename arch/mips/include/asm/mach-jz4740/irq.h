@@ -54,4 +54,9 @@
 
 #define NR_IRQS (JZ4740_IRQ_ADC_BASE + 6)
 
+struct irq_data;
+
+extern void jz4740_irq_suspend(struct irq_data *data);
+extern void jz4740_irq_resume(struct irq_data *data);
+
 #endif
