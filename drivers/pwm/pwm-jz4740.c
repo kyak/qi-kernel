@@ -24,9 +24,11 @@
 #include <asm/mach-jz4740/gpio.h>
 #include <timer.h>
 
-#define NUM_PWM 6
+#define NUM_PWM 8
 
 static const unsigned int jz4740_pwm_gpio_list[NUM_PWM] = {
+	JZ_GPIO_PWM0,
+	JZ_GPIO_PWM1,
 	JZ_GPIO_PWM2,
 	JZ_GPIO_PWM3,
 	JZ_GPIO_PWM4,
@@ -49,6 +51,13 @@ static int jz4740_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	unsigned int gpio = jz4740_pwm_gpio_list[pwm->hwpwm];
 	int ret;
+
+	/*
+	 * Timer 0 and 1 are used for system tasks, so they are unavailable
+	 * for use as PWMs.
+	 */
+	if (pwm->hwpwm < 2)
+		return -EBUSY;
 
 	ret = gpio_request(gpio, pwm->label);
 
