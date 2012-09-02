@@ -21,19 +21,28 @@
 
 #include <asm/mach-jz4740/base.h>
 
+#define JZ_REG_TIMER_STOP		0x0C
+#define JZ_REG_TIMER_STOP_SET		0x1C
+#define JZ_REG_TIMER_STOP_CLEAR		0x2C
+#define JZ_REG_TIMER_ENABLE		0x00
+#define JZ_REG_TIMER_ENABLE_SET		0x04
+#define JZ_REG_TIMER_ENABLE_CLEAR	0x08
+#define JZ_REG_TIMER_FLAG		0x10
+#define JZ_REG_TIMER_FLAG_SET		0x14
+#define JZ_REG_TIMER_FLAG_CLEAR		0x18
+#define JZ_REG_TIMER_MASK		0x20
+#define JZ_REG_TIMER_MASK_SET		0x24
+#define JZ_REG_TIMER_MASK_CLEAR		0x28
+
+#define JZ_REG_TIMER_DFR(x) (((x) * 0x10) + 0x30)
+#define JZ_REG_TIMER_DHR(x) (((x) * 0x10) + 0x34)
+#define JZ_REG_TIMER_CNT(x) (((x) * 0x10) + 0x38)
+#define JZ_REG_TIMER_CTRL(x) (((x) * 0x10) + 0x3C)
+
+#define JZ_TIMER_IRQ_HALF(x) BIT((x) + 0x10)
+#define JZ_TIMER_IRQ_FULL(x) BIT(x)
+
 void __iomem *jz4740_timer_base;
-
-void jz4740_timer_enable_watchdog(void)
-{
-	writel(BIT(16), jz4740_timer_base + JZ_REG_TIMER_STOP_CLEAR);
-}
-EXPORT_SYMBOL_GPL(jz4740_timer_enable_watchdog);
-
-void jz4740_timer_disable_watchdog(void)
-{
-	writel(BIT(16), jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
-}
-EXPORT_SYMBOL_GPL(jz4740_timer_disable_watchdog);
 
 void __init jz4740_timer_init(void)
 {
@@ -48,3 +57,100 @@ void __init jz4740_timer_init(void)
 	/* Timer irqs are unmasked by default, mask them */
 	writel(0x00ff00ff, jz4740_timer_base + JZ_REG_TIMER_MASK_SET);
 }
+
+void jz4740_timer_stop(unsigned int timer)
+{
+	writel(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_stop);
+
+void jz4740_timer_start(unsigned int timer)
+{
+	writel(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_STOP_CLEAR);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_start);
+
+bool jz4740_timer_is_enabled(unsigned int timer)
+{
+	return readb(jz4740_timer_base + JZ_REG_TIMER_ENABLE) & BIT(timer);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_is_enabled);
+
+void jz4740_timer_enable(unsigned int timer)
+{
+	writeb(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_ENABLE_SET);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_enable);
+
+void jz4740_timer_disable(unsigned int timer)
+{
+	writeb(BIT(timer), jz4740_timer_base + JZ_REG_TIMER_ENABLE_CLEAR);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_disable);
+
+void jz4740_timer_set_period(unsigned int timer, uint16_t period)
+{
+	writew(period, jz4740_timer_base + JZ_REG_TIMER_DFR(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_set_period);
+
+void jz4740_timer_set_duty(unsigned int timer, uint16_t duty)
+{
+	writew(duty, jz4740_timer_base + JZ_REG_TIMER_DHR(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_set_duty);
+
+void jz4740_timer_set_count(unsigned int timer, uint16_t count)
+{
+	writew(count, jz4740_timer_base + JZ_REG_TIMER_CNT(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_set_count);
+
+uint16_t jz4740_timer_get_count(unsigned int timer)
+{
+	return readw(jz4740_timer_base + JZ_REG_TIMER_CNT(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_get_count);
+
+void jz4740_timer_ack_full(unsigned int timer)
+{
+	writel(JZ_TIMER_IRQ_FULL(timer), jz4740_timer_base + JZ_REG_TIMER_FLAG_CLEAR);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_ack_full);
+
+void jz4740_timer_irq_full_enable(unsigned int timer)
+{
+	writel(JZ_TIMER_IRQ_FULL(timer), jz4740_timer_base + JZ_REG_TIMER_FLAG_CLEAR);
+	writel(JZ_TIMER_IRQ_FULL(timer), jz4740_timer_base + JZ_REG_TIMER_MASK_CLEAR);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_irq_full_enable);
+
+void jz4740_timer_irq_full_disable(unsigned int timer)
+{
+	writel(JZ_TIMER_IRQ_FULL(timer), jz4740_timer_base + JZ_REG_TIMER_MASK_SET);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_irq_full_disable);
+
+void jz4740_timer_set_ctrl(unsigned int timer, uint16_t ctrl)
+{
+	writew(ctrl, jz4740_timer_base + JZ_REG_TIMER_CTRL(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_set_ctrl);
+
+uint16_t jz4740_timer_get_ctrl(unsigned int timer)
+{
+	return readw(jz4740_timer_base + JZ_REG_TIMER_CTRL(timer));
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_get_ctrl);
+
+void jz4740_timer_enable_watchdog(void)
+{
+	writel(BIT(16), jz4740_timer_base + JZ_REG_TIMER_STOP_CLEAR);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_enable_watchdog);
+
+void jz4740_timer_disable_watchdog(void)
+{
+	writel(BIT(16), jz4740_timer_base + JZ_REG_TIMER_STOP_SET);
+}
+EXPORT_SYMBOL_GPL(jz4740_timer_disable_watchdog);
