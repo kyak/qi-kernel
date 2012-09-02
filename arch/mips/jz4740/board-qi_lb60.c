@@ -393,7 +393,7 @@ static struct platform_device qi_lb60_pwm_beeper = {
 	.name = "pwm-beeper",
 	.id = -1,
 	.dev = {
-		.platform_data = (void *)2,
+		.platform_data = (void *)4,
 	},
 };
 
