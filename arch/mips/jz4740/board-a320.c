@@ -26,6 +26,7 @@
 #include <linux/power/gpio-charger.h>
 #include <linux/power/jz4740-battery.h>
 
+#include <linux/pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/input.h>
 #include <linux/gpio_keys.h>
@@ -188,7 +189,6 @@ static int a320_backlight_notify(struct device *dev, int brightness)
 }
 
 static struct platform_pwm_backlight_data a320_backlight_pdata = {
-	.pwm_id = 7,
 	.max_brightness = 255,
 	.dft_brightness = 145,
 	.pwm_period_ns = 1000000,
@@ -201,6 +201,10 @@ static struct platform_device a320_backlight_device = {
 	.dev = {
 		.platform_data = &a320_backlight_pdata,
 	},
+};
+
+struct pwm_lookup a320_pwm_table[] = {
+	PWM_LOOKUP("jz4740-pwm", 7, "pwm-backlight", 0),
 };
 
 static struct jz4740_mmc_platform_data a320_mmc_pdata = {
@@ -373,6 +377,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_adc_device,
 	&jz4740_wdt_device,
 	&a320_charger_device,
+	&jz4740_pwm_device,
 	&a320_backlight_device,
 	&a320_gpio_keys_device,
 	&a320_audio_device,
@@ -397,6 +402,8 @@ static int __init a320_init_platform_devices(void)
 	jz4740_mmc_device.dev.platform_data = &a320_mmc_pdata;
 
 	jz4740_serial_device_register();
+
+	pwm_add_table(a320_pwm_table, ARRAY_SIZE(a320_pwm_table));
 
 	return platform_add_devices(jz_platform_devices,
 					ARRAY_SIZE(jz_platform_devices));
