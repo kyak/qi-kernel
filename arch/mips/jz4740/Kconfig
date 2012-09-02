@@ -10,6 +10,3 @@ config JZ4740_A320
 	bool "Dingoo A320 game and media player"
 
 endchoice
-
-config HAVE_PWM
-	bool

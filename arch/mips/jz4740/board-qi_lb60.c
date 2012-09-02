@@ -393,7 +393,7 @@ static struct platform_device qi_lb60_pwm_beeper = {
 	.name = "pwm-beeper",
 	.id = -1,
 	.dev = {
-		.platform_data = (void *)4,
+		.platform_data = (void *)2,
 	},
 };
 
@@ -436,6 +436,7 @@ static struct platform_device *jz_platform_devices[] __initdata = {
 	&jz4740_codec_device,
 	&jz4740_rtc_device,
 	&jz4740_adc_device,
+	&jz4740_pwm_device,
 	&qi_lb60_gpio_keys,
 	&qi_lb60_pwm_beeper,
 	&qi_lb60_charger_device,
