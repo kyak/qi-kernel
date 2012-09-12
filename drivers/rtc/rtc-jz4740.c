@@ -14,6 +14,7 @@
  *
  */
 
+#include <linux/clk.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -215,6 +216,7 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 	int ret;
 	struct jz4740_rtc *rtc;
 	uint32_t scratchpad;
+	struct clk *rtc_clk;
 
 	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
 	if (!rtc)
@@ -279,6 +281,21 @@ static int __devinit jz4740_rtc_probe(struct platform_device *pdev)
 			goto err_free_irq;
 		}
 	}
+
+	rtc_clk = clk_get(&pdev->dev, "rtc");
+	if (IS_ERR(rtc_clk)) {
+		dev_err(&pdev->dev, "Failed to get RTC clock\n");
+		goto err_free_irq;
+	}
+
+	/* TODO: initialize the ADJC bits (25:16) to fine-tune
+	 * the accuracy of the RTC */
+	ret = jz4740_rtc_reg_write(rtc, JZ_REG_RTC_REGULATOR,
+				(clk_get_rate(rtc_clk) - 1) & 0xffff);
+	clk_put(rtc_clk);
+
+	if (ret)
+		dev_warn(&pdev->dev, "Could not update RTC regulator register\n");
 
 	return 0;
 
