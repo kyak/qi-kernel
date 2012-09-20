@@ -477,7 +477,7 @@ static int __devinit rda5807_i2c_probe(struct i2c_client *client,
 
 	// TODO: Resetting the chip would be good.
 
-	radio = kzalloc(sizeof(*radio), GFP_KERNEL);
+	radio = devm_kzalloc(&client->dev, sizeof(*radio), GFP_KERNEL);
 	if (!radio) {
 		dev_err(&client->dev, "Failed to allocate driver data\n");
 		return -ENOMEM;
@@ -573,7 +573,6 @@ err_ctrl_free:
 
 /*err_radio_rel:*/
 	video_device_release_empty(&radio->video_dev);
-	kfree(radio);
 
 	return err;
 }
@@ -585,7 +584,6 @@ static int __devexit rda5807_i2c_remove(struct i2c_client *client)
 	video_unregister_device(&radio->video_dev);
 	v4l2_ctrl_handler_free(&radio->ctrl_handler);
 	video_device_release_empty(&radio->video_dev);
-	kfree(radio);
 
 	return 0;
 }
