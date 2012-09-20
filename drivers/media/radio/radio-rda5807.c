@@ -639,18 +639,7 @@ static struct i2c_driver rda5807_i2c_driver = {
 	},
 };
 
-static int __init rda5807_init(void)
-{
-	return i2c_add_driver(&rda5807_i2c_driver);
-}
-
-static void __exit rda5807_exit(void)
-{
-	i2c_del_driver(&rda5807_i2c_driver);
-}
-
-module_init(rda5807_init);
-module_exit(rda5807_exit);
+module_i2c_driver(rda5807_i2c_driver);
 
 MODULE_AUTHOR("Maarten ter Huurne <maarten@treewalker.org>");
 MODULE_DESCRIPTION("RDA5807 FM tuner driver");
