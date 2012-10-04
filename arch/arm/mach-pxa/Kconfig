@@ -33,12 +33,14 @@ config ARCH_LUBBOCK
 config MACH_MAINSTONE
 	bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
 	select PXA27x
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_ZYLONITE
 	bool
 	select PXA3xx
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_ZYLONITE300
 	bool "PXA3xx Development Platform (aka Zylonite) PXA300/310"
@@ -78,7 +80,8 @@ config ARCH_VIPER
 	select PXA25x
 	select ISA
 	select I2C_GPIO
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 	select PXA_HAVE_ISA_IRQS
 	select ARCOM_PCMCIA
 
@@ -128,7 +131,8 @@ config MACH_CM_X300
 	select PXA3xx
 	select CPU_PXA300
 	select CPU_PXA310
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_CAPC7117
 	bool "Embedian CAPC-7117 evaluation kit based on the MXM-8x10 CoM"
@@ -220,7 +224,8 @@ config TRIZEPS_PCMCIA
 config MACH_LOGICPD_PXA270
 	bool "LogicPD PXA270 Card Engine Development Platform"
 	select PXA27x
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_PCM027
 	bool "Phytec phyCORE-PXA270 CPU module (PCM-027)"
@@ -229,7 +234,8 @@ config MACH_PCM027
 
 config MACH_PCM990_BASEBOARD
 	bool "PHYTEC PCM-990 development board"
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 	depends on MACH_PCM027
 
 choice
@@ -255,7 +261,8 @@ config MACH_COLIBRI_PXA270_INCOME
 	bool "Income s.r.o. PXA270 SBC"
 	depends on MACH_COLIBRI
 	select PXA27x
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_COLIBRI300
 	bool "Toradex Colibri PXA300/310"
@@ -285,7 +292,8 @@ config MACH_H4700
 	bool "HP iPAQ hx4700"
 	select PXA27x
 	select IWMMXT
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_H5000
 	bool "HP iPAQ h5000"
@@ -299,13 +307,15 @@ config MACH_MAGICIAN
 	bool "Enable HTC Magician Support"
 	select PXA27x
 	select IWMMXT
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_MIOA701
 	bool "Mitac Mio A701 Support"
 	select PXA27x
 	select IWMMXT
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 	select GPIO_SYSFS
 	help
 	  Say Y here if you intend to run this kernel on a
@@ -316,7 +326,8 @@ config PXA_EZX
 	bool "Motorola EZX Platform"
 	select PXA27x
 	select IWMMXT
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_EZX_A780
 	bool "Motorola EZX A780"
@@ -354,7 +365,8 @@ config MACH_MP900C
 
 config ARCH_PXA_PALM
 	bool "PXA based Palm PDAs"
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_PALM27X
 	bool
@@ -454,7 +466,8 @@ config MACH_RAUMFELD_RC
 	select PXA3xx
 	select CPU_PXA300
 	select POWER_SUPPLY
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 
 config MACH_RAUMFELD_CONNECTOR
 	bool "Raumfeld Connector"
@@ -617,7 +630,8 @@ config MACH_E800
 config MACH_ZIPIT2
 	bool "Zipit Z2 Handheld"
 	select PXA27x
-	select HAVE_PWM
+	select PWM
+	select PWM_PXA
 endif
 endmenu
 

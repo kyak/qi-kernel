@@ -68,9 +68,6 @@ config ARM_DMA_USE_IOMMU
 	select ARM_HAS_SG_CHAIN
 	bool
 
-config HAVE_PWM
-	bool
-
 config MIGHT_HAVE_PCI
 	bool
 
@@ -604,7 +601,8 @@ config ARCH_LPC32XX
 	select CLKDEV_LOOKUP
 	select GENERIC_CLOCKEVENTS
 	select USE_OF
-	select HAVE_PWM
+	select PWM
+	select PWM_LPC32XX
 	help
 	  Support for the NXP LPC32XX family of processors
 
