@@ -921,4 +921,4 @@ static int jz4740_clock_init(void)
 
 	return 0;
 }
-arch_initcall(jz4740_clock_init);
+postcore_initcall(jz4740_clock_init);
