@@ -191,10 +191,17 @@ static int jz4740_pwm_remove(struct platform_device *pdev)
 	return pwmchip_remove(&jz4740->chip);
 }
 
+static const struct of_device_id jz4740_pwm_of_match[] = {
+	{ .compatible = "ingenic,jz4740-pwm" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, jz4740_pwm_of_match);
+
 static struct platform_driver jz4740_pwm_driver = {
 	.driver = {
 		.name = "jz4740-pwm",
 		.owner = THIS_MODULE,
+		.of_match_table = jz4740_pwm_of_match,
 	},
 	.probe = jz4740_pwm_probe,
 	.remove = jz4740_pwm_remove,
