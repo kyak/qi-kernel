@@ -145,7 +145,7 @@ static struct lcd_ops ili8960_lcd_ops = {
 	.set_mode = ili8960_set_mode,
 };
 
-static int __devinit ili8960_probe(struct spi_device *spi)
+static int ili8960_probe(struct spi_device *spi)
 {
 	int ret;
 	struct ili8960 *ili8960;
@@ -193,7 +193,7 @@ err_unregister_lcd:
 	return ret;
 }
 
-static int __devexit ili8960_remove(struct spi_device *spi)
+static int ili8960_remove(struct spi_device *spi)
 {
 	struct ili8960 *ili8960 = spi_get_drvdata(spi);
 
@@ -237,7 +237,7 @@ static struct spi_driver ili8960_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = ili8960_probe,
-	.remove = __devexit_p(ili8960_remove),
+	.remove = ili8960_remove,
 	.suspend = ili8960_suspend,
 	.resume = ili8960_resume,
 };
