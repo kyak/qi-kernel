@@ -269,6 +269,7 @@ static int rda5807_seek_frequency(struct rda5807_driver *radio,
 {
 	u16 mask = 0;
 	u16 val = 0;
+	int ret, count = 0;
 
 	/* TODO: Seek threshold is configurable. How should the driver handle
 	 *       this configuration?
@@ -285,7 +286,34 @@ static int rda5807_seek_frequency(struct rda5807_driver *radio,
 	mask |= RDA5807_MASK_CTRL_SEEK;
 	val  |= RDA5807_MASK_CTRL_SEEK;
 
-	return rda5807_update_reg(radio, RDA5807_REG_CTRL, mask, val);
+	ret = rda5807_update_reg(radio, RDA5807_REG_CTRL, mask, val);
+	if (ret < 0)
+		return ret;
+
+	while (1) {
+		/*
+		 * The programming guide says we should wait for 35 ms for each
+		 * frequency tested.
+		 */
+		msleep(35);
+
+		ret = rda5807_i2c_read(radio->i2c_client,
+				       RDA5807_REG_SEEK_RESULT);
+		if (ret < 0)
+			return ret;
+
+		/* Seek done? */
+		if (ret & RDA5807_MASK_SEEKRES_COMPLETE)
+			return 0;
+
+		/*
+		 * Channel spacing is 100 kHz.
+		 * TODO: Should we support configurable spacing?
+		 */
+		count++;
+		if (count > (RDA5807_FREQ_MAX_KHZ - RDA5807_FREQ_MIN_KHZ) / 100)
+			return -ETIMEDOUT;
+	}
 }
 
 static inline struct rda5807_driver *ctrl_to_radio(struct v4l2_ctrl *ctrl)
