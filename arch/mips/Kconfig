@@ -248,6 +248,7 @@ config MACH_JZ4740
 	select HAVE_CLK
 	select GENERIC_IRQ_CHIP
 	select CPU_SUPPORTS_CPUFREQ
+	select COMMON_CLK
 
 config LANTIQ
 	bool "Lantiq based platforms"
