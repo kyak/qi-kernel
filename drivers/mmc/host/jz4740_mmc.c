@@ -630,7 +630,7 @@ static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			gpio_set_value(host->pdata->gpio_power,
 					!host->pdata->power_active_low);
 		host->cmdat |= JZ_MMC_CMDAT_INIT;
-		clk_enable(host->clk);
+		clk_prepare_enable(host->clk);
 		break;
 	case MMC_POWER_ON:
 		break;
@@ -638,7 +638,7 @@ static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (gpio_is_valid(host->pdata->gpio_power))
 			gpio_set_value(host->pdata->gpio_power,
 					host->pdata->power_active_low);
-		clk_disable(host->clk);
+		clk_disable_unprepare(host->clk);
 		break;
 	}
 
@@ -701,13 +701,13 @@ static int jz4740_mmc_cpufreq_transition(struct notifier_block *nb,
 
 	if (val == CPUFREQ_PRECHANGE) {
 		mmc_claim_host(cpufreq_host->mmc);
-		clk_disable(cpufreq_host->clk);
+		clk_disable_unprepare(cpufreq_host->clk);
 	} else if (val == CPUFREQ_POSTCHANGE) {
 		struct mmc_ios *ios = &cpufreq_host->mmc->ios;
 		if (ios->clock)
 			jz4740_mmc_set_clock_rate(cpufreq_host, ios->clock);
 		if (ios->power_mode != MMC_POWER_OFF)
-			clk_enable(cpufreq_host->clk);
+			clk_prepare_enable(cpufreq_host->clk);
 		mmc_release_host(cpufreq_host->mmc);
 	}
 	return 0;
