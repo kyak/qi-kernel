@@ -39,7 +39,6 @@
 #define JZ_RTC_CTRL_ENABLE	BIT(0)
 
 struct jz4740_rtc {
-	struct resource *mem;
 	void __iomem *base;
 
 	struct rtc_device *rtc;
@@ -216,6 +215,7 @@ static int jz4740_rtc_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct jz4740_rtc *rtc;
+	struct resource *mem;
 	uint32_t scratchpad;
 	struct clk *rtc_clk;
 
@@ -229,25 +229,10 @@ static int jz4740_rtc_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
-	rtc->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!rtc->mem) {
-		dev_err(&pdev->dev, "Failed to get platform mmio memory\n");
-		return -ENOENT;
-	}
-
-	rtc->mem = devm_request_mem_region(&pdev->dev, rtc->mem->start,
-					resource_size(rtc->mem), pdev->name);
-	if (!rtc->mem) {
-		dev_err(&pdev->dev, "Failed to request mmio memory region\n");
-		return -EBUSY;
-	}
-
-	rtc->base = devm_ioremap_nocache(&pdev->dev, rtc->mem->start,
-					resource_size(rtc->mem));
-	if (!rtc->base) {
-		dev_err(&pdev->dev, "Failed to ioremap mmio memory\n");
-		return -EBUSY;
-	}
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	rtc->base = devm_ioremap_resource(&pdev->dev, mem);
+	if (!rtc->base)
+		return PTR_ERR(rtc->base);
 
 	spin_lock_init(&rtc->lock);
 
@@ -283,7 +268,7 @@ static int jz4740_rtc_probe(struct platform_device *pdev)
 	rtc_clk = clk_get(&pdev->dev, "rtc");
 	if (IS_ERR(rtc_clk)) {
 		dev_err(&pdev->dev, "Failed to get RTC clock\n");
-		goto err_free_irq;
+		return PTR_ERR(rtc_clk);
 	}
 
 	/* TODO: initialize the ADJC bits (25:16) to fine-tune
