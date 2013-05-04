@@ -2126,6 +2126,12 @@ static SIMPLE_DEV_PM_OPS(jz4740_udc_pm_ops, jz4740_udc_suspend, jz4740_udc_resum
 #define JZ4740_UDC_PM_OPS NULL
 #endif
 
+static const struct of_device_id jz4740_udc_of_match[] = {
+	{ .compatible = "ingenic,jz4740-udc" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, jz4740_udc_of_match);
+
 static struct platform_driver udc_driver = {
 	.probe		= jz4740_udc_probe,
 	.remove		= jz4740_udc_remove,
@@ -2133,6 +2139,7 @@ static struct platform_driver udc_driver = {
 		.name	= "jz-udc",
 		.owner	= THIS_MODULE,
 		.pm		= JZ4740_UDC_PM_OPS,
+		.of_match_table = jz4740_udc_of_match,
 	},
 };
 
