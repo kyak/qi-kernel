@@ -1,0 +1,23 @@
+JZ4740 audio controller
+
+Required properties:
+	compatible: Must be "ingenic,jz4740-dma"
+	reg: The audio controller's regsiters location and length
+	clocks: Phandles to the aic and i2s clock
+	clock-names: "aic", "i2s"
+	dmas: Phandles to the transmit and receive DMA streams
+	dma-names: Names for the DMA streams. These strings correspond 1:1 with the
+	 ordered pairs in dmas. Valid values are "tx" and "rx"
+
+Example:
+	aic: aic@20000 {
+		compatible = "ingenic,jz4740-aic";
+		reg = <0x20000 0x80>;
+		interrupts = <18>;
+
+		clocks = <&aic_clk &i2s_clk>;
+		clock-names = "aic", "i2s";
+
+		dmas = <&dmac 0 0 0 &dmac 0 0 0>;
+		dma-names = "tx", "rx";
+	};
