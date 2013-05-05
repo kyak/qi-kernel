@@ -481,6 +481,7 @@ static void __init clk_register_clks(void)
 	clk = jz4740_register_gate("rtc", "RTCLK_XI", JZ_CLOCK_GATE_RTC);
 	clk_register_clkdev(clk, "rtc", "jz4740-rtc");
 	clk_register_clkdev(clk, "rtc", "jz4740-wdt");
+	clk_register_clkdev(clk, "rtc", "10003000.rtc");
 
 #if 0
 	jz4740_register_gate("uart0", "EXCLK", JZ_CLOCK_GATE_UART0);
@@ -503,6 +504,7 @@ static void __init clk_register_clks(void)
 
 	clk = jz4740_register_gate("aic", "EXCLK", JZ_CLOCK_GATE_AIC);
 	clk_register_clkdev(clk, "aic", "jz4740-i2s");
+	clk_register_clkdev(clk, "aic", "10020000.aic");
 
 	clk_register_divider_table(NULL, "PERIP CLK", "PLL", 0,
 		jz4740_clk_base + JZ_REG_CLOCK_CTRL, 21, 1, 0,
@@ -513,6 +515,7 @@ static void __init clk_register_clks(void)
 		JZ_REG_CLOCK_I2S, 0, 9,
 		JZ_REG_CLOCK_GATE, JZ_CLOCK_GATE_I2S);
 	clk_register_clkdev(clk, "i2s", "jz4740-i2s");
+	clk_register_clkdev(clk, "i2s", "10020000.aic");
 
 	jz4740_register_peripheral_clock("spi", "EXCLK",
 		JZ_REG_CLOCK_SPI, 31,
@@ -533,6 +536,7 @@ static void __init clk_register_clks(void)
 		JZ_REG_CLOCK_MMC, 0, 5,
 		JZ_REG_CLOCK_GATE, JZ_CLOCK_GATE_MMC);
 	clk_register_clkdev(clk, "mmc", "jz4740-mmc.0");
+	clk_register_clkdev(clk, "mmc", "10021000.msc");
 
 	clk = jz4740_register_peripheral_clock("uhc", NULL, 0, 0,
 		JZ_REG_CLOCK_UHC, 0, 4,

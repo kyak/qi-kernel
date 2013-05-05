@@ -157,26 +157,18 @@ int jz4740_adc_set_config(struct device *dev, uint32_t mask, uint32_t val)
 }
 EXPORT_SYMBOL_GPL(jz4740_adc_set_config);
 
-static struct resource jz4740_hwmon_resources[] = {
+static struct resource jz4740_iio_resources[] = {
 	{
 		.start = JZ_ADC_IRQ_ADCIN,
 		.flags = IORESOURCE_IRQ,
 	},
-	{
-		.start	= JZ_REG_ADC_HWMON_BASE,
-		.end	= JZ_REG_ADC_HWMON_BASE + 3,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
-static struct resource jz4740_battery_resources[] = {
 	{
 		.start = JZ_ADC_IRQ_BATTERY,
 		.flags = IORESOURCE_IRQ,
 	},
 	{
 		.start	= JZ_REG_ADC_BATTERY_BASE,
-		.end	= JZ_REG_ADC_BATTERY_BASE + 3,
+		.end	= JZ_REG_ADC_BATTERY_BASE + 7,
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -184,18 +176,9 @@ static struct resource jz4740_battery_resources[] = {
 static const struct mfd_cell jz4740_adc_cells[] = {
 	{
 		.id = 0,
-		.name = "jz4740-hwmon",
-		.num_resources = ARRAY_SIZE(jz4740_hwmon_resources),
-		.resources = jz4740_hwmon_resources,
-
-		.enable = jz4740_adc_cell_enable,
-		.disable = jz4740_adc_cell_disable,
-	},
-	{
-		.id = 1,
-		.name = "jz4740-battery",
-		.num_resources = ARRAY_SIZE(jz4740_battery_resources),
-		.resources = jz4740_battery_resources,
+		.name = "jz4740-iio",
+		.num_resources = ARRAY_SIZE(jz4740_iio_resources),
+		.resources = jz4740_iio_resources,
 
 		.enable = jz4740_adc_cell_enable,
 		.disable = jz4740_adc_cell_disable,

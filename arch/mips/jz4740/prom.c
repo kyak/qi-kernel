@@ -17,6 +17,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/bootmem.h>
+#include <linux/of_platform.h>
+#include <linux/of_fdt.h>
 
 #include <linux/serial_reg.h>
 
@@ -44,6 +47,11 @@ static __init void jz4740_init_cmdline(int argc, char *argv[])
 	*dst = 0;
 }
 
+void __init device_tree_init(void)
+{
+	unflatten_and_copy_device_tree();
+}
+
 void __init prom_init(void)
 {
 	jz4740_init_cmdline((int)fw_arg0, (char **)fw_arg1);
@@ -66,3 +74,16 @@ void prom_putchar(char c)
 
 	writeb(c, UART_REG(UART_TX));
 }
+
+static const struct of_device_id __initdata of_ids[] = {
+	{ .compatible = "simple-bus", },
+	{},
+};
+
+static int __init plat_of_setup(void)
+{
+	if (!of_have_populated_dt())
+		return 0;
+	return of_platform_bus_probe(NULL, of_ids, NULL);
+}
+arch_initcall(plat_of_setup);

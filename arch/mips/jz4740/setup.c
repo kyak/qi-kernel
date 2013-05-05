@@ -17,8 +17,12 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/of_platform.h>
+#include <linux/of_fdt.h>
 
 #include <asm/bootinfo.h>
+#include <asm/mips-boards/generic.h>
+#include <asm/prom.h>
 
 #include <asm/mach-jz4740/base.h>
 
@@ -26,7 +30,6 @@
 
 
 #define JZ4740_EMC_SDRAM_CTRL 0x80
-
 
 static void __init jz4740_detect_mem(void)
 {
@@ -53,6 +56,7 @@ void __init plat_mem_setup(void)
 {
 	jz4740_reset_init();
 	jz4740_detect_mem();
+	__dt_setup_arch(&__dtb_start);
 }
 
 const char *get_system_type(void)

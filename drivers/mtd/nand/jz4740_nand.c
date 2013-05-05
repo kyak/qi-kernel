@@ -405,6 +405,8 @@ notfound_gpio:
 	return ret;
 }
 
+static const char *jz_nand_part_probes[] = { "ofpart", NULL };
+
 static int jz_nand_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -414,6 +416,7 @@ static int jz_nand_probe(struct platform_device *pdev)
 	struct jz_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	size_t chipnr, bank_idx;
 	uint8_t nand_maf_id = 0, nand_dev_id = 0;
+	struct mtd_part_parser_data ppdata;
 
 	nand = kzalloc(sizeof(*nand), GFP_KERNEL);
 	if (!nand)
@@ -507,7 +510,8 @@ static int jz_nand_probe(struct platform_device *pdev)
 		goto err_unclaim_banks;
 	}
 
-	ret = mtd_device_parse_register(mtd, NULL, NULL,
+	ppdata.of_node = pdev->dev.of_node;
+	ret = mtd_device_parse_register(mtd, jz_nand_part_probes, &ppdata,
 					pdata ? pdata->partitions : NULL,
 					pdata ? pdata->num_partitions : 0);
 
@@ -563,12 +567,19 @@ static int jz_nand_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id jz4740_nand_of_match[] = {
+	{ .compatible = "ingenic,jz4740-nand" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, jz4740_nand_of_match);
+
 static struct platform_driver jz_nand_driver = {
 	.probe = jz_nand_probe,
 	.remove = jz_nand_remove,
 	.driver = {
 		.name = "jz4740-nand",
 		.owner = THIS_MODULE,
+		.of_match_table = jz4740_nand_of_match,
 	},
 };
 

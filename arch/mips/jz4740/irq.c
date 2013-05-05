@@ -21,6 +21,9 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/irqdomain.h>
+#include <linux/of_irq.h>
 
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
@@ -76,20 +79,37 @@ static struct irqaction jz4740_cascade_action = {
 	.name = "JZ4740 cascade interrupt",
 };
 
+static struct of_device_id __initdata of_irq_ids[] = {
+	{ .compatible = "mti,cpu-interrupt-controller", .data = mips_cpu_intc_init },
+	{},
+};
+
 void __init arch_init_irq(void)
 {
 	struct irq_chip_generic *gc;
 	struct irq_chip_type *ct;
+	struct irq_domain *domain;
+	struct device_node *np;
+	int ret;
 
+	of_irq_init(of_irq_ids);
 	mips_cpu_irq_init();
+
+	np = of_find_compatible_node(NULL, NULL, "ingenic,jz4740-intc");
 
 	jz_intc_base = ioremap(JZ4740_INTC_BASE_ADDR, 0x14);
 
 	/* Mask all irqs */
 	writel(0xffffffff, jz_intc_base + JZ_REG_INTC_SET_MASK);
 
-	gc = irq_alloc_generic_chip("INTC", 1, JZ4740_IRQ_BASE, jz_intc_base,
-		handle_level_irq);
+	domain = irq_domain_add_linear(np, 32, &irq_generic_chip_ops,
+	NULL);
+
+	ret = irq_alloc_domain_generic_chips(domain, 32, 1, "INTC",
+		handle_level_irq, 0, IRQ_NOPROBE | IRQ_LEVEL, 0);
+	printk("INTC: %d\n", ret);
+
+	gc = irq_get_domain_generic_chip(domain, 0);
 
 	gc->wake_enabled = IRQ_MSK(32);
 
@@ -102,8 +122,9 @@ void __init arch_init_irq(void)
 	ct->chip.irq_set_wake = irq_gc_set_wake;
 	ct->chip.irq_suspend = jz4740_irq_suspend;
 	ct->chip.irq_resume = jz4740_irq_resume;
+	gc->reg_base = jz_intc_base;
 
-	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, 0, IRQ_NOPROBE | IRQ_LEVEL);
+	irq_domain_associate_many(domain, JZ4740_IRQ_BASE, 0, 32);
 
 	setup_irq(2, &jz4740_cascade_action);
 }

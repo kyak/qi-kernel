@@ -153,7 +153,7 @@ static struct gpiod_lookup_table qi_lb60_nand_gpio_table = {
 
 
 /* Keyboard*/
-
+#if 0
 #define KEY_QI_QI	KEY_F13
 #define KEY_QI_UPRED	KEY_RIGHTALT
 #define KEY_QI_VOLUP	KEY_VOLUMEUP
@@ -269,7 +269,7 @@ static struct platform_device qi_lb60_keypad = {
 		.platform_data = &qi_lb60_pdata,
 	},
 };
-
+#endif
 /* Display */
 static struct fb_videomode qi_lb60_video_modes[] = {
 	{
@@ -297,7 +297,7 @@ static struct jz4740_fb_platform_data qi_lb60_fb_pdata = {
 	.lcd_type	= JZ_LCD_TYPE_8BIT_SERIAL,
 	.pixclk_falling_edge = 1,
 };
-
+#if 0
 struct spi_gpio_platform_data spigpio_platform_data = {
 	.sck = JZ_GPIO_PORTC(23),
 	.mosi = JZ_GPIO_PORTC(22),
@@ -322,6 +322,7 @@ static struct spi_board_info qi_lb60_spi_board_info[] = {
 		.max_speed_hz = 30 * 1000,
 	},
 };
+#endif
 
 /* Battery */
 static struct jz_battery_platform_data qi_lb60_battery_pdata = {
@@ -334,7 +335,7 @@ static struct jz_battery_platform_data qi_lb60_battery_pdata = {
 		.voltage_min_design = 3600000,
 	},
 };
-
+#if 0
 /* GPIO Key: power */
 static struct gpio_keys_button qi_lb60_gpio_keys_buttons[] = {
 	[0] = {
@@ -358,7 +359,8 @@ static struct platform_device qi_lb60_gpio_keys = {
 		.platform_data = &qi_lb60_gpio_keys_data,
 	}
 };
-
+#endif
+#if 0
 static struct regulator_consumer_supply qi_lb60_mmc_regulator_consumer =
 	REGULATOR_SUPPLY("vmmc", "jz4740-mmc.0");
 
@@ -390,12 +392,12 @@ static struct platform_device qi_lb60_mmc_regulator_device = {
 		.platform_data = &qi_lb60_mmc_regulator_data,
 	}
 };
+#endif
 
 static struct jz4740_mmc_platform_data qi_lb60_mmc_pdata = {
 	.gpio_card_detect	= QI_LB60_GPIO_SD_CD,
 	.gpio_read_only		= -1,
 };
-
 /* OHCI */
 static struct regulator_consumer_supply avt2_usb_regulator_consumer =
 	REGULATOR_SUPPLY("vbus", "jz4740-ohci");
@@ -457,11 +459,13 @@ static struct platform_device qi_lb60_charger_device = {
 	},
 };
 
+#if 0
 /* audio */
 static struct platform_device qi_lb60_audio_device = {
 	.name = "qi-lb60-audio",
 	.id = -1,
 };
+#endif
 
 static struct gpiod_lookup_table qi_lb60_audio_gpio_table = {
 	.dev_id = "qi-lb60-audio",
@@ -473,25 +477,27 @@ static struct gpiod_lookup_table qi_lb60_audio_gpio_table = {
 };
 
 static struct platform_device *jz_platform_devices[] __initdata = {
+#if 0
 	&jz4740_udc_device,
 	&jz4740_udc_xceiv_device,
 	&jz4740_mmc_device,
+#endif
 	&jz4740_nand_device,
-	&qi_lb60_keypad,
-	&spigpio_device,
+/*	&qi_lb60_keypad,*/
+/*	&spigpio_device,*/
 	&jz4740_framebuffer_device,
-	&jz4740_pcm_device,
+/*	&jz4740_pcm_device,
 	&jz4740_i2s_device,
-	&jz4740_codec_device,
-	&jz4740_rtc_device,
+	&jz4740_codec_device,*/
+/*	&jz4740_rtc_device,*/
 	&jz4740_adc_device,
 	&jz4740_pwm_device,
-	&jz4740_dma_device,
-	&qi_lb60_gpio_keys,
+/*	&jz4740_dma_device,*/
+/*	&qi_lb60_gpio_keys,*/
 	&qi_lb60_pwm_beeper,
 	&qi_lb60_charger_device,
-	&qi_lb60_audio_device,
-	&qi_lb60_mmc_regulator_device,
+/*	&qi_lb60_audio_device,*/
+/*	&qi_lb60_mmc_regulator_device,*/
 };
 
 static void __init board_gpio_setup(void)
@@ -514,9 +520,10 @@ static int __init qi_lb60_init_platform_devices(void)
 
 	jz4740_serial_device_register();
 
+#if 0
 	spi_register_board_info(qi_lb60_spi_board_info,
 				ARRAY_SIZE(qi_lb60_spi_board_info));
-
+#endif
 	if (is_avt2) {
 		platform_device_register(&avt2_usb_regulator_device);
 		platform_device_register(&jz4740_usb_ohci_device);

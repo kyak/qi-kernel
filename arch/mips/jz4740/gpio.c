@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
+#include <linux/of.h>
 
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
@@ -458,7 +459,13 @@ static void jz4740_gpio_chip_init(struct jz_gpio_chip *chip, unsigned int id)
 
 static int __init jz4740_gpio_init(void)
 {
-	unsigned int i;
+	struct device_node *np;
+	unsigned int i = 0;
+
+	for_each_compatible_node(np, NULL, "ingenic,jz4740-gpio") {
+		jz4740_gpio_chips[i].gpio_chip.of_node = np;
+		i++;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(jz4740_gpio_chips); ++i)
 		jz4740_gpio_chip_init(&jz4740_gpio_chips[i], i);
