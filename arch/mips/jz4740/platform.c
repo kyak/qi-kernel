@@ -21,6 +21,8 @@
 
 #include <linux/dma-mapping.h>
 
+#include <linux/usb/musb.h>
+
 #include <asm/mach-jz4740/platform.h>
 #include <asm/mach-jz4740/base.h>
 #include <asm/mach-jz4740/irq.h>
@@ -56,29 +58,50 @@ struct platform_device jz4740_usb_ohci_device = {
 	.resource	= jz4740_usb_ohci_resources,
 };
 
-/* UDC (USB gadget controller) */
-static struct resource jz4740_usb_gdt_resources[] = {
-	{
-		.start	= JZ4740_UDC_BASE_ADDR,
-		.end	= JZ4740_UDC_BASE_ADDR + 0x1000 - 1,
-		.flags	= IORESOURCE_MEM,
+/* USB Device Controller */
+struct platform_device jz4740_udc_xceiv_device = {
+	.name = "usb_phy_gen_xceiv",
+	.id   = 0,
+};
+
+static struct musb_hdrc_config jz4740_udc_config = {
+	/* Silicon does not implement USB OTG. */
+	.multipoint = 0,
+	/* Max EPs scanned, driver will decide which EP can be used. */
+	.num_eps    = 4,
+	/* RAMbits needed to configure EPs from table */
+	.ram_bits   = 9,
+};
+
+static struct musb_hdrc_platform_data jz4740_udc_platform_data = {
+	.mode   = MUSB_PERIPHERAL,
+	.config = &jz4740_udc_config,
+};
+
+static struct resource jz4740_udc_resources[] = {
+	[0] = {
+		.start = JZ4740_UDC_BASE_ADDR,
+		.end   = JZ4740_UDC_BASE_ADDR + 0x10000 - 1,
+		.flags = IORESOURCE_MEM,
 	},
-	{
-		.start	= JZ4740_IRQ_UDC,
-		.end	= JZ4740_IRQ_UDC,
-		.flags	= IORESOURCE_IRQ,
+	[1] = {
+		.start = JZ4740_IRQ_UDC,
+		.end   = JZ4740_IRQ_UDC,
+		.flags = IORESOURCE_IRQ,
+		.name  = "mc",
 	},
 };
 
 struct platform_device jz4740_udc_device = {
-	.name		= "jz-udc",
-	.id		= -1,
-	.dev = {
-		.dma_mask = &jz4740_udc_device.dev.coherent_dma_mask,
+	.name = "musb-jz4740",
+	.id   = -1,
+	.dev  = {
+		.dma_mask          = &jz4740_udc_device.dev.coherent_dma_mask,
 		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.platform_data     = &jz4740_udc_platform_data,
 	},
-	.num_resources	= ARRAY_SIZE(jz4740_usb_gdt_resources),
-	.resource	= jz4740_usb_gdt_resources,
+	.num_resources = ARRAY_SIZE(jz4740_udc_resources),
+	.resource      = jz4740_udc_resources,
 };
 
 /* MMC/SD controller */
