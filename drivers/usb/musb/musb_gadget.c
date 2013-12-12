@@ -2115,6 +2115,14 @@ __acquires(musb->lock)
 	/* Normal reset, as B-Device;
 	 * or else after HNP, as A-Device
 	 */
+#if defined(CONFIG_USB_MUSB_JZ4740) || defined(CONFIG_USB_MUSB_JZ4740_MODULE)
+	/* JZ4740 UDC Controller is not OTG compatible and does not
+	 * have DEVCTL register in silicon: do not rely on devctl for
+	 * setting peripheral mode.
+	 */
+	musb->xceiv->state = OTG_STATE_B_PERIPHERAL;
+	musb->g.is_a_peripheral = 0;
+#else
 	if (devctl & MUSB_DEVCTL_BDEVICE) {
 		musb->xceiv->state = OTG_STATE_B_PERIPHERAL;
 		musb->g.is_a_peripheral = 0;
@@ -2122,6 +2130,7 @@ __acquires(musb->lock)
 		musb->xceiv->state = OTG_STATE_A_PERIPHERAL;
 		musb->g.is_a_peripheral = 1;
 	}
+#endif
 
 	/* start with default limits on VBUS power draw */
 	(void) musb_gadget_vbus_draw(&musb->g, 8);
