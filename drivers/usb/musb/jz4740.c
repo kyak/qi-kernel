@@ -85,6 +85,20 @@ static irqreturn_t jz4740_musb_interrupt(int irq, void *__hci)
 	return retval;
 }
 
+static struct musb_hdrc_config jz4740_musb_config = {
+	/* Silicon does not implement USB OTG. */
+	.multipoint = 0,
+	/* Max EPs scanned, driver will decide which EP can be used. */
+	.num_eps    = 4,
+	/* RAMbits needed to configure EPs from table */
+	.ram_bits   = 9,
+};
+
+static struct musb_hdrc_platform_data jz4740_musb_platform_data = {
+	.mode   = MUSB_PERIPHERAL,
+	.config = &jz4740_musb_config,
+};
+
 static int jz4740_musb_init(struct musb *musb)
 {
 	musb->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
@@ -119,16 +133,11 @@ static const struct musb_platform_ops jz4740_musb_ops = {
 
 static int jz4740_probe(struct platform_device *pdev)
 {
-	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
+	struct musb_hdrc_platform_data	*pdata = &jz4740_musb_platform_data;
 	struct platform_device		*musb;
 	struct jz4740_glue		*glue;
 	struct clk                      *clk;
 	int				ret;
-
-	if (!pdata) {
-		dev_err(&pdev->dev, "failed to allocate platform data\n");
-		return -EINVAL;
-	}
 
 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
 	if (!glue)
