@@ -85,6 +85,11 @@ static irqreturn_t jz4740_musb_interrupt(int irq, void *__hci)
 	return retval;
 }
 
+static struct musb_fifo_cfg jz4740_musb_fifo_cfg[] = {
+{ .hw_ep_num = 1, .style = FIFO_TX, .maxpacket = 512, },
+{ .hw_ep_num = 1, .style = FIFO_RX, .maxpacket = 512, },
+{ .hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 64, },
+};
 static struct musb_hdrc_config jz4740_musb_config = {
 	/* Silicon does not implement USB OTG. */
 	.multipoint = 0,
@@ -92,6 +97,8 @@ static struct musb_hdrc_config jz4740_musb_config = {
 	.num_eps    = 4,
 	/* RAMbits needed to configure EPs from table */
 	.ram_bits   = 9,
+	.fifo_cfg = jz4740_musb_fifo_cfg,
+	.fifo_cfg_size = ARRAY_SIZE(jz4740_musb_fifo_cfg),
 };
 
 static struct musb_hdrc_platform_data jz4740_musb_platform_data = {

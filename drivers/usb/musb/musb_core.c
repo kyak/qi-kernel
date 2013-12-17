@@ -1038,9 +1038,6 @@ static ushort fifo_mode = 4;
 #elif defined(CONFIG_USB_MUSB_UX500)			\
 	|| defined(CONFIG_USB_MUSB_UX500_MODULE)
 static ushort fifo_mode = 5;
-#elif defined(CONFIG_USB_MUSB_JZ4740)			\
-	|| defined(CONFIG_USB_MUSB_JZ4740_MODULE)
-static ushort fifo_mode = 6;
 #else
 static ushort fifo_mode = 2;
 #endif
@@ -1152,13 +1149,6 @@ static struct musb_fifo_cfg mode_5_cfg[] = {
 { .hw_ep_num = 13, .style = FIFO_RXTX, .maxpacket = 512, },
 { .hw_ep_num = 14, .style = FIFO_RXTX, .maxpacket = 1024, },
 { .hw_ep_num = 15, .style = FIFO_RXTX, .maxpacket = 1024, },
-};
-
-/* mode 6 - fits in 2KB */
-static struct musb_fifo_cfg mode_6_cfg[] = {
-{ .hw_ep_num = 1, .style = FIFO_TX, .maxpacket = 512, },
-{ .hw_ep_num = 1, .style = FIFO_RX, .maxpacket = 512, },
-{ .hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 64, },
 };
 
 /*
@@ -1282,10 +1272,6 @@ static int ep_config_from_table(struct musb *musb)
 	case 5:
 		cfg = mode_5_cfg;
 		n = ARRAY_SIZE(mode_5_cfg);
-		break;
-	case 6:
-		cfg = mode_6_cfg;
-		n = ARRAY_SIZE(mode_6_cfg);
 		break;
 	}
 
