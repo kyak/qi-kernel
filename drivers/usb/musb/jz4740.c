@@ -28,43 +28,6 @@ struct jz4740_glue {
 	struct clk		*clk;
 };
 
-static void jz4740_musb_set_vbus(struct musb *musb, int is_on)
-{
-	u8 devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
-
-	/* HDRC controls CPEN, but beware current surges during device
-	 * connect.  They can trigger transient overcurrent conditions
-	 * that must be ignored.
-	 */
-
-	if (is_on) {
-		musb->is_active = 1;
-		musb->xceiv->otg->default_a = 1;
-		musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-		devctl |= MUSB_DEVCTL_SESSION;
-
-		MUSB_HST_MODE(musb);
-	} else {
-		musb->is_active = 0;
-
-		/* NOTE:  we're skipping A_WAIT_VFALL -> A_IDLE and
-		 * jumping right to B_IDLE...
-		 */
-
-		musb->xceiv->otg->default_a = 0;
-		musb->xceiv->state = OTG_STATE_B_IDLE;
-		devctl &= ~MUSB_DEVCTL_SESSION;
-
-		MUSB_DEV_MODE(musb);
-	}
-	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-
-	dev_dbg(musb->xceiv->dev, "VBUS %s, devctl %02x "
-		/* otg %3x conf %08x prcm %08x */ "\n",
-		usb_otg_state_string(musb->xceiv->state),
-		musb_readb(musb->mregs, MUSB_DEVCTL));
-}
-
 static irqreturn_t jz4740_musb_interrupt(int irq, void *__hci)
 {
 	unsigned long   flags;
@@ -142,8 +105,6 @@ static int jz4740_musb_exit(struct musb *musb)
 static const struct musb_platform_ops jz4740_musb_ops = {
 	.init		= jz4740_musb_init,
 	.exit		= jz4740_musb_exit,
-
-	.set_vbus       = jz4740_musb_set_vbus,
 };
 
 static int jz4740_probe(struct platform_device *pdev)
