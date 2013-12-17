@@ -123,37 +123,34 @@ static int jz4740_probe(struct platform_device *pdev)
 	struct platform_device		*musb;
 	struct jz4740_glue		*glue;
 	struct clk                      *clk;
-
-	int				ret = -ENOMEM;
+	int				ret;
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "failed to allocate platform data\n");
-		goto err0;
+		return -EINVAL;
 	}
 
 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-	if (!glue) {
-		dev_err(&pdev->dev, "failed to allocate glue context\n");
-		goto err0;
-	}
+	if (!glue)
+		return -ENOMEM;
 
 	musb = platform_device_alloc("musb-hdrc", PLATFORM_DEVID_AUTO);
 	if (!musb) {
 		dev_err(&pdev->dev, "failed to allocate musb device\n");
-		goto err1;
+		return -ENOMEM;
 	}
 
 	clk = devm_clk_get(&pdev->dev, "udc");
 	if (IS_ERR(clk)) {
 		dev_err(&pdev->dev, "failed to get clock\n");
 		ret = PTR_ERR(clk);
-		goto err2;
+		goto err_platform_device_put;
 	}
 
 	ret = clk_prepare_enable(clk);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to enable clock\n");
-		goto err3;
+		goto err_platform_device_put;
 	}
 
 	musb->dev.parent		= &pdev->dev;
@@ -170,36 +167,27 @@ static int jz4740_probe(struct platform_device *pdev)
 					    pdev->num_resources);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add resources\n");
-		goto err4;
+		goto err_clk_disable;
 	}
 
 	ret = platform_device_add_data(musb, pdata, sizeof(*pdata));
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add platform_data\n");
-		goto err4;
+		goto err_clk_disable;
 	}
 
 	ret = platform_device_add(musb);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register musb device\n");
-		goto err4;
+		goto err_clk_disable;
 	}
 
 	return 0;
 
-err4:
+err_clk_disable:
 	clk_disable_unprepare(clk);
-
-err3:
-	devm_clk_put(&pdev->dev, clk);
-
-err2:
+err_platform_device_put:
 	platform_device_put(musb);
-
-err1:
-	devm_kfree(&pdev->dev, glue);
-
-err0:
 	return ret;
 }
 
@@ -209,8 +197,6 @@ static int jz4740_remove(struct platform_device *pdev)
 
 	platform_device_unregister(glue->musb);
 	clk_disable_unprepare(glue->clk);
-	clk_put(glue->clk);
-	devm_kfree(&pdev->dev, glue);
 
 	return 0;
 }
