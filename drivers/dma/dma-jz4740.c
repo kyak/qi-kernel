@@ -363,8 +363,8 @@ static void jz4740_dma_chan_irq(struct jz4740_dmaengine_chan *chan)
 		} else {
 			if (chan->next_sg == chan->desc->num_sgs) {
 				list_del(&chan->desc->vdesc.node);
-				chan->desc = NULL;
 				vchan_cookie_complete(&chan->desc->vdesc);
+				chan->desc = NULL;
 			}
 		}
 	}
